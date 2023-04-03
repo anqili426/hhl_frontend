@@ -1,0 +1,16 @@
+.idea
+.idea_modules
+project/project
+project/target
+target
+bin/**
+lib/
+tmp/
+.bsp/
+.bloop/
+.metals/
+*.smt2
+*.smt2.*
+results.txt
+*.bpl
+*.bpl.*
