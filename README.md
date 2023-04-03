@@ -1,0 +1,1 @@
+Clone the project via `git clone --recursive https://gitlab.inf.ethz.ch/gauravp/frontend-demo`.
