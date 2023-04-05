@@ -32,7 +32,15 @@ object Main {
       Seq.empty,
     )()
 
-    //we know invoke Silicon in order to verify the program
+    val consistencyErrors = p.checkTransitively
+
+    //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
+    if (consistencyErrors.nonEmpty) {
+      consistencyErrors.foreach(err => println(err.readableMessage))
+      sys.exit(1)
+    }
+
+    //We now invoke Silicon in order to verify the program
     val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
     silicon.start()
     val res = silicon.verify(p)
