@@ -23,5 +23,6 @@ lazy val impcon_frontend = (project in file("."))
         assembly / assemblyJarName := "impcon.jar",             // JAR filename
         assembly / mainClass := Some("impcon.Main"),    // Define JAR's entry point
         assembly / test := {},                                  // Prevent testing before packaging
+        fork := true //if forking is not set to true, there are classloader issues in Silver
     )
   .enablePlugins(BuildInfoPlugin)
