@@ -34,14 +34,16 @@ object Parser {
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
   def whileLoop[$: P] : P[Stmt] = P("while" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}").map(loop => WhileLoopStmt(loop._1, loop._2))
 
+  // Expressions
+  // TODO: Need to update the grammars
   def expr[$: P]: P[Expr] = P(prefixExpr ~ (binaryExpr).rep(min = 0, max = 1)).map {
     case (e, Nil) => e
     case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
   }
-
   def binaryExpr[$: P]: P[(String, Expr)]= P(binaryOp ~ expr)
-
-  def binaryOp[$: P]: P[String] = P("+" | "-" | "*" | "/" | "&&" | "||" | "==" | ">" | "<" | ">" | "<" | ">=" | "<=").!
+  def binaryOp[$: P]: P[String] = P(arithOp | cmpOp)
+  def arithOp[$: P]: P[String] = P("+" | "-" | "*" | "/" | "&&" | "||").!
+  def cmpOp[$: P]: P[String] = P("==" | "!=" | ">" | "<" | ">=" | "<=").!
 
   def prefixExpr[$: P]: P[Expr] = P(boolean | unaryExpr | nonDet | identUsed | number)
 

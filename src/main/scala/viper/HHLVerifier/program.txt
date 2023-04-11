@@ -1,0 +1,3 @@
+var a: Int
+assume true
+assert a > 3

@@ -21,9 +21,11 @@ object Main {
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)
 
+        println(viperProgram)
+
         val consistencyErrors = viperProgram.checkTransitively
 
-        println(viperProgram)
+
 
         //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
         if (consistencyErrors.nonEmpty) {
