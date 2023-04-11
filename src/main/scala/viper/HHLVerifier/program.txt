@@ -1,3 +1,1 @@
-var a: Int
-assume true
-assert a > 3
+assert (1 + 7) + 4 == 1 + 3

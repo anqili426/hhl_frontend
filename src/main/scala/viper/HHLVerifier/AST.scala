@@ -14,7 +14,7 @@ case class VarDecl(vName: String, vType: String) extends Decl
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt
 case class AssignStmt(left: Expr, right: Expr) extends Stmt
-case class HavocStmt(left: Expr, right: Expr) extends Stmt
+case class HavocStmt(id: Id) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
 case class AssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: Stmt, elseStmt: Stmt) extends Stmt

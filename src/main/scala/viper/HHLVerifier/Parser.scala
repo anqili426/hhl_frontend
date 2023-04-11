@@ -27,7 +27,7 @@ object Parser {
   def stmts[$: P] : P[Stmt] = P(stmt.rep).map(CompositeStmt)
   def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign)
   def assign[$: P] : P[Stmt] = P(identUsed ~ ":=" ~ expr).map(e => AssignStmt(e._1, e._2))
-  def havoc[$: P] : P[Stmt] = P(identUsed ~ ":=" ~ nonDet).map(e => HavocStmt(e._1, e._2))
+  def havoc[$: P] : P[Stmt] = P("havoc " ~ space ~ identUsed).map(e => HavocStmt(e))
   def assume[$: P] : P[Stmt] = P("assume" ~ space ~ expr).map(AssumeStmt)
   def assert[$: P] : P[Stmt] = P("assert" ~ space ~ expr).map(AssertStmt)
   def ifElse[$: P] : P[Stmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}" ~ ("else" ~ "{" ~ stmts ~ "}").?).map{
@@ -35,33 +35,41 @@ object Parser {
   def whileLoop[$: P] : P[Stmt] = P("while" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}").map(loop => WhileLoopStmt(loop._1, loop._2))
 
   // Expressions
-  // TODO: Need to update the grammars
-  def expr[$: P]: P[Expr] = P(prefixExpr ~ (binaryExpr).rep(min = 0, max = 1)).map {
+  def arithOp1[$: P]: P[String] = P("+" | "-" | "&&" | "!!").!
+  def arithOp2[$: P]: P[String] = P("*" | "/").!
+  def cmpOp[$: P]: P[String] = P("==" | "!=" | ">" | "<" | ">=" | "<=").!
+
+  def expr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~ expr).rep(min=0, max=1)).map{
     case (e, Nil) => e
     case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
   }
-  def binaryExpr[$: P]: P[(String, Expr)]= P(binaryOp ~ expr)
-  def binaryOp[$: P]: P[String] = P(arithOp | cmpOp)
-  def arithOp[$: P]: P[String] = P("+" | "-" | "*" | "/" | "&&" | "||").!
-  def cmpOp[$: P]: P[String] = P("==" | "!=" | ">" | "<" | ">=" | "<=").!
 
-  def prefixExpr[$: P]: P[Expr] = P(boolean | unaryExpr | nonDet | identUsed | number)
+  def arithExpr[$: P]: P[Expr] = P(arithTerm ~ (arithOp1 ~ arithExpr).rep(min=0, max=1)).map{
+    case (e, Nil) => e
+    case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
+  }
 
-  def unaryExpr[$: P]: P[Expr] = P(notExpr | negExpr)
-  def notExpr[$: P]: P[Expr] = P("!" ~ boolean).map(e => UnaryExpr("!", e))
-  def negExpr[$: P]: P[Expr] = P("-" ~ number).map(e => UnaryExpr("-", e))
+  def arithTerm[$: P]: P[Expr] = P(basicExpr ~ (arithOp2 ~ arithTerm).rep(min=0, max=1)).map{
+    case (e, Nil) => e
+    case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
+  }
 
-  def boolean[$: P] : P[Expr] = P(boolTrue | boolFalse)
-  def boolTrue[$: P]: P[Expr] = P("true").!.map(_ => Bool(true))
-  def boolFalse[$: P]: P[Expr] = P("false").!.map(_ => Bool(false))
+  def basicExpr[$: P]: P[Expr] = P(boolean | unaryExpr | identUsed | number | "(" ~ expr ~ ")")
 
-  def nonDet[$: P]: P[Expr] = P("nonDet()").!.map(_ => Havoc())
+  def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
+  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ boolean).map(e => UnaryExpr("!", e))
+  def negExpr[$: P]: P[UnaryExpr] = P("-" ~ number).map(e => UnaryExpr("-", e))
 
-  def identUsed[$: P]: P[Expr] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map{
+  def boolean[$: P] : P[Bool] = P(boolTrue | boolFalse)
+  def boolTrue[$: P]: P[Bool] = P("true").!.map(_ => Bool(true))
+  def boolFalse[$: P]: P[Bool] = P("false").!.map(_ => Bool(false))
+
+
+  def identUsed[$: P]: P[Id] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map{
     case name =>
       if (!allVars.contains(name)) throw IdentifierNotFoundException("Identifier " + name + " is not defined. ")
       Id(name)
   }
 
-  def number[$: P]: P[Expr] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(value => Num(value))
+  def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(value => Num(value))
 }

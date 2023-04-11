@@ -14,3 +14,4 @@ tmp/
 results.txt
 *.bpl
 *.bpl.*
+src/main/scala/viper/HHLVerifier/program.txt

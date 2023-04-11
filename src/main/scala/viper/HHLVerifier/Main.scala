@@ -15,23 +15,18 @@ object Main {
       val res = fastparse.parse(program, Parser.program(_))
       if (res.isSuccess) {
         println("Parsing successful. ")
-        // Get the parse tree
         val parsedProgram: HHLProgram = res.get.value
 
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)
-
         println(viperProgram)
-
-        val consistencyErrors = viperProgram.checkTransitively
-
-
-
-        //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
-        if (consistencyErrors.nonEmpty) {
-          consistencyErrors.foreach(err => println(err.readableMessage))
-          sys.exit(1)
-        }
+//
+//        val consistencyErrors = viperProgram.checkTransitively
+//        //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
+//        if (consistencyErrors.nonEmpty) {
+//          consistencyErrors.foreach(err => println(err.readableMessage))
+//          sys.exit(1)
+//        }
 
         // Not working at the moment
 //        val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
