@@ -4,18 +4,26 @@ import viper.silver.ast.{Type, TypeVar}
 import viper.silver.{ast => vpr}
 
 object Generator {
+  // State domain
   val stateDomainName = "State"
   val equalFuncName = "equal_on_everything_except"
   val getFuncName = "get"
 
+  // SetState domain
   val setStateDomainName = "SetState"
   val inSetFuncName = "in_set"
   val setUnionFuncName = "set_union"
+
+  val funcToDomainNameMap = Map(equalFuncName -> stateDomainName,
+                                getFuncName -> stateDomainName,
+                                inSetFuncName -> setStateDomainName,
+                                setUnionFuncName -> setStateDomainName)
+
   val havocSetMethodName = "havocSet"
 
   val typeVar = vpr.TypeVar("T")
-  val stateType = vpr.DomainType(stateDomainName, Map(typeVar -> typeVar))(Seq(typeVar))
-  val setStateType = vpr.DomainType(setStateDomainName, Map(typeVar -> typeVar))(Seq(typeVar))
+  val stateType = getConcreteStateType(Map.empty)   // Type State[T]
+  val setStateType = getConcreteSetStateType(Map.empty) // Type SetState[T]
 
   val sVarName = "s"
   val currStatesVarName = "S"
@@ -26,6 +34,7 @@ object Generator {
   var tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, setStateType)()
 
   var extraVars: List[vpr.LocalVarDecl] = List.empty // Extra variables added to the program during translation
+
 
   def generate(input: HHLProgram): vpr.Program = {
     var domains: Seq[vpr.Domain] = Seq.empty
@@ -131,7 +140,7 @@ object Generator {
         case Id(name) =>
           // Any reference to a var is translated to get(state, var)
           val id = vpr.LocalVar(name, translateType(Parser.allVars.getOrElse(name, null)))()
-          getDomainFuncApp(getFuncName, Seq(state.localVar, id), stateDomainName, id.typ, state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap)
+          getGetApp(Seq(state.localVar, id), state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap)
         case Num(value) => vpr.IntLit(value)()
         case Bool(value) => vpr.BoolLit(value)()
         case BinaryExpr(left, op, right) =>
@@ -188,6 +197,7 @@ object Generator {
     val SVar = vpr.LocalVarDecl("S", setStateType)()
     val S1Var = vpr.LocalVarDecl("S1", setStateType)()
     val S2Var = vpr.LocalVarDecl("S2", setStateType)()
+    val TToTMap = Map(typeVar -> typeVar)
 
     val stateDomain = vpr.Domain(
       stateDomainName,
@@ -214,16 +224,19 @@ object Generator {
             Seq(s1Var, s2Var, xVar),
             // Triggers
             Seq(vpr.Trigger(Seq(
-              getDomainFuncApp(equalFuncName, Seq(s1Var.localVar, s2Var.localVar, xVar.localVar), stateDomainName, vpr.Bool, Map.empty)
+              getEqualExceptApp(Seq(s1Var.localVar, s2Var.localVar, xVar.localVar), TToTMap)
             ))()),
             // Expression
             vpr.Forall(
               Seq(yVar),
               Seq.empty,
-              vpr.Implies(getDomainFuncApp(equalFuncName, Seq(s1Var.localVar, s2Var.localVar, xVar.localVar), stateDomainName, vpr.Bool, Map.empty),
+              vpr.Implies(getEqualExceptApp(Seq(s1Var.localVar, s2Var.localVar, xVar.localVar), TToTMap),
                 vpr.Implies(vpr.NeCmp(xVar.localVar, yVar.localVar)(),
-                  vpr.EqCmp(getDomainFuncApp(getFuncName, Seq(s1Var.localVar, xVar.localVar), stateDomainName, typeVar, Map.empty),
-                    getDomainFuncApp(getFuncName, Seq(s2Var.localVar, xVar.localVar), stateDomainName, typeVar, Map.empty))())())()
+                  vpr.EqCmp(getGetApp(Seq(s1Var.localVar, xVar.localVar)),
+                    getGetApp(Seq(s2Var.localVar, xVar.localVar))
+                  )()
+                )()
+              )()
             )()
           )())(domainName = stateDomainName)),
       // Type variable of the domain
@@ -245,23 +258,15 @@ object Generator {
           setUnionFuncName + "_def",
           vpr.Forall(
             Seq(S1Var, S2Var),
-            Seq(vpr.Trigger(
-              Seq(
-                getDomainFuncApp(setUnionFuncName, Seq(S1Var.localVar, S2Var.localVar), setStateDomainName, setStateType, Map(typeVar -> typeVar))
-              ))()
-            ),
+            Seq(vpr.Trigger(Seq(getSetUnionApp(Seq(S1Var.localVar, S2Var.localVar))))()),
             vpr.Forall(
               Seq(sVar),
               Seq.empty,
               vpr.EqCmp(
-                vpr.Or(getDomainFuncApp(inSetFuncName, Seq(sVar.localVar, S1Var.localVar), setStateDomainName, vpr.Bool, Map.empty),
-                  getDomainFuncApp(inSetFuncName, Seq(sVar.localVar, S2Var.localVar), setStateDomainName, vpr.Bool, Map.empty)
+                vpr.Or(getInSetApp(Seq(sVar.localVar, S1Var.localVar)),
+                  getInSetApp(Seq(sVar.localVar, S2Var.localVar))
                 )(),
-                getDomainFuncApp(inSetFuncName,
-                  Seq(sVar.localVar,
-                    getDomainFuncApp(setUnionFuncName, Seq(S1Var.localVar, S2Var.localVar), setStateDomainName, setStateType, Map(typeVar -> typeVar))
-                  ),
-                  setStateDomainName, vpr.Bool, Map.empty)
+                getInSetApp(Seq(sVar.localVar, getSetUnionApp(Seq(S1Var.localVar, S2Var.localVar))))
               )()
             )()
           )()
@@ -277,7 +282,6 @@ object Generator {
     val havocSetMethod = vpr.Method(havocSetMethodName, Seq.empty, Seq(SS), Seq.empty, Seq.empty, Option.empty)()
 
     (Seq(stateDomain, setStateDomain), Seq(havocSetMethod))
-
   }
 
   def getConcreteSetStateType(typVarMap: Map[TypeVar, Type]): vpr.Type = {
@@ -292,15 +296,24 @@ object Generator {
     vpr.MethodCall(havocSetMethodName, Seq.empty, Seq(set))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
   }
 
-  def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
-    getDomainFuncApp(inSetFuncName, args, setStateDomainName, vpr.Bool, typVarMap)
+  def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type] = Map.empty): vpr.DomainFuncApp = {
+    getDomainFuncApp(inSetFuncName, args, vpr.Bool, typVarMap)
   }
 
-  def getSetUnionApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
-    getDomainFuncApp(setUnionFuncName, args, setStateDomainName, getConcreteSetStateType(typVarMap), typVarMap)
+  def getSetUnionApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type] = Map(typeVar -> typeVar)): vpr.DomainFuncApp = {
+    getDomainFuncApp(setUnionFuncName, args, getConcreteSetStateType(typVarMap), typVarMap)
   }
 
-  def getDomainFuncApp(funcName: String, args: Seq[vpr.Exp], domainName: String, retType:Type, typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
+  def getEqualExceptApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type] = Map.empty): vpr.DomainFuncApp = {
+    getDomainFuncApp(equalFuncName, args, vpr.Bool, typVarMap)
+  }
+
+  def getGetApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type] = Map.empty): vpr.DomainFuncApp = {
+    val retTyp = typVarMap.get(typeVar).getOrElse(typeVar)
+    getDomainFuncApp(getFuncName, args, retTyp, typVarMap)
+  }
+
+  def getDomainFuncApp(funcName: String, args: Seq[vpr.Exp], retType:Type, typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
     vpr.DomainFuncApp(
       funcName,
       args,
@@ -308,7 +321,6 @@ object Generator {
       info = vpr.NoInfo,
       errT = vpr.NoTrafos,
       typ = retType,
-      domainName = domainName)
+      domainName = funcToDomainNameMap.get(funcName).getOrElse("Error"))
   }
-
 }
