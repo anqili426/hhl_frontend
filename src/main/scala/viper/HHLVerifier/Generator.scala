@@ -4,7 +4,6 @@ import viper.silver.ast.{Type, TypeVar}
 import viper.silver.{ast => vpr}
 
 object Generator {
-
   val stateDomainName = "State"
   val equalFuncName = "equal_on_everything_except"
   val getFuncName = "get"
@@ -19,23 +18,12 @@ object Generator {
   val setStateType = vpr.DomainType(setStateDomainName, Map(typeVar -> typeVar))(Seq(typeVar))
 
   val sVarName = "s"
-  val sVar = vpr.LocalVarDecl(sVarName, stateType)()
-  val s1Var = vpr.LocalVarDecl("s1", stateType)()
-  val s2Var = vpr.LocalVarDecl("s2", stateType)()
-  val xVar = vpr.LocalVarDecl("x", typeVar)()
-  val yVar = vpr.LocalVarDecl("y", typeVar)()
-  val SVar = vpr.LocalVarDecl("S", setStateType)()
-  val S1Var = vpr.LocalVarDecl("S1", setStateType)()
-  val S2Var = vpr.LocalVarDecl("S2", setStateType)()
-
   val currStatesVarName = "S"
   val tempStatesVarName = "S_temp"
   val failedStatesVarName = "S_fail"
   val tempFailedStatesVarName = "S_fail_temp"
   var failedStates = vpr.LocalVarDecl(failedStatesVarName, setStateType)()
   var tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, setStateType)()
-
-
 
   var extraVars: List[vpr.LocalVarDecl] = List.empty // Extra variables added to the program during translation
 
@@ -65,9 +53,19 @@ object Generator {
       val localVars = Seq(currStates, tempStates, tempFailedStates, failedStates) ++
                       Parser.allVars.map(kv => vpr.LocalVarDecl(kv._1, translateType(kv._2))()) ++ extraVars
       // TODO: Also need to assume that variables are not the same!
-      // TODO: Assume that S_fail is empty here
+      val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+      // The following statement assumes that S_fail is empty
+      val assumeSFailEmpty = vpr.Assume(vpr.Forall(
+                                            Seq(state),
+                                            Seq.empty,
+                                            vpr.Not(
+                                              getInSetApp(Seq(state.localVar, failedStates.localVar), typVarMap)
+                                            )()
+                                          )()
+                                        )()
+      val methodBody = assumeSFailEmpty +: translatedContent._1
       val mainMethod = vpr.Method("main", Seq.empty, Seq.empty, Seq.empty, Seq.empty,
-                                  Some(vpr.Seqn(translatedContent._1, localVars)()))()
+                                  Some(vpr.Seqn(methodBody, localVars)()))()
       mainMethod +: translatedContent._2
   }
 
@@ -88,6 +86,9 @@ object Generator {
 
       val typVarMap = currStates.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap
 
+      // A state called s
+      val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+
       stmt match {
         case CompositeStmt(stmts) =>
           // Translate each statement in the sequence
@@ -99,22 +100,23 @@ object Generator {
         case VarDecl(_, _) =>
           return (translatedStmt, translatedMethods, currStates)
         case AssumeStmt(e) =>
-          val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
-          val translatedExpr = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+          val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
                                         translateExp(e, state))()
-          newStmts = newStmts :+ translateAssumeWithViperExpr(translatedExpr, state, STmp, typVarMap)
-//        case AssertStmt(e) =>
-//          val havocSFailTmp = havocSetMethodCall(pFailTmpSetStateVar.localVar)
-//          val updateSFail = vpr.LocalVarAssign(pFailSetStateVar.localVar, pFailTmpSetStateVar.localVar)()
-//          // TODO: fix the bug for failing states
-//          // TODO: make sure S_fail is empty in the beginning
-//          // TODO: S_fail_temp do a union
-//          val tmpRes = Seq(translateAssumeExpHelper(e), translateAssumeExpHelper(UnaryExpr("!",e)))
-//          val resStmt = ((translatedStmt :+ havocSTmp :+ havocSFailTmp) ++ tmpRes) :+ updateS :+ updateSFail
-//          (resStmt, translatedMethods)
+          newStmts = newStmts :+ translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
+        case AssertStmt(e) =>
+            val havocSFailTmp = havocSetMethodCall(tempFailedStates.localVar)
+            val exp1 = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+                                translateExp(e, state))()
+            val stmt1 = translateAssumeWithViperExpr(exp1, state, STmp, typVarMap)
+            val exp2 = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+                                translateExp(UnaryExpr("!", e), state))()
+            val stmt2 = translateAssumeWithViperExpr(exp2, state, tempFailedStates, typVarMap)
+            val updateSFail = vpr.LocalVarAssign(failedStates.localVar,
+                              getSetUnionApp(Seq(failedStates.localVar, tempFailedStates.localVar), typVarMap))()
+            newStmts = newStmts ++ Seq(havocSFailTmp, stmt1, stmt2, updateSFail)
 //          // Assign
 //          // Havoc
-//          // If Else  // TODO: add another argument to method call the pass the initial program state
+//          // If Else
 //          // While -- Need to define assertion language
         case _ =>
       }
@@ -170,10 +172,6 @@ object Generator {
     )()
   }
 
-//    def translateAssumeWithExpr(e: Expr, pStates: vpr.LocalVar, typVarMap: Map[TypeVar, Type]): vpr.Assume = {
-//      translateAssumeWithViperExpr(translateExp(e), pStates, typVarMap)
-//    }
-
     def translateType(typName: String): vpr.Type = {
         typName match {
           case "Int" => vpr.Int
@@ -182,6 +180,15 @@ object Generator {
     }
 
   def generatePreamble(typVarMap: Map[TypeVar, Type]): (Seq[vpr.Domain], Seq[vpr.Method]) = {
+    val sVar = vpr.LocalVarDecl(sVarName, stateType)()
+    val s1Var = vpr.LocalVarDecl("s1", stateType)()
+    val s2Var = vpr.LocalVarDecl("s2", stateType)()
+    val xVar = vpr.LocalVarDecl("x", typeVar)()
+    val yVar = vpr.LocalVarDecl("y", typeVar)()
+    val SVar = vpr.LocalVarDecl("S", setStateType)()
+    val S1Var = vpr.LocalVarDecl("S1", setStateType)()
+    val S2Var = vpr.LocalVarDecl("S2", setStateType)()
+
     val stateDomain = vpr.Domain(
       stateDomainName,
       // Domain functions
@@ -287,6 +294,10 @@ object Generator {
 
   def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
     getDomainFuncApp(inSetFuncName, args, setStateDomainName, vpr.Bool, typVarMap)
+  }
+
+  def getSetUnionApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
+    getDomainFuncApp(setUnionFuncName, args, setStateDomainName, getConcreteSetStateType(typVarMap), typVarMap)
   }
 
   def getDomainFuncApp(funcName: String, args: Seq[vpr.Exp], domainName: String, retType:Type, typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
