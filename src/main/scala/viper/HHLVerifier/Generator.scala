@@ -12,13 +12,14 @@ object Generator {
   val setStateDomainName = "SetState"
   val inSetFuncName = "in_set"
   val setUnionFuncName = "set_union"
+  val havocSetMethodName = "havocSet"
 
   val typeVar = vpr.TypeVar("T")
   val stateType = vpr.DomainType(stateDomainName, Map(typeVar -> typeVar))(Seq(typeVar))
   val setStateType = vpr.DomainType(setStateDomainName, Map(typeVar -> typeVar))(Seq(typeVar))
-  val TtoIntMap = Map(typeVar -> vpr.Int)
 
-  val sVar = vpr.LocalVarDecl("s", stateType)()
+  val sVarName = "s"
+  val sVar = vpr.LocalVarDecl(sVarName, stateType)()
   val s1Var = vpr.LocalVarDecl("s1", stateType)()
   val s2Var = vpr.LocalVarDecl("s2", stateType)()
   val xVar = vpr.LocalVarDecl("x", typeVar)()
@@ -27,21 +28,16 @@ object Generator {
   val S1Var = vpr.LocalVarDecl("S1", setStateType)()
   val S2Var = vpr.LocalVarDecl("S2", setStateType)()
 
-  val setStateWithIntType = getConcreteSetStateType(TtoIntMap)
-  val sVarInt = vpr.LocalVarDecl("s", getConcreteStateType(TtoIntMap))()
+  val currStatesVarName = "S"
+  val tempStatesVarName = "S_temp"
+  val failedStatesVarName = "S_fail"
+  val tempFailedStatesVarName = "S_fail_temp"
+  var failedStates = vpr.LocalVarDecl(failedStatesVarName, setStateType)()
+  var tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, setStateType)()
 
 
-  val pSetStateVarName = "S"
-  val pTmpSetStateVarName = "S_temp"
-  val pFailSetStateVarName = "S_fail"
-  val pTmpFailSetStateVarName = "S_fail_temp"
-  val pSetStateVar = vpr.LocalVarDecl(pSetStateVarName, getConcreteSetStateType(TtoIntMap))()
-  val pTmpSetStateVar = vpr.LocalVarDecl(pTmpSetStateVarName, getConcreteSetStateType(TtoIntMap))()
-  val pFailSetStateVar = vpr.LocalVarDecl(pFailSetStateVarName, getConcreteSetStateType(TtoIntMap))()
-  val pFailTmpSetStateVar = vpr.LocalVarDecl(pTmpFailSetStateVarName, getConcreteSetStateType(TtoIntMap))()
 
-  val havocSetMethodName = "havocSet"
-
+  var extraVars: List[vpr.LocalVarDecl] = List.empty // Extra variables added to the program during translation
 
   def generate(input: HHLProgram): vpr.Program = {
     var domains: Seq[vpr.Domain] = Seq.empty
@@ -51,97 +47,132 @@ object Generator {
     var methods: Seq[vpr.Method] = Seq.empty
     var extensions: Seq[vpr.ExtensionMember] = Seq.empty
 
-    val preamble = generatePreamble()
+    val TtoIntMap = Map(typeVar -> vpr.Int)
+    val preamble = generatePreamble(Map(typeVar -> vpr.Int))
     domains = domains ++ preamble._1
-    methods = methods ++ preamble._2 ++ translateProgram(input)
+    methods = methods ++ preamble._2 ++ translateProgram(input, TtoIntMap)
     val p = vpr.Program(domains, fields, functions, predicates, methods, extensions)()
     p
   }
 
-  def translateProgram(input: HHLProgram): Seq[vpr.Method] = {
-      val translatedContent = translateStmt(input.content, Seq.empty, Seq.empty)
-      var localVars = Seq(pSetStateVar, pTmpSetStateVar, pFailTmpSetStateVar, pFailSetStateVar)
-      localVars = localVars ++ Parser.allVars.map(kv => vpr.LocalVarDecl(kv._1, translateType(kv._2))())
-      // TODO: also need to assume that variables are not the same!
+  def translateProgram(input: HHLProgram, typVarMap: Map[TypeVar, Type]): Seq[vpr.Method] = {
+      val currStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()
+      val tempStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
+      failedStates = vpr.LocalVarDecl(failedStatesVarName, getConcreteSetStateType(typVarMap))()
+      tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, getConcreteSetStateType(typVarMap))()
+      val translatedContent = translateStmt(input.content, Seq.empty, Seq.empty, currStates)
+
+      val localVars = Seq(currStates, tempStates, tempFailedStates, failedStates) ++
+                      Parser.allVars.map(kv => vpr.LocalVarDecl(kv._1, translateType(kv._2))()) ++ extraVars
+      // TODO: Also need to assume that variables are not the same!
+      // TODO: Assume that S_fail is empty here
       val mainMethod = vpr.Method("main", Seq.empty, Seq.empty, Seq.empty, Seq.empty,
                                   Some(vpr.Seqn(translatedContent._1, localVars)()))()
       mainMethod +: translatedContent._2
   }
 
-    def translateStmt(stmt: Stmt, translatedStmt: Seq[vpr.Stmt], translatedMethods: Seq[vpr.Method]): (Seq[vpr.Stmt], Seq[vpr.Method]) = {
-      val havocSTmp = havocSetMethodCall(pTmpSetStateVar.localVar)
-      val updateS = vpr.LocalVarAssign(pSetStateVar.localVar, pTmpSetStateVar.localVar)()
+    // Any statement is translated to a block of Viper code as follows:
+    // S refers to the current program states, provided as input
+    // S_temp := havocSet()
+    //      .... (Translation uses S_temp and S)
+    // S := S_temp
+    // In the end, we get back S in the output
+    def translateStmt(stmt: Stmt, translatedStmt: Seq[vpr.Stmt], translatedMethods: Seq[vpr.Method], currStates: vpr.LocalVarDecl): (Seq[vpr.Stmt], Seq[vpr.Method], vpr.LocalVarDecl) = {
+      val STmp = vpr.LocalVarDecl(tempStatesVarName, currStates.typ)()
+      // Translate S_temp := havocSet()
+      val havocSTmp = havocSetMethodCall(STmp.localVar)
+
+      var newStmts: Seq[vpr.Stmt] = Seq.empty
+      var newMethods: Seq[vpr.Method] = Seq.empty
+      var newStates = currStates   // Do we really need this? Can we just return currStates?
+
+      val typVarMap = currStates.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap
 
       stmt match {
         case CompositeStmt(stmts) =>
           // Translate each statement in the sequence
-          var tmpRes = (translatedStmt, translatedMethods)
+          var tmpRes = (translatedStmt, translatedMethods, currStates)
           for (s <- stmts) {
-            tmpRes = translateStmt(s, tmpRes._1, tmpRes._2)
+            tmpRes = translateStmt(s, tmpRes._1, tmpRes._2, tmpRes._3)
           }
-          tmpRes
+          return tmpRes
+        case VarDecl(_, _) =>
+          return (translatedStmt, translatedMethods, currStates)
         case AssumeStmt(e) =>
-          val res = translateAssumeExpHelper(e)
-          (translatedStmt :+ havocSTmp :+ res :+ updateS , translatedMethods)
-        case AssertStmt(e) =>
-          val havocSFailTmp = havocSetMethodCall(pFailTmpSetStateVar.localVar)
-          val updateSFail = vpr.LocalVarAssign(pFailSetStateVar.localVar, pFailTmpSetStateVar.localVar)()
-          val tmpRes = Seq(translateAssumeExpHelper(e), translateAssumeExpHelper(UnaryExpr("!",e)))
-          val resStmt = ((translatedStmt :+ havocSTmp :+ havocSFailTmp) ++ tmpRes) :+ updateS :+ updateSFail
-          (resStmt, translatedMethods)
-          // Assign
-          // Havoc
-          // If Else
-          // While -- Need to define assertion language
+          val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+          val translatedExpr = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+                                        translateExp(e, state))()
+          newStmts = newStmts :+ translateAssumeWithViperExpr(translatedExpr, state, STmp, typVarMap)
+//        case AssertStmt(e) =>
+//          val havocSFailTmp = havocSetMethodCall(pFailTmpSetStateVar.localVar)
+//          val updateSFail = vpr.LocalVarAssign(pFailSetStateVar.localVar, pFailTmpSetStateVar.localVar)()
+//          // TODO: fix the bug for failing states
+//          // TODO: make sure S_fail is empty in the beginning
+//          // TODO: S_fail_temp do a union
+//          val tmpRes = Seq(translateAssumeExpHelper(e), translateAssumeExpHelper(UnaryExpr("!",e)))
+//          val resStmt = ((translatedStmt :+ havocSTmp :+ havocSFailTmp) ++ tmpRes) :+ updateS :+ updateSFail
+//          (resStmt, translatedMethods)
+//          // Assign
+//          // Havoc
+//          // If Else  // TODO: add another argument to method call the pass the initial program state
+//          // While -- Need to define assertion language
         case _ =>
-          (translatedStmt, translatedMethods)
       }
+      // Translate S := S_temp
+      val updateProgStates = vpr.LocalVarAssign(newStates.localVar, STmp.localVar)()
+      newStmts = (havocSTmp +: newStmts) :+ updateProgStates
+      (translatedStmt ++ newStmts, translatedMethods ++ newMethods, newStates)
     }
 
-    def translateExp(e: Expr): vpr.Exp = {
+    def translateExp(e: Expr, state: vpr.LocalVarDecl): vpr.Exp = {
       e match {
-        case Id(name) => vpr.LocalVar(name, translateType(Parser.allVars.getOrElse(name, null)))()
+        case Id(name) =>
+          // Any reference to a var is translated to get(state, var)
+          val id = vpr.LocalVar(name, translateType(Parser.allVars.getOrElse(name, null)))()
+          getDomainFuncApp(getFuncName, Seq(state.localVar, id), stateDomainName, id.typ, state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap)
         case Num(value) => vpr.IntLit(value)()
         case Bool(value) => vpr.BoolLit(value)()
         case BinaryExpr(left, op, right) =>
           op match {
-            case "+" => vpr.Add(translateExp(left), translateExp(right))()
-            case "-" => vpr.Sub(translateExp(left), translateExp(right))()
-            case "*" => vpr.Mul(translateExp(left), translateExp(right))()
-            case "/" => vpr.Div(translateExp(left), translateExp(right))()
-            case "&&" => vpr.And(translateExp(left), translateExp(right))()
-            case "||" => vpr.Or(translateExp(left), translateExp(right))()
-            case "==" => vpr.EqCmp(translateExp(left), translateExp(right))()
-            case "!=" => vpr.NeCmp(translateExp(left), translateExp(right))()
-            case ">" => vpr.GtCmp(translateExp(left), translateExp(right))()
-            case ">=" => vpr.GeCmp(translateExp(left), translateExp(right))()
-            case "<" => vpr.LtCmp(translateExp(left), translateExp(right))()
-            case "<=" => vpr.LeCmp(translateExp(left), translateExp(right))()
+            case "+" => vpr.Add(translateExp(left, state), translateExp(right, state))()
+            case "-" => vpr.Sub(translateExp(left, state), translateExp(right, state))()
+            case "*" => vpr.Mul(translateExp(left, state), translateExp(right, state))()
+            case "/" => vpr.Div(translateExp(left, state), translateExp(right, state))()
+            case "&&" => vpr.And(translateExp(left, state), translateExp(right, state))()
+            case "||" => vpr.Or(translateExp(left, state), translateExp(right, state))()
+            case "==" => vpr.EqCmp(translateExp(left, state), translateExp(right, state))()
+            case "!=" => vpr.NeCmp(translateExp(left, state), translateExp(right, state))()
+            case ">" => vpr.GtCmp(translateExp(left, state), translateExp(right, state))()
+            case ">=" => vpr.GeCmp(translateExp(left, state), translateExp(right, state))()
+            case "<" => vpr.LtCmp(translateExp(left, state), translateExp(right, state))()
+            case "<=" => vpr.LeCmp(translateExp(left, state), translateExp(right, state))()
           }
         case UnaryExpr(op, e) =>
           op match {
-            case "!" => vpr.Not(translateExp(e))()
-            case "-" => vpr.Minus(translateExp(e))()
+            case "!" => vpr.Not(translateExp(e, state))()
+            case "-" => vpr.Minus(translateExp(e, state))()
           }
-        // case Havoc() =>  No need to translate anything
       }
     }
 
-    def translateAssumeExpHelper(e: Expr): vpr.Assume = {
-      vpr.Assume(
-        vpr.Forall(
-          Seq(sVarInt),
-          Seq.empty,
-          vpr.Implies(
-            getInSetApp(Seq(sVarInt.localVar, pTmpSetStateVar.localVar), TtoIntMap),
-            vpr.And(
-              getInSetApp(Seq(sVarInt.localVar, pSetStateVar.localVar), TtoIntMap),
-              translateExp(e)
-            )()
-          )()
+  // This returns a Viper assume statement of the form "assume forall stateVar: State[T] :: in_set(stateVar, pStates) => e"
+  // T is determined by the typVarMap(T -> someType)
+  def translateAssumeWithViperExpr(e: vpr.Exp, stateVar: vpr.LocalVarDecl, states: vpr.LocalVarDecl, typVarMap: Map[TypeVar, Type]): vpr.Assume = {
+    vpr.Assume(
+      vpr.Forall(
+        Seq(stateVar),
+        Seq.empty,
+        vpr.Implies(
+          getInSetApp(Seq(stateVar.localVar, states.localVar), typVarMap),
+          e
         )()
       )()
-    }
+    )()
+  }
+
+//    def translateAssumeWithExpr(e: Expr, pStates: vpr.LocalVar, typVarMap: Map[TypeVar, Type]): vpr.Assume = {
+//      translateAssumeWithViperExpr(translateExp(e), pStates, typVarMap)
+//    }
 
     def translateType(typName: String): vpr.Type = {
         typName match {
@@ -150,7 +181,7 @@ object Generator {
         }
     }
 
-  def generatePreamble(): (Seq[vpr.Domain], Seq[vpr.Method]) = {
+  def generatePreamble(typVarMap: Map[TypeVar, Type]): (Seq[vpr.Domain], Seq[vpr.Method]) = {
     val stateDomain = vpr.Domain(
       stateDomainName,
       // Domain functions
@@ -235,7 +266,7 @@ object Generator {
       Option.empty
     )()
 
-    val SS = vpr.LocalVarDecl("SS", getConcreteSetStateType(TtoIntMap))()
+    val SS = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
     val havocSetMethod = vpr.Method(havocSetMethodName, Seq.empty, Seq(SS), Seq.empty, Seq.empty, Option.empty)()
 
     (Seq(stateDomain, setStateDomain), Seq(havocSetMethod))
@@ -257,8 +288,6 @@ object Generator {
   def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
     getDomainFuncApp(inSetFuncName, args, setStateDomainName, vpr.Bool, typVarMap)
   }
-
-
 
   def getDomainFuncApp(funcName: String, args: Seq[vpr.Exp], domainName: String, retType:Type, typVarMap: Map[TypeVar, Type]): vpr.DomainFuncApp = {
     vpr.DomainFuncApp(

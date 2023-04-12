@@ -34,10 +34,9 @@ object Parser {
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
   def whileLoop[$: P] : P[Stmt] = P("while" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}").map(loop => WhileLoopStmt(loop._1, loop._2))
 
-  // Expressions
   def arithOp1[$: P]: P[String] = P("+" | "-" | "&&" | "!!").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!
-  def cmpOp[$: P]: P[String] = P("==" | "!=" | ">" | "<" | ">=" | "<=").!
+  def cmpOp[$: P]: P[String] = P("==" | "!=" | ">=" | "<=" | ">" | "<").!
 
   def expr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~ expr).rep(min=0, max=1)).map{
     case (e, Nil) => e
