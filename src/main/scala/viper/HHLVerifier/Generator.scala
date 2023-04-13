@@ -116,7 +116,7 @@ object Generator {
         case AssumeStmt(e) =>
           val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
                                         translateExp(e, state))()
-          newStmts = newStmts :+ translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
+          newStmts = Seq(translateAssumeWithViperExpr(exp, state, STmp, typVarMap))
 
         case AssertStmt(e) =>
             val havocSFailTmp = havocSetMethodCall(tempFailedStates.localVar)
@@ -128,19 +128,19 @@ object Generator {
             val stmt2 = translateAssumeWithViperExpr(exp2, state, tempFailedStates, typVarMap)
             val updateSFail = vpr.LocalVarAssign(failedStates.localVar,
                               getSetUnionApp(Seq(failedStates.localVar, tempFailedStates.localVar), typVarMap))()
-            newStmts = newStmts ++ Seq(havocSFailTmp, stmt1, stmt2, updateSFail)
+            newStmts = Seq(havocSFailTmp, stmt1, stmt2, updateSFail)
 
         case AssignStmt(left, right) =>
             val leftVar = vpr.LocalVarDecl(left.name, typVarMap.get(typeVar).get)()
             val stmt1 = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
             val exp = vpr.EqCmp(translateExp(left, state), translateExp(right, state))()
             val stmt2 = translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
-            newStmts = newStmts :+ stmt1 :+ stmt2
+            newStmts = Seq(stmt1, stmt2)
 
         case HavocStmt(id) =>
           val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
           val stmt = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
-          newStmts = newStmts :+ stmt
+          newStmts = Seq(stmt)
 
         case IfElseStmt(cond, ifStmt, elseStmt) =>
           // Define new variables to hold the states in the if and else blocks respectively
@@ -149,28 +149,23 @@ object Generator {
           counter = counter + 1
           val elseBlockStates = vpr.LocalVarDecl(currStatesVarName + counter, currStates.typ)()
           extraVars = extraVars :+ ifBlockStates :+ elseBlockStates
+
           // Cond satisfied
-          val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
-            translateExp(cond, state))()
-          val assumeCond = translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
-          // Assignment ifBlockStates := STmp
-          val assign1 = vpr.LocalVarAssign(ifBlockStates.localVar, STmp.localVar)()
+          // Let ifBlockStates := S
+          val assign1 = vpr.LocalVarAssign(ifBlockStates.localVar, currStates.localVar)()
+          val assumeCond = translateStmt(AssumeStmt(cond), ifBlockStates)
           val ifBlock = translateStmt(ifStmt, ifBlockStates)
 
-          // Havoc STmp again -- just use havocSTmp declared before
-
           // Cond not satisfied
-          val notExp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
-            translateExp(UnaryExpr("!", cond), state))()
-          val assumeNotCond =  translateAssumeWithViperExpr(notExp, state, STmp, typVarMap)
-          // Assignment elseBlockStates := STmp
-          val assign2 = vpr.LocalVarAssign(elseBlockStates.localVar, STmp.localVar)()
+          // Let elseBlockStates := S
+          val assign2 = vpr.LocalVarAssign(elseBlockStates.localVar, currStates.localVar)()
+          val assumeNotCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), elseBlockStates)
           val elseBlock = translateStmt(elseStmt, elseBlockStates)
+
           val updateSTmp = vpr.LocalVarAssign(STmp.localVar, getSetUnionApp(Seq(ifBlockStates.localVar, elseBlockStates.localVar), typVarMap))()
 
-          newStmts = newStmts ++ Seq(assumeCond, assign1) ++ ifBlock._1
-          newStmts = newStmts ++ Seq(havocSTmp, assumeNotCond, assign2) ++ elseBlock._1 :+ updateSTmp
-          newMethods = newMethods ++ ifBlock._2 ++ elseBlock._2
+          newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp)
+          newMethods = ifBlock._2 ++ elseBlock._2
 //        TODO: case WhileLoopStmt(cond, body) =>
       }
       // Translation of S := S_temp
