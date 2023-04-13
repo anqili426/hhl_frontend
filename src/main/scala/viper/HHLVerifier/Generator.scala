@@ -26,6 +26,7 @@ object Generator {
   val setStateType = getConcreteSetStateType(Map.empty) // Type SetState[T]
 
   val sVarName = "s"
+  val s0VarName = "s0"
   val currStatesVarName = "S"
   val tempStatesVarName = "S_temp"
   val failedStatesVarName = "S_fail"
@@ -106,12 +107,14 @@ object Generator {
             tmpRes = translateStmt(s, tmpRes._1, tmpRes._2, tmpRes._3)
           }
           return tmpRes
+
         case VarDecl(_, _) =>
           return (translatedStmt, translatedMethods, currStates)
         case AssumeStmt(e) =>
           val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
                                         translateExp(e, state))()
           newStmts = newStmts :+ translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
+
         case AssertStmt(e) =>
             val havocSFailTmp = havocSetMethodCall(tempFailedStates.localVar)
             val exp1 = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
@@ -123,11 +126,26 @@ object Generator {
             val updateSFail = vpr.LocalVarAssign(failedStates.localVar,
                               getSetUnionApp(Seq(failedStates.localVar, tempFailedStates.localVar), typVarMap))()
             newStmts = newStmts ++ Seq(havocSFailTmp, stmt1, stmt2, updateSFail)
-//          // Assign
-//          // Havoc
-//          // If Else
-//          // While -- Need to define assertion language
-        case _ =>
+
+        case AssignStmt(left, right) =>
+            val leftVar = vpr.LocalVarDecl(left.name, typVarMap.get(typeVar).get)()
+            val stmt1 = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
+            val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+                              vpr.EqCmp(translateExp(left, state),
+                                        translateExp(right, state)
+                                        )()
+                              )()
+            val stmt2 = translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
+            newStmts = newStmts :+ stmt1 :+ stmt2
+
+        case HavocStmt(id) =>
+          val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
+          val stmt = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
+          newStmts = newStmts :+ stmt
+
+//        case IfElseStmt(cond, ifStmt, elseStmt) =>
+
+//        case WhileLoopStmt(cond, body) =>
       }
       // Translate S := S_temp
       val updateProgStates = vpr.LocalVarAssign(newStates.localVar, STmp.localVar)()
@@ -165,6 +183,20 @@ object Generator {
           }
       }
     }
+
+  // This returns a Viper assume statement that expresses the following:
+  // assume forall stateVar :: in_set(stateVar, tmpStates) ==> (exists s0 :: in_set(s0, currStates) && equal_on_everything_except(s0, stateVar, leftVar))
+  def translateHavocVarHelper(leftVar: vpr.LocalVarDecl, stateVar: vpr.LocalVarDecl, tmpStates: vpr.LocalVarDecl,
+                              currStates: vpr.LocalVarDecl, typVarMap: Map[TypeVar, Type])
+                                : vpr.Assume = {
+    val s0 = vpr.LocalVarDecl(s0VarName, stateVar.typ)()
+    val existsExpr = vpr.Exists(Seq(s0), Seq.empty,
+                                vpr.And(getInSetApp(Seq(s0.localVar, currStates.localVar), typVarMap),
+                                        getEqualExceptApp(Seq(s0.localVar, stateVar.localVar, leftVar.localVar), typVarMap)
+                                        )()
+                                )()
+    translateAssumeWithViperExpr(existsExpr, stateVar, tmpStates, typVarMap)
+  }
 
   // This returns a Viper assume statement of the form "assume forall stateVar: State[T] :: in_set(stateVar, pStates) => e"
   // T is determined by the typVarMap(T -> someType)
