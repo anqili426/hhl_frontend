@@ -36,6 +36,7 @@ object Generator {
 
   var extraVars: List[vpr.LocalVarDecl] = List.empty // Extra variables added to the program during translation
 
+  var counter = 0
 
   def generate(input: HHLProgram): vpr.Program = {
     var domains: Seq[vpr.Domain] = Seq.empty
@@ -130,11 +131,7 @@ object Generator {
         case AssignStmt(left, right) =>
             val leftVar = vpr.LocalVarDecl(left.name, typVarMap.get(typeVar).get)()
             val stmt1 = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
-            val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
-                              vpr.EqCmp(translateExp(left, state),
-                                        translateExp(right, state)
-                                        )()
-                              )()
+            val exp = vpr.EqCmp(translateExp(left, state), translateExp(right, state))()
             val stmt2 = translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
             newStmts = newStmts :+ stmt1 :+ stmt2
 
@@ -143,8 +140,35 @@ object Generator {
           val stmt = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
           newStmts = newStmts :+ stmt
 
-//        case IfElseStmt(cond, ifStmt, elseStmt) =>
+        case IfElseStmt(cond, ifStmt, elseStmt) =>
+          // Define new variables to hold the states in the if and else blocks respectively
+          counter = counter + 1
+          val ifBlockStates = vpr.LocalVarDecl(currStatesVarName + counter, currStates.typ)()
+          counter = counter + 1
+          val elseBlockStates = vpr.LocalVarDecl(currStatesVarName + counter, currStates.typ)()
+          extraVars = extraVars :+ ifBlockStates :+ elseBlockStates
+          // Cond satisfied
+          val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+            translateExp(cond, state))()
+          val assumeCond = translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
+          // Assignment ifBlockStates := STmp
+          val assign1 = vpr.LocalVarAssign(ifBlockStates.localVar, STmp.localVar)()
+          val ifBlock = translateStmt(ifStmt, Seq.empty, Seq.empty, ifBlockStates)
 
+          // Havoc STmp again -- just use havocSTmp declared before
+
+          // Cond not satisfied
+          val notExp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+            translateExp(UnaryExpr("!", cond), state))()
+          val assumeNotCond =  translateAssumeWithViperExpr(notExp, state, STmp, typVarMap)
+          // Assignment elseBlockStates := STmp
+          val assign2 = vpr.LocalVarAssign(elseBlockStates.localVar, STmp.localVar)()
+          val elseBlock = translateStmt(elseStmt, Seq.empty, Seq.empty, elseBlockStates)
+          val updateSTmp = vpr.LocalVarAssign(STmp.localVar, getSetUnionApp(Seq(ifBlock._3.localVar, elseBlock._3.localVar), typVarMap))()
+
+          newStmts = newStmts ++ Seq(assumeCond, assign1) ++ ifBlock._1
+          newStmts = newStmts ++ Seq(havocSTmp, assumeNotCond, assign2) ++ elseBlock._1 :+ updateSTmp
+          newMethods = newMethods ++ ifBlock._2 ++ elseBlock._2
 //        case WhileLoopStmt(cond, body) =>
       }
       // Translate S := S_temp
