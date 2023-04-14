@@ -13,7 +13,7 @@ object Parser {
 
   def program[$: P]: P[HHLProgram] = P(Start ~ stmts ~ End).map(s => HHLProgram(s))
 
-  def space[$: P]: P[Unit] = P(CharsWhileIn(" \r\n", 0))
+  def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
 
   def identNew[$: P] : P[Expr] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => Id(name))
   def varDecl[$: P] : P[Decl] = P("var" ~ identNew.! ~ ":" ~ typeName.!).map{
@@ -30,16 +30,16 @@ object Parser {
   def stmts[$: P] : P[Stmt] = P(stmt.rep).map(CompositeStmt)
   def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign)
   def assign[$: P] : P[Stmt] = P(progVarUsed ~ ":=" ~ expr).map(e => AssignStmt(e._1, e._2))
-  def havoc[$: P] : P[Stmt] = P("havoc " ~ space ~ progVarUsed).map(e => HavocStmt(e))
-  def assume[$: P] : P[Stmt] = P("assume" ~ space ~ expr).map(AssumeStmt)
-  def assert[$: P] : P[Stmt] = P("assert" ~ space ~ expr).map(AssertStmt)
+  def havoc[$: P] : P[Stmt] = P("havoc" ~~ spaces ~ progVarUsed).map(e => HavocStmt(e))
+  def assume[$: P] : P[Stmt] = P("assume" ~~ spaces ~ expr).map(AssumeStmt)
+  def assert[$: P] : P[Stmt] = P("assert" ~~ spaces ~ expr).map(AssertStmt)
   def ifElse[$: P] : P[Stmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}" ~ ("else" ~ "{" ~ stmts ~ "}").?).map{
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
   def whileLoop[$: P] : P[Stmt] = P("while" ~ "(" ~ expr ~ ")" ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
     case (cond, Nil, s) => WhileLoopStmt(cond, s)
     case (cond, invs, s) => WhileLoopStmt(cond, s, invs)
   }
-  def loopInv[$: P]: P[Expr] = P("invariant" ~ space ~ hyperAssertExpr)
+  def loopInv[$: P]: P[Expr] = P("invariant" ~~ spaces ~ hyperAssertExpr)
 
   def arithOp1[$: P]: P[String] = P("+" | "-" | "&&" | "!!").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!
@@ -49,7 +49,7 @@ object Parser {
 
   def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
 
-  def hyperAssertExpr[$: P]: P[Expr] = P(quantifier ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map{
+  def hyperAssertExpr[$: P]: P[Expr] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map{
     case (quant, vars, e) => {
       quant match {
         case "forall" => ForAllExpr(vars, e)
@@ -58,7 +58,7 @@ object Parser {
     }
   }
 
-  def otherExpr[$: P]: P[Expr] = P(normalExpr ~ (impliesOp ~/ expr).?).map{
+  def otherExpr[$: P]: P[Expr] = P(normalExpr ~~ (spaces ~ impliesOp ~~/ spaces ~ expr).?).map{
     case (e, None) => e
     case (e, Some(items)) => ImpliesExpr(e, items._2)
   }

@@ -1,7 +1,8 @@
 package viper.HHLVerifier
 
-import viper.silicon.Silicon //this is the Silicon verifier
-import viper.silver.{ast => vpr} //this creates an alias to the Viper AST package
+import fastparse.Parsed
+import viper.silicon.Silicon
+import viper.silver.{ast => vpr}
 import viper.silver.reporter.NoopReporter
 import viper.silver.verifier.{Failure, Success}
 
@@ -43,7 +44,8 @@ object Main {
             err.foreach(e => println(e.readableMessage))
         }
       } else {
-        println(res)
+        val Parsed.Failure(_, _, extra) = res
+        println(extra.trace().longAggregateMsg)
       }
     } catch {
       case e: DuplicateIdentifierException => println(e.msg)
