@@ -2,11 +2,12 @@ package viper.HHLVerifier
 
 sealed trait Expr
 case class Id(name: String) extends Expr
+case class AssertVar(name: String) extends Expr
 case class Num(value: Int) extends Expr
 case class Bool(value: Boolean) extends Expr
-case class Havoc() extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
+case class ImpliesExpr(left: Expr, right: Expr) extends Expr
 
 sealed trait Decl extends Stmt
 case class VarDecl(vName: String, vType: String) extends Decl

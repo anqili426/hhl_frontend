@@ -16,6 +16,8 @@ object Main {
       if (res.isSuccess) {
         println("Parsing successful. ")
         val parsedProgram: HHLProgram = res.get.value
+        println(parsedProgram)
+        sys.exit(0)
 
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)
