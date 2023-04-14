@@ -20,8 +20,11 @@ object Parser {
     case (varName, typ) =>
       if (allVars.contains(varName)) throw DuplicateIdentifierException("Duplicate identifier " + varName)
       else allVars += varName -> typ
-      VarDecl(varName, typ)
+      PVarDecl(varName, typ)
   }
+
+  def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ typeName.!).map(items => AssertVarDecl(items._1, items._2))
+
   def typeName[$: P] : P[Unit] = P("Int" | "Bool")
 
   def stmts[$: P] : P[Stmt] = P(stmt.rep).map(CompositeStmt)
@@ -38,11 +41,41 @@ object Parser {
   def arithOp2[$: P]: P[String] = P("*" | "/").!
   def impliesOp[$: P]: P[String] = P("implies").!
   def cmpOp[$: P]: P[String] = P("==" | "!=" | ">=" | "<=" | ">" | "<").!
+  def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
-  def expr[$: P]: P[Expr] = P(normalExpr ~ (impliesOp ~/ expr).rep(min = 0, max = 1)).map {
-    case (e, Nil) => e
-    case (e, items) => ImpliesExpr(e, items(0)._2)
+  // def expr
+  def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
+
+  def hyperAssertExpr[$: P]: P[Expr] = P(quantifier ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map{
+    case (quant, vars, e) => {
+      quant match {
+        case "forall" => ForAllExpr(vars, e)
+        case "exists" => ExistsExpr(vars, e)
+      }
+    }
   }
+
+  def otherExpr[$: P]: P[Expr] = P(normalExpr ~ (impliesOp ~/ expr).?).map{
+    case (e, None) => e
+    case (e, Some(items)) => ImpliesExpr(e, items._2)
+  }
+  
+//  def expr[$: P]: P[Expr] = P((quantifier ~ (assertVarDecl ~ ",".?).rep ~ "::").? ~ normalExpr ~ (impliesOp ~/ expr).?).map{
+//    case (None, e, None) => e
+//    case (None, e, Some(items)) => ImpliesExpr(e, items._2)
+//    case (Some(items1), e, None) => {
+//      items1._1 match {
+//        case "forall" => ForAllExpr(items1._2, e)
+//        case "exists" => ExistsExpr(items1._2, e)
+//      }
+//    }
+//    case (Some(items1), e, Some(items2)) => {
+//        items1._1 match {
+//          case "forall" => ForAllExpr(items1._2, ImpliesExpr(e, items2._2))
+//          case "exists" => ExistsExpr(items1._2, ImpliesExpr(e, items2._2))
+//        }
+//    }
+//  }
 
   def normalExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ normalExpr).rep(min = 0, max = 1)).map {
     case (e, Nil) => e

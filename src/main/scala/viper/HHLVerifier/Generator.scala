@@ -111,7 +111,7 @@ object Generator {
           }
           return (resStmts, resMethods)
 
-        case VarDecl(_, _) =>
+        case PVarDecl(_, _) =>
           return (Seq.empty, Seq.empty)
         case AssumeStmt(e) =>
           val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),

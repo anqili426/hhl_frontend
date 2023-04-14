@@ -8,9 +8,12 @@ case class Bool(value: Boolean) extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
+case class ForAllExpr(assertVars: Seq[AssertVarDecl], body: Expr) extends Expr
+case class ExistsExpr(assertVars: Seq[AssertVarDecl], body: Expr) extends Expr
 
 sealed trait Decl extends Stmt
-case class VarDecl(vName: String, vType: String) extends Decl
+case class PVarDecl(vName: String, vType: String) extends Decl
+case class AssertVarDecl(vName: AssertVar, vType: String) extends Decl
 
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt
