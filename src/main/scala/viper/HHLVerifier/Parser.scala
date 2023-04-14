@@ -3,34 +3,25 @@ package viper.HHLVerifier
 import fastparse._
 import MultiLineWhitespace._
 
-
-case class DuplicateIdentifierException(msg: String) extends Exception
-case class IdentifierNotFoundException(msg: String) extends Exception
-
 object Parser {
-  // TODO: add symbol table to check var defined & var used
-  var allVars = Map[String, String]()
-
   def program[$: P]: P[HHLProgram] = P(Start ~ stmts ~ End).map(s => HHLProgram(s))
 
   def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
 
-  def identNew[$: P] : P[Expr] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => Id(name))
-  def varDecl[$: P] : P[Decl] = P("var" ~ identNew.! ~ ":" ~ typeName.!).map{
-    case (varName, typ) =>
-      if (allVars.contains(varName)) throw DuplicateIdentifierException("Duplicate identifier " + varName)
-      else allVars += varName -> typ
-      PVarDecl(varName, typ)
+  def varDecl[$: P] : P[Decl] = P("var" ~ progVar ~ ":" ~ typeName).map(items => PVarDecl(items._1, items._2))
+
+  def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ typeName).map(items => AssertVarDecl(items._1, items._2))
+
+  def typeName[$: P] : P[Type] = P("Int" | "Bool" | "State").!.map{
+    case "Int" => IntType()
+    case "Bool" => BoolType()
+    case "State" => State()
   }
-
-  def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ typeName.!).map(items => AssertVarDecl(items._1, items._2))
-
-  def typeName[$: P] : P[Unit] = P("Int" | "Bool")
 
   def stmts[$: P] : P[Stmt] = P(stmt.rep).map(CompositeStmt)
   def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign)
-  def assign[$: P] : P[Stmt] = P(progVarUsed ~ ":=" ~ expr).map(e => AssignStmt(e._1, e._2))
-  def havoc[$: P] : P[Stmt] = P("havoc" ~~ spaces ~ progVarUsed).map(e => HavocStmt(e))
+  def assign[$: P] : P[Stmt] = P(progVar ~ ":=" ~ expr).map(e => AssignStmt(e._1, e._2))
+  def havoc[$: P] : P[Stmt] = P("havoc" ~~ spaces ~ progVar).map(e => HavocStmt(e))
   def assume[$: P] : P[Stmt] = P("assume" ~~ spaces ~ expr).map(AssumeStmt)
   def assert[$: P] : P[Stmt] = P("assert" ~~ spaces ~ expr).map(AssertStmt)
   def ifElse[$: P] : P[Stmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}" ~ ("else" ~ "{" ~ stmts ~ "}").?).map{
@@ -78,19 +69,19 @@ object Parser {
     case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
   }
 
-  def basicExpr[$: P]: P[Expr] = P(boolean | unaryExpr | identUsed | number | "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(boolean | unaryExpr | identifier | number | "(" ~ expr ~ ")")
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   def notExpr[$: P]: P[UnaryExpr] = P("!" ~ boolean).map(e => UnaryExpr("!", e))
   def negExpr[$: P]: P[UnaryExpr] = P("-" ~ number).map(e => UnaryExpr("-", e))
 
-  def boolean[$: P] : P[Bool] = P(boolTrue | boolFalse)
-  def boolTrue[$: P]: P[Bool] = P("true").!.map(_ => Bool(true))
-  def boolFalse[$: P]: P[Bool] = P("false").!.map(_ => Bool(false))
+  def boolean[$: P] : P[BoolLit] = P(boolTrue | boolFalse)
+  def boolTrue[$: P]: P[BoolLit] = P("true").!.map(_ => BoolLit(true))
+  def boolFalse[$: P]: P[BoolLit] = P("false").!.map(_ => BoolLit(false))
 
-  def identUsed[$: P]: P[Expr] = P(progVarUsed | assertVar)
+  def identifier[$: P]: P[Expr] = P(progVar | assertVar)
 
-  def progVarUsed[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => Id(name))
+  def progVar[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => Id(name))
 
   def assertVar[$: P]: P[AssertVar] = P("_" ~~ CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => AssertVar(name))
 

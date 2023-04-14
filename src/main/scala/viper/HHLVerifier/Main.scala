@@ -2,7 +2,6 @@ package viper.HHLVerifier
 
 import fastparse.Parsed
 import viper.silicon.Silicon
-import viper.silver.{ast => vpr}
 import viper.silver.reporter.NoopReporter
 import viper.silver.verifier.{Failure, Success}
 
@@ -18,6 +17,11 @@ object Main {
         println("Parsing successful. ")
         val parsedProgram: HHLProgram = res.get.value
         println(parsedProgram)
+
+        // Symbol table
+        SymbolChecker.checkSymbolsProg(parsedProgram)
+
+        // TODO: Type checking
 
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)
@@ -48,8 +52,7 @@ object Main {
         println(extra.trace().longAggregateMsg)
       }
     } catch {
-      case e: DuplicateIdentifierException => println(e.msg)
-      case e: IdentifierNotFoundException => println(e.msg)
+      case e: VerifierException => println(e.errMsg)
     }
   }
 
