@@ -202,8 +202,23 @@ object Generator {
             case "!" => vpr.Not(translateExp(e, state))()
             case "-" => vpr.Minus(translateExp(e, state))()
           }
+          // TODO: get the type programmatically
+        case AssertVar(name) => vpr.LocalVar(name, vpr.Int)()
+        case ForAllExpr(vars, body) =>
+          val variables = vars.map(v => translateAssertVarDecl(v))
+          vpr.Forall(variables, Seq.empty, translateExp(body, state))()
+        case ExistsExpr(vars, body) =>
+          val variables = vars.map(v => translateAssertVarDecl(v))
+          vpr.Exists(variables, Seq.empty, translateExp(body, state))()
+        case ImpliesExpr(left, right) =>
+          vpr.Implies(translateExp(left, state), translateExp(right, state))()
+        // case AssertVarDecl(name, typ) => TODO: raise error here
       }
     }
+
+  def translateAssertVarDecl(decl: AssertVarDecl): vpr.LocalVarDecl = {
+    vpr.LocalVarDecl(decl.vName.name, translateType(decl.vType))()
+  }
 
   // This returns a Viper assume statement that expresses the following:
   // assume forall stateVar :: in_set(stateVar, tmpStates) ==> (exists s0 :: in_set(s0, currStates) && equal_on_everything_except(s0, stateVar, leftVar))

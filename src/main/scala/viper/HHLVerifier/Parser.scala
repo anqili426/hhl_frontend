@@ -35,7 +35,11 @@ object Parser {
   def assert[$: P] : P[Stmt] = P("assert" ~ space ~ expr).map(AssertStmt)
   def ifElse[$: P] : P[Stmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}" ~ ("else" ~ "{" ~ stmts ~ "}").?).map{
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
-  def whileLoop[$: P] : P[Stmt] = P("while" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}").map(loop => WhileLoopStmt(loop._1, loop._2))
+  def whileLoop[$: P] : P[Stmt] = P("while" ~ "(" ~ expr ~ ")" ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
+    case (cond, Nil, s) => WhileLoopStmt(cond, s)
+    case (cond, invs, s) => WhileLoopStmt(cond, s, invs)
+  }
+  def loopInv[$: P]: P[Expr] = P("invariant" ~ space ~ hyperAssertExpr)
 
   def arithOp1[$: P]: P[String] = P("+" | "-" | "&&" | "!!").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!
@@ -43,7 +47,6 @@ object Parser {
   def cmpOp[$: P]: P[String] = P("==" | "!=" | ">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
-  // def expr
   def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
 
   def hyperAssertExpr[$: P]: P[Expr] = P(quantifier ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map{
@@ -59,23 +62,6 @@ object Parser {
     case (e, None) => e
     case (e, Some(items)) => ImpliesExpr(e, items._2)
   }
-  
-//  def expr[$: P]: P[Expr] = P((quantifier ~ (assertVarDecl ~ ",".?).rep ~ "::").? ~ normalExpr ~ (impliesOp ~/ expr).?).map{
-//    case (None, e, None) => e
-//    case (None, e, Some(items)) => ImpliesExpr(e, items._2)
-//    case (Some(items1), e, None) => {
-//      items1._1 match {
-//        case "forall" => ForAllExpr(items1._2, e)
-//        case "exists" => ExistsExpr(items1._2, e)
-//      }
-//    }
-//    case (Some(items1), e, Some(items2)) => {
-//        items1._1 match {
-//          case "forall" => ForAllExpr(items1._2, ImpliesExpr(e, items2._2))
-//          case "exists" => ExistsExpr(items1._2, ImpliesExpr(e, items2._2))
-//        }
-//    }
-//  }
 
   def normalExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ normalExpr).rep(min = 0, max = 1)).map {
     case (e, Nil) => e
