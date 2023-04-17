@@ -20,6 +20,7 @@ object Main {
 
         // Symbol table
         SymbolChecker.checkSymbolsProg(parsedProgram)
+        TypeChecker.typeCheckProg(parsedProgram)
 
         // TODO: Type checking
 

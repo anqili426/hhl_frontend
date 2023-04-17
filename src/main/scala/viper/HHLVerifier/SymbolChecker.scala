@@ -1,13 +1,7 @@
 package viper.HHLVerifier
 
-
-// When do we enter a new scope? -- Entering if-else body, while loop body and hyper-assertion body
-class SymbolTable() {
-  var allVars: Map[String, Type] = Map.empty
-}
-
 object SymbolChecker {
-  val table = new SymbolTable()
+  var allVars: Map[String, Type] = Map.empty
   def checkSymbolsProg(p: HHLProgram): Unit = {
     checkSymbolsStmt(p.stmts)
   }
@@ -17,7 +11,7 @@ object SymbolChecker {
       case CompositeStmt(stmts) => stmts.foreach(s => checkSymbolsStmt(s))
       case PVarDecl(id, typ) =>
         checkIdDup(id)
-        table.allVars = table.allVars + (id.name -> typ)
+        allVars = allVars + (id.name -> typ)
       case AssignStmt(id, exp) =>
         checkSymbolsExpr(id)
         checkSymbolsExpr(exp)
@@ -46,7 +40,7 @@ object SymbolChecker {
         case av@AssertVar(_) => checkIdDefined(av)
         case AssertVarDecl(vName, vType) =>
           checkIdDup(vName)
-          table.allVars = table.allVars + (vName.name -> vType)
+          allVars = allVars + (vName.name -> vType)
           case Num(_) =>
           case BoolLit(_) =>
           case BinaryExpr(left, _, right) =>
@@ -57,17 +51,17 @@ object SymbolChecker {
             checkSymbolsExpr(left)
             checkSymbolsExpr(right)
         case ForAllExpr(assertVars, body) =>
-            val originalTable = table.allVars
+            val originalTable = allVars
             // Assertion variables will be added to the symbol table
             assertVars.foreach(v => checkSymbolsExpr(v))
             checkSymbolsExpr(body)
             // Remove the assertion variables from the symbol table
-            table.allVars = originalTable
+            allVars = originalTable
        case ExistsExpr(assertVars, body) =>
-            val originalTable = table.allVars
+            val originalTable = allVars
             assertVars.foreach(v => checkSymbolsExpr(v))
             checkSymbolsExpr(body)
-            table.allVars = originalTable
+            allVars = originalTable
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
       }
@@ -75,12 +69,12 @@ object SymbolChecker {
 
     def checkIdDup(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (table.allVars.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
+      if (allVars.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
     }
 
     def checkIdDefined(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (!table.allVars.contains(idName)) throw IdentifierNotFoundException("Identifier " + idName + " not found")
+      if (!allVars.contains(idName)) throw IdentifierNotFoundException("Identifier " + idName + " not found")
     }
 
     def getIdName(id: Expr): String = {

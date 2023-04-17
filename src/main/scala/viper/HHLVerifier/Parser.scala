@@ -15,7 +15,7 @@ object Parser {
   def typeName[$: P] : P[Type] = P("Int" | "Bool" | "State").!.map{
     case "Int" => IntType()
     case "Bool" => BoolType()
-    case "State" => State()
+    case "State" => StateType()
   }
 
   def stmts[$: P] : P[Stmt] = P(stmt.rep).map(CompositeStmt)

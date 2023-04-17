@@ -177,7 +177,7 @@ object Generator {
       e match {
         case Id(name) =>
           // Any reference to a var is translated to get(state, var)
-          val id = vpr.LocalVar(name, translateType(SymbolChecker.table.allVars.getOrElse(name, null)))()
+          val id = vpr.LocalVar(name, translateType(SymbolChecker.allVars.getOrElse(name, null)))()
           getGetApp(Seq(state.localVar, id), state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap)
         case Num(value) => vpr.IntLit(value)()
         case BoolLit(value) => vpr.BoolLit(value)()
@@ -201,7 +201,7 @@ object Generator {
             case "!" => vpr.Not(translateExp(e, state))()
             case "-" => vpr.Minus(translateExp(e, state))()
           }
-          // TODO: get the type programmatically --  do this when detecting a AssertVarDecl
+          // TODO: get the type programmatically -- do this when detecting a AssertVarDecl
         case AssertVar(name) =>
           vpr.LocalVar(name, vpr.Int)()
         case ForAllExpr(vars, body) =>
