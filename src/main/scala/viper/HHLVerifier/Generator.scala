@@ -201,9 +201,8 @@ object Generator {
             case "!" => vpr.Not(translateExp(e, state))()
             case "-" => vpr.Minus(translateExp(e, state))()
           }
-          // TODO: get the type programmatically -- do this when detecting a AssertVarDecl
-        case AssertVar(name) =>
-          vpr.LocalVar(name, vpr.Int)()
+        case av@AssertVar(name) =>
+          vpr.LocalVar(name, translateType(av.typ))()
         case ForAllExpr(vars, body) =>
           val variables = vars.map(v => translateAssertVarDecl(v))
           vpr.Forall(variables, Seq.empty, translateExp(body, state))()

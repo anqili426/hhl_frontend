@@ -83,9 +83,11 @@ object TypeChecker {
         res = typeCheckExpr(left) && typeCheckExpr(right)
         res = res && checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
-      case ExistsExpr(assertVarDecls, body) =>
+      case ee@ExistsExpr(assertVarDecls, body) =>
         res = typeCheckQuantifierExprHelper(assertVarDecls, body)
-      case ForAllExpr(assertVarDecls, body) =>
+        ee.typ = boolType
+      case fe@ForAllExpr(assertVarDecls, body) =>
+        fe.typ = boolType
         res = typeCheckQuantifierExprHelper(assertVarDecls, body)
     }
     if (!res) throw TypeException("The expression has a type error: " + e)
@@ -98,7 +100,7 @@ object TypeChecker {
     val originalAssertVars = assertVars
     assertVars = assertVars ++ assertVarDecls.map(decl => decl.vName.name -> decl.vType).toMap
     // AssertVar will appear in the body. Update the assertVars map before type checking the body
-    res = res && typeCheckExpr(body)
+    res = res && typeCheckExpr(body) && checkIfTypeMatch(body.typ, boolType)
     assertVars = originalAssertVars
     res
   }
