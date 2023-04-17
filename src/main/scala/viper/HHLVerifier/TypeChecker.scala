@@ -6,6 +6,7 @@ object TypeChecker {
   val numOp = List("+", "-", "*", "/")
   val boolType = TypeInstance.boolType
   val intType = TypeInstance.intType
+  val stateType = TypeInstance.stateType
 
   var assertVars: Map[String, Type] = Map.empty
 
@@ -45,9 +46,8 @@ object TypeChecker {
     var res = true
     e match {
       case id@Id(_) =>
-        // Every identifier should have its typ field set to some type when it is declared
-        // If not, there must be an error
-        res = !id.typ.isInstanceOf[UnknownType]
+        if (SymbolChecker.allVars.contains(id.name)) id.typ = SymbolChecker.allVars.get(id.name).get
+        else res = false
       case be@BinaryExpr(e1, op, e2) =>
         res = typeCheckExpr(e1) && typeCheckExpr(e2)
         val typeMatched = checkIfTypeMatch(e1.typ, e2.typ)
@@ -69,9 +69,9 @@ object TypeChecker {
           res = typeCheckExpr(e) && checkIfTypeMatch(e.typ, intType)
           ue.typ = intType
         }
-      case num@Num(value) =>
+      case num@Num(_) =>
         num.typ = intType
-      case bool@BoolLit(value) =>
+      case bool@BoolLit(_) =>
         bool.typ = boolType
       case av@AssertVar(name) =>
         if (assertVars.keySet.contains(name)) av.typ = assertVars.get(name).get
@@ -87,8 +87,11 @@ object TypeChecker {
         res = typeCheckQuantifierExprHelper(assertVarDecls, body)
         ee.typ = boolType
       case fe@ForAllExpr(assertVarDecls, body) =>
-        fe.typ = boolType
         res = typeCheckQuantifierExprHelper(assertVarDecls, body)
+        fe.typ = boolType
+      case gve@GetValExpr(state, id) =>
+        res = typeCheckExpr(state) && typeCheckExpr(id) && checkIfTypeMatch(state.typ, stateType)
+        gve.typ = id.typ
     }
     if (!res) throw TypeException("The expression has a type error: " + e)
     res

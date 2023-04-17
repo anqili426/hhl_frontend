@@ -14,6 +14,7 @@ case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
 case class ForAllExpr(assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
 case class ExistsExpr(assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
+case class GetValExpr(state: AssertVar, id: Id) extends Expr
 
 sealed trait Decl extends Stmt
 case class PVarDecl(vName: Id, vType: Type) extends Decl

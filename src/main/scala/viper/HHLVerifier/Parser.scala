@@ -8,11 +8,16 @@ object Parser {
 
   def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
 
-  def varDecl[$: P] : P[Decl] = P("var" ~ progVar ~ ":" ~ typeName).map(items => PVarDecl(items._1, items._2))
+  def varDecl[$: P] : P[Decl] = P("var" ~ progVar ~ ":" ~ progVartypeName).map(items => PVarDecl(items._1, items._2))
 
-  def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ typeName).map(items => AssertVarDecl(items._1, items._2))
+  def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ assertVarTypeName).map(items => AssertVarDecl(items._1, items._2))
 
-  def typeName[$: P] : P[Type] = P("Int" | "Bool" | "State").!.map{
+  def progVartypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
+    case "Int" => IntType()
+    case "Bool" => BoolType()
+  }
+
+  def assertVarTypeName[$: P]: P[Type] = P("Int" | "Bool" | "State").!.map {
     case "Int" => IntType()
     case "Bool" => BoolType()
     case "State" => StateType()
@@ -69,7 +74,7 @@ object Parser {
     case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
   }
 
-  def basicExpr[$: P]: P[Expr] = P(boolean | unaryExpr | identifier | number | "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(boolean | unaryExpr | getProgVarExpr | identifier | number | "(" ~ expr ~ ")")
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   def notExpr[$: P]: P[UnaryExpr] = P("!" ~ boolean).map(e => UnaryExpr("!", e))
@@ -78,6 +83,8 @@ object Parser {
   def boolean[$: P] : P[BoolLit] = P(boolTrue | boolFalse)
   def boolTrue[$: P]: P[BoolLit] = P("true").!.map(_ => BoolLit(true))
   def boolFalse[$: P]: P[BoolLit] = P("false").!.map(_ => BoolLit(false))
+
+  def getProgVarExpr[$: P]: P[GetValExpr] = P("get(" ~ assertVar ~ "," ~ progVar ~ ")").map(items => GetValExpr(items._1, items._2))
 
   def identifier[$: P]: P[Expr] = P(progVar | assertVar)
 

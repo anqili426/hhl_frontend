@@ -41,13 +41,13 @@ object SymbolChecker {
         case AssertVarDecl(vName, vType) =>
           checkIdDup(vName)
           allVars = allVars + (vName.name -> vType)
-          case Num(_) =>
-          case BoolLit(_) =>
-          case BinaryExpr(left, _, right) =>
+        case Num(_) =>
+        case BoolLit(_) =>
+        case BinaryExpr(left, _, right) =>
             checkSymbolsExpr(left)
             checkSymbolsExpr(right)
-          case UnaryExpr(_, e) => checkSymbolsExpr(e)
-          case ImpliesExpr(left, right) =>
+        case UnaryExpr(_, e) => checkSymbolsExpr(e)
+        case ImpliesExpr(left, right) =>
             checkSymbolsExpr(left)
             checkSymbolsExpr(right)
         case ForAllExpr(assertVars, body) =>
@@ -57,11 +57,14 @@ object SymbolChecker {
             checkSymbolsExpr(body)
             // Remove the assertion variables from the symbol table
             allVars = originalTable
-       case ExistsExpr(assertVars, body) =>
+        case ExistsExpr(assertVars, body) =>
             val originalTable = allVars
             assertVars.foreach(v => checkSymbolsExpr(v))
             checkSymbolsExpr(body)
             allVars = originalTable
+        case GetValExpr(state, id) =>
+            checkIdDefined(state)
+            checkIdDefined(id)
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
       }

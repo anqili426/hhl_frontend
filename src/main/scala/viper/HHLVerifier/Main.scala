@@ -20,9 +20,10 @@ object Main {
 
         // Symbol table
         SymbolChecker.checkSymbolsProg(parsedProgram)
-        TypeChecker.typeCheckProg(parsedProgram)
 
-        // TODO: Type checking
+        // Type checking
+        TypeChecker.typeCheckProg(parsedProgram)
+        println("Type checking successful. ")
 
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)

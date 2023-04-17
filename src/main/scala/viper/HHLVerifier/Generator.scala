@@ -32,6 +32,8 @@ object Generator {
   var failedStates = vpr.LocalVarDecl(failedStatesVarName, setStateType)()
   var tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, setStateType)()
 
+  val tmpTypeVarMap = Map(typeVar -> vpr.Int) // TODO: remove later
+
   var extraVars: List[vpr.LocalVarDecl] = List.empty // Extra variables added to the program during translation
 
   var counter = 0
@@ -202,7 +204,9 @@ object Generator {
             case "-" => vpr.Minus(translateExp(e, state))()
           }
         case av@AssertVar(name) =>
-          vpr.LocalVar(name, translateType(av.typ))()
+          // TODO: The type variable map in the method call below needs to be retrieved programtically.
+          //        It can be added as another argument of the method, but can we just use a global variable?
+          vpr.LocalVar(name, translateType(av.typ, tmpTypeVarMap))()
         case ForAllExpr(vars, body) =>
           val variables = vars.map(v => translateAssertVarDecl(v))
           vpr.Forall(variables, Seq.empty, translateExp(body, state))()
@@ -211,12 +215,16 @@ object Generator {
           vpr.Exists(variables, Seq.empty, translateExp(body, state))()
         case ImpliesExpr(left, right) =>
           vpr.Implies(translateExp(left, state), translateExp(right, state))()
-        // case AssertVarDecl(name, typ) => TODO: raise error here
+        case GetValExpr(s, id) =>
+          getGetApp(Seq(translateExp(s, state), vpr.LocalVar(id.name, translateType(id.typ))()), tmpTypeVarMap)
+        // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
+        case _ =>
+          throw UnknownException("Unexpected expression " + e)
       }
     }
 
   def translateAssertVarDecl(decl: AssertVarDecl): vpr.LocalVarDecl = {
-    vpr.LocalVarDecl(decl.vName.name, translateType(decl.vType))()
+    vpr.LocalVarDecl(decl.vName.name, translateType(decl.vType, tmpTypeVarMap))()
   }
 
   // This returns a Viper assume statement that expresses the following:
@@ -248,13 +256,12 @@ object Generator {
     )()
   }
 
-    def translateType(typ: Type): vpr.Type = {
+    def translateType(typ: Type, typVarMap: Map[vpr.TypeVar, vpr.Type] = Map.empty): vpr.Type = {
         typ match {
           case IntType() => vpr.Int
           case BoolType() => vpr.Bool
-          case null => println("null type")
-            vpr.Int
-          // TODO: state type!!
+          case StateType() => getConcreteStateType(typVarMap)
+          case _ => throw UnknownException("Cannot translate type " + typ)
         }
     }
 
