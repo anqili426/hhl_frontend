@@ -18,6 +18,7 @@ object Generator {
                                 setUnionFuncName -> setStateDomainName)
 
   val havocSetMethodName = "havocSet"
+  val checkInvMethodName = "check_inv"
 
   val typeVar = vpr.TypeVar("T")
   val stateType = getConcreteStateType(Map.empty)   // Type State[T]
@@ -32,11 +33,10 @@ object Generator {
   var failedStates = vpr.LocalVarDecl(failedStatesVarName, setStateType)()
   var tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, setStateType)()
 
-  val tmpTypeVarMap = Map(typeVar -> vpr.Int) // TODO: remove later
-
   var extraVars: List[vpr.LocalVarDecl] = List.empty // Extra variables added to the program during translation
 
-  var counter = 0
+  var ifCounter = 0
+  var loopCounter = 0
 
   def generate(input: HHLProgram): vpr.Program = {
     var domains: Seq[vpr.Domain] = Seq.empty
@@ -145,10 +145,10 @@ object Generator {
 
         case IfElseStmt(cond, ifStmt, elseStmt) =>
           // Define new variables to hold the states in the if and else blocks respectively
-          counter = counter + 1
-          val ifBlockStates = vpr.LocalVarDecl(currStatesVarName + counter, currStates.typ)()
-          counter = counter + 1
-          val elseBlockStates = vpr.LocalVarDecl(currStatesVarName + counter, currStates.typ)()
+          ifCounter = ifCounter + 1
+          val ifBlockStates = vpr.LocalVarDecl(currStatesVarName + ifCounter, currStates.typ)()
+          ifCounter = ifCounter + 1
+          val elseBlockStates = vpr.LocalVarDecl(currStatesVarName + ifCounter, currStates.typ)()
           extraVars = extraVars :+ ifBlockStates :+ elseBlockStates
 
           // Cond satisfied
@@ -167,7 +167,33 @@ object Generator {
 
           newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp)
           newMethods = ifBlock._2 ++ elseBlock._2
-//        TODO: case WhileLoopStmt(cond, body) =>
+        case WhileLoopStmt(cond, body, inv) =>
+          loopCounter = loopCounter + 1
+          // Connect all invariants with && to form 1 invariant
+          // TODO: invariant should take a set of states as parameter.
+          //  The invariant provided by the user doesn't specify the set of states,
+          //  so we need to add this when forming form a viper expression
+          var invariant: vpr.Exp = vpr.BoolLit(true)()
+          inv.foreach(i => invariant = vpr.And(invariant, translateExp(i, state))())
+          // Assert I(0)
+          val assertI0 = vpr.Assert(invariant)()
+          // Verify invariant in a separate method
+          // newMethods = Seq(translateInvariantVerification(invariant, body))
+          // Let currStates be a union of Sn's
+          val havocCurrStates = havocSetMethodCall(currStates.localVar)
+          val k = vpr.LocalVarDecl("k", vpr.Int)()
+          val zero = vpr.IntLit(0)()
+          val Sn = vpr.LocalVarDecl("Sn", getConcreteSetStateType(typVarMap))()
+          val unionStates = vpr.Exists(Seq(k, Sn), Seq.empty,
+                                        vpr.And(vpr.LeCmp(k.localVar, zero)(),
+                                            vpr.And(getInSetApp(Seq(state.localVar, Sn.localVar), typVarMap), invariant)()
+                                            )()
+                                      )()
+          val AssumeUnionStates = translateAssumeWithViperExpr(unionStates, state, currStates, typVarMap)
+          // Translate assume !cond
+          val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
+          newStmts = Seq(assertI0, havocCurrStates, AssumeUnionStates) ++ notCond._1
+          return (newStmts, newMethods)
       }
       // Translation of S := S_temp
       val updateProgStates = vpr.LocalVarAssign(currStates.localVar, STmp.localVar)()
@@ -175,7 +201,12 @@ object Generator {
       (newStmts, newMethods)
     }
 
+//    def translateInvariantVerification(inv: vpr.Exp, body: Stmt): vpr.Method = {
+//        vpr.Method(checkInvMethodName, )()
+//    }
+
     def translateExp(e: Expr, state: vpr.LocalVarDecl): vpr.Exp = {
+      val typVarMap = state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap
       e match {
         case Id(name) =>
           // Any reference to a var is translated to get(state, var)
@@ -204,27 +235,25 @@ object Generator {
             case "-" => vpr.Minus(translateExp(e, state))()
           }
         case av@AssertVar(name) =>
-          // TODO: The type variable map in the method call below needs to be retrieved programtically.
-          //        It can be added as another argument of the method, but can we just use a global variable?
-          vpr.LocalVar(name, translateType(av.typ, tmpTypeVarMap))()
+          vpr.LocalVar(name, translateType(av.typ, typVarMap))()
         case ForAllExpr(vars, body) =>
-          val variables = vars.map(v => translateAssertVarDecl(v))
+          val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
           vpr.Forall(variables, Seq.empty, translateExp(body, state))()
         case ExistsExpr(vars, body) =>
-          val variables = vars.map(v => translateAssertVarDecl(v))
+          val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
           vpr.Exists(variables, Seq.empty, translateExp(body, state))()
         case ImpliesExpr(left, right) =>
           vpr.Implies(translateExp(left, state), translateExp(right, state))()
         case GetValExpr(s, id) =>
-          getGetApp(Seq(translateExp(s, state), vpr.LocalVar(id.name, translateType(id.typ))()), tmpTypeVarMap)
+          getGetApp(Seq(translateExp(s, state), vpr.LocalVar(id.name, translateType(id.typ))()), typVarMap)
         // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
         case _ =>
           throw UnknownException("Unexpected expression " + e)
       }
     }
 
-  def translateAssertVarDecl(decl: AssertVarDecl): vpr.LocalVarDecl = {
-    vpr.LocalVarDecl(decl.vName.name, translateType(decl.vType, tmpTypeVarMap))()
+  def translateAssertVarDecl(decl: AssertVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.LocalVarDecl = {
+    vpr.LocalVarDecl(decl.vName.name, translateType(decl.vType, typVarMap))()
   }
 
   // This returns a Viper assume statement that expresses the following:
