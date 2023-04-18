@@ -21,8 +21,10 @@ object Generator {
   val checkInvMethodName = "check_inv"
 
   val typeVar = vpr.TypeVar("T")
-  val stateType = getConcreteStateType(Map.empty)   // Type State[T]
-  val setStateType = getConcreteSetStateType(Map.empty) // Type SetState[T]
+  val defaultTypeVarMap = Map(typeVar -> typeVar)
+  val stateType = getConcreteStateType(defaultTypeVarMap)   // Type State[T]
+  val setStateType = getConcreteSetStateType(defaultTypeVarMap) // Type SetState[T]
+
 
   val sVarName = "s"
   val s0VarName = "s0"
@@ -319,7 +321,7 @@ object Generator {
     )()
   }
 
-    def translateType(typ: Type, typVarMap: Map[vpr.TypeVar, vpr.Type] = Map.empty): vpr.Type = {
+    def translateType(typ: Type, typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.Type = {
         typ match {
           case IntType() => vpr.Int
           case BoolType() => vpr.Bool
@@ -436,19 +438,19 @@ object Generator {
     vpr.MethodCall(havocSetMethodName, Seq.empty, Seq(set))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
   }
 
-  def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = Map.empty): vpr.DomainFuncApp = {
+  def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {
     getDomainFuncApp(inSetFuncName, args, vpr.Bool, typVarMap)
   }
 
-  def getSetUnionApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = Map(typeVar -> typeVar)): vpr.DomainFuncApp = {
+  def getSetUnionApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {
     getDomainFuncApp(setUnionFuncName, args, getConcreteSetStateType(typVarMap), typVarMap)
   }
 
-  def getEqualExceptApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = Map.empty): vpr.DomainFuncApp = {
+  def getEqualExceptApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {
     getDomainFuncApp(equalFuncName, args, vpr.Bool, typVarMap)
   }
 
-  def getGetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = Map.empty): vpr.DomainFuncApp = {
+  def getGetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {
     val retTyp = typVarMap.get(typeVar).getOrElse(typeVar)
     getDomainFuncApp(getFuncName, args, retTyp, typVarMap)
   }
