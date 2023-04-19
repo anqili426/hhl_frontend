@@ -104,6 +104,11 @@ object TypeChecker {
   def typeCheckAssertionHelper(assertVarDecls: Seq[AssertVarDecl], body: Expr, inHyperAssertion: Boolean): Boolean = {
     var res = true
     assertVarDecls.foreach(decl => res = res && typeCheckExpr(decl, inHyperAssertion))
+    if (inHyperAssertion
+        && !assertVarDecls.exists(decl => decl.vType.isInstanceOf[StateType])
+        && !assertVars.exists(v => v._2.isInstanceOf[StateType]))
+      throw TypeException("Hyper assertions must quantifier over states. ")
+
     val originalAssertVars = assertVars
     assertVars = assertVars ++ assertVarDecls.map(decl => decl.vName.name -> decl.vType).toMap
     // AssertVar will appear in the body. Update the assertVars map before type checking the body
