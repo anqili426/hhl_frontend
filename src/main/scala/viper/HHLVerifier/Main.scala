@@ -9,14 +9,17 @@ object Main {
 
   def main(args: Array[String]): Unit = {
 
-    val programAbsPath = "/Users/anqili/Desktop/thesis/hhl_frontend/src/main/scala/viper/HHLVerifier/program.txt"
+    if (args.length == 0) {
+      println("Please provide the program to verify. ")
+      sys.exit(1)
+    }
+    val programAbsPath = args(0)
     val program = scala.io.Source.fromFile(programAbsPath).mkString
     try {
       val res = fastparse.parse(program, Parser.program(_))
       if (res.isSuccess) {
         println("Parsing successful. ")
         val parsedProgram: HHLProgram = res.get.value
-        println(parsedProgram)
 
         // Symbol table
         SymbolChecker.checkSymbolsProg(parsedProgram)
@@ -36,6 +39,7 @@ object Main {
           sys.exit(1)
         }
 
+        println("Translated program is being verified by Viper. ")
         val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
         silicon.start()
         val verifyRes = silicon.verify(viperProgram)

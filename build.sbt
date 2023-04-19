@@ -5,7 +5,7 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 
 ThisBuild / scalaVersion := "2.13.10"
 
-val fastParse = "com.lihaoyi" %% "fastparse" % "3.0.1"
+val fastParse = "com.lihaoyi" %% "fastparse" % "2.2.2"
 lazy val silicon = project in file("silicon")
 //lazy val carbon = project in file("carbon")
 

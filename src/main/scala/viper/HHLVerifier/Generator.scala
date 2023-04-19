@@ -67,7 +67,7 @@ object Generator {
       // TODO: Also need to assume that variables are not the same!
       val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
       // The following statement assumes that S_fail is empty
-      val assumeSFailEmpty = vpr.Assume(vpr.Forall(
+      val assumeSFailEmpty = vpr.Inhale(vpr.Forall(
                                             Seq(state),
                                             Seq.empty,
                                             vpr.Not(
@@ -296,7 +296,7 @@ object Generator {
   // assume forall stateVar :: in_set(stateVar, tmpStates) ==> (exists s0 :: in_set(s0, currStates) && equal_on_everything_except(s0, stateVar, leftVar))
   def translateHavocVarHelper(leftVar: vpr.LocalVarDecl, stateVar: vpr.LocalVarDecl, tmpStates: vpr.LocalVarDecl,
                               currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type])
-                                : vpr.Assume = {
+                                : vpr.Inhale = {
     val s0 = vpr.LocalVarDecl(s0VarName, stateVar.typ)()
     val existsExpr = vpr.Exists(Seq(s0), Seq.empty,
                                 vpr.And(getInSetApp(Seq(s0.localVar, currStates.localVar), typVarMap),
@@ -308,8 +308,8 @@ object Generator {
 
   // This returns a Viper assume statement of the form "assume forall stateVar: State[T] :: in_set(stateVar, pStates) => e"
   // T is determined by the typVarMap(T -> someType)
-  def translateAssumeWithViperExpr(e: vpr.Exp, stateVar: vpr.LocalVarDecl, states: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Assume = {
-    vpr.Assume(
+  def translateAssumeWithViperExpr(e: vpr.Exp, stateVar: vpr.LocalVarDecl, states: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Inhale = {
+    vpr.Inhale(
       vpr.Forall(
         Seq(stateVar),
         Seq.empty,
