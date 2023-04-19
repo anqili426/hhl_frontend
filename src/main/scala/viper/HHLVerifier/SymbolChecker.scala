@@ -50,21 +50,18 @@ object SymbolChecker {
         case ImpliesExpr(left, right) =>
             checkSymbolsExpr(left)
             checkSymbolsExpr(right)
-        case ForAllExpr(assertVars, body) =>
-            val originalTable = allVars
-            // Assertion variables will be added to the symbol table
-            assertVars.foreach(v => checkSymbolsExpr(v))
-            checkSymbolsExpr(body)
-            // Remove the assertion variables from the symbol table
-            allVars = originalTable
-        case ExistsExpr(assertVars, body) =>
-            val originalTable = allVars
-            assertVars.foreach(v => checkSymbolsExpr(v))
-            checkSymbolsExpr(body)
-            allVars = originalTable
+        case Assertion(_, assertVars, body) =>
+          val originalTable = allVars
+          // Assertion variables will be added to the symbol table
+          assertVars.foreach(v => checkSymbolsExpr(v))
+          checkSymbolsExpr(body)
+          // Remove the assertion variables from the symbol table
+          allVars = originalTable
         case GetValExpr(state, id) =>
             checkIdDefined(state)
             checkIdDefined(id)
+        case StateExistsExpr(state) =>
+            checkIdDefined(state)
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
       }

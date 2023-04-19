@@ -12,9 +12,9 @@ case class BoolLit(value: Boolean) extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
-case class ForAllExpr(assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
-case class ExistsExpr(assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
+case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
 case class GetValExpr(state: AssertVar, id: Id) extends Expr
+case class StateExistsExpr(state: AssertVar) extends Expr
 
 sealed trait Decl extends Stmt
 case class PVarDecl(vName: Id, vType: Type) extends Decl

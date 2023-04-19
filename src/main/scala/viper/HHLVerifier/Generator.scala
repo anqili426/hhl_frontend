@@ -215,13 +215,13 @@ object Generator {
     // / forall _s1: State :: in_set(_s1, currStates) ==> inv.body
     def getInvariant(inv: Expr, currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Exp = {
       //  Currently, inv has to be a ForAll expressions
-          assert(inv.isInstanceOf[ForAllExpr])
-          val e = inv.asInstanceOf[ForAllExpr]
+          assert(inv.isInstanceOf[Assertion])
+          val e = inv.asInstanceOf[Assertion]
           val stateVars = e.assertVarDecls.filter(decl => decl.vType.isInstanceOf[StateType])
           val otherVars = e.assertVarDecls.diff(stateVars)
           val vprStateVars = stateVars.map(s => translateAssertVarDecl(s, typVarMap))
           val vprOtherVars = otherVars.map(s =>  translateAssertVarDecl(s, typVarMap))
-
+          // Need to check for empty sequence
           val statesInSet: Seq[vpr.Exp] = vprStateVars.map(s => getInSetApp(Seq(s.localVar, currStates.localVar), typVarMap))
           val statesInSetAnd = statesInSet.reduceLeft((e1, e2) => vpr.And(e1, e2)())
 
@@ -271,12 +271,11 @@ object Generator {
           }
         case av@AssertVar(name) =>
           vpr.LocalVar(name, translateType(av.typ, typVarMap))()
-        case ForAllExpr(vars, body) =>
+        case Assertion(quantifier, vars, body) =>
           val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
-          vpr.Forall(variables, Seq.empty, translateExp(body, state))()
-        case ExistsExpr(vars, body) =>
-          val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
-          vpr.Exists(variables, Seq.empty, translateExp(body, state))()
+          if (quantifier == "forall") vpr.Forall(variables, Seq.empty, translateExp(body, state))()
+          else if (quantifier == "exists") vpr.Exists(variables, Seq.empty, translateExp(body, state))()
+          else throw UnknownException("Unexpected quantifier " + quantifier)
         case ImpliesExpr(left, right) =>
           vpr.Implies(translateExp(left, state), translateExp(right, state))()
         case GetValExpr(s, id) =>

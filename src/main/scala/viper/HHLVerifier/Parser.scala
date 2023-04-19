@@ -35,7 +35,7 @@ object Parser {
     case (cond, Nil, s) => WhileLoopStmt(cond, s)
     case (cond, invs, s) => WhileLoopStmt(cond, s, invs)
   }
-  def loopInv[$: P]: P[Expr] = P("invariant" ~~ spaces ~ hyperAssertExpr)
+  def loopInv[$: P]: P[Assertion] = P("invariant" ~~ spaces ~ hyperAssertExpr)
 
   def arithOp1[$: P]: P[String] = P("+" | "-" | "&&" | "!!").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!
@@ -45,14 +45,8 @@ object Parser {
 
   def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
 
-  def hyperAssertExpr[$: P]: P[Expr] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map{
-    case (quant, vars, e) => {
-      quant match {
-        case "forall" => ForAllExpr(vars, e)
-        case "exists" => ExistsExpr(vars, e)
-      }
-    }
-  }
+  def hyperAssertExpr[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(
+    items => Assertion(items._1, items._2, items._3))
 
   def otherExpr[$: P]: P[Expr] = P(normalExpr ~~ (spaces ~ impliesOp ~~/ spaces ~ expr).?).map{
     case (e, None) => e
@@ -74,7 +68,7 @@ object Parser {
     case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
   }
 
-  def basicExpr[$: P]: P[Expr] = P(boolean | unaryExpr | getProgVarExpr | identifier | number | "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(boolean | unaryExpr | getProgVarExpr | identifier | number | stateExistsExpr | "(" ~ expr ~ ")")
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   def notExpr[$: P]: P[UnaryExpr] = P("!" ~ boolean).map(e => UnaryExpr("!", e))
@@ -85,6 +79,8 @@ object Parser {
   def boolFalse[$: P]: P[BoolLit] = P("false").!.map(_ => BoolLit(false))
 
   def getProgVarExpr[$: P]: P[GetValExpr] = P("get(" ~ assertVar ~ "," ~ progVar ~ ")").map(items => GetValExpr(items._1, items._2))
+
+  def stateExistsExpr[$: P]: P[StateExistsExpr] = P("<" ~ assertVar ~ ">").map(StateExistsExpr)
 
   def identifier[$: P]: P[Expr] = P(progVar | assertVar)
 

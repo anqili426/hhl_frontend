@@ -20,19 +20,19 @@ object TypeChecker {
       case CompositeStmt(stmts) =>
         stmts.foreach(stmt => res = res && typeCheckStmt(stmt))
       case AssignStmt(left, right) =>
-        res = typeCheckExpr(left) && typeCheckExpr(right) && checkIfTypeMatch(left.typ, right.typ)
+        res = typeCheckExpr(left, false) && typeCheckExpr(right, false) && checkIfTypeMatch(left.typ, right.typ)
       case HavocStmt(id) =>
-        res = typeCheckExpr(id)
+        res = typeCheckExpr(id, false)
       case AssumeStmt(e) =>
-        res = typeCheckExpr(e) && checkIfTypeMatch(e.typ, boolType)
+        res = typeCheckExpr(e, false) && checkIfTypeMatch(e.typ, boolType)
       case AssertStmt(e) =>
-        res = typeCheckExpr(e) && checkIfTypeMatch(e.typ, boolType)
+        res = typeCheckExpr(e, false) && checkIfTypeMatch(e.typ, boolType)
       case IfElseStmt(cond, ifStmt, elseStmt) =>
-        res = typeCheckExpr(cond) && checkIfTypeMatch(cond.typ, boolType)
+        res = typeCheckExpr(cond, false) && checkIfTypeMatch(cond.typ, boolType)
         res = res && typeCheckStmt(ifStmt) && typeCheckStmt(elseStmt)
       case WhileLoopStmt(cond, body, inv) =>
-        res = typeCheckExpr(cond) && checkIfTypeMatch(cond.typ, boolType)
-        inv.foreach(i => res = res && typeCheckExpr(i) && checkIfTypeMatch(i.typ, boolType))
+        res = typeCheckExpr(cond, false) && checkIfTypeMatch(cond.typ, boolType)
+        inv.foreach(i => res = res && typeCheckExpr(i, true) && checkIfTypeMatch(i.typ, boolType))
         res = res && typeCheckStmt(body)
       case PVarDecl(vName, vType) =>
         vName.typ = vType
@@ -42,14 +42,15 @@ object TypeChecker {
     res
   }
 
-  def typeCheckExpr(e: Expr): Boolean = {
+  def typeCheckExpr(e: Expr, inHyperAssertion: Boolean): Boolean = {
     var res = true
     e match {
       case id@Id(_) =>
+        if (inHyperAssertion) throw TypeException("Program variables cannot appear in a hyper assertion")
         if (SymbolChecker.allVars.contains(id.name)) id.typ = SymbolChecker.allVars.get(id.name).get
         else res = false
       case be@BinaryExpr(e1, op, e2) =>
-        res = typeCheckExpr(e1) && typeCheckExpr(e2)
+        res = typeCheckExpr(e1, inHyperAssertion) && typeCheckExpr(e2, inHyperAssertion)
         val typeMatched = checkIfTypeMatch(e1.typ, e2.typ)
         res = res && typeMatched
         if (!typeMatched) res = false
@@ -63,10 +64,10 @@ object TypeChecker {
         } else res = false  // e1 & e2 have the same type, but their type is undefined for the binary operator
       case ue@UnaryExpr(op, e) =>
         if (op == "!") {
-          res = typeCheckExpr(e) && checkIfTypeMatch(e.typ, boolType)
+          res = typeCheckExpr(e, inHyperAssertion) && checkIfTypeMatch(e.typ, boolType)
           ue.typ = boolType
         } else if (op == "-") {
-          res = typeCheckExpr(e) && checkIfTypeMatch(e.typ, intType)
+          res = typeCheckExpr(e, inHyperAssertion) && checkIfTypeMatch(e.typ, intType)
           ue.typ = intType
         }
       case num@Num(_) =>
@@ -77,33 +78,36 @@ object TypeChecker {
         if (assertVars.keySet.contains(name)) av.typ = assertVars.get(name).get
         else res = false
       case AssertVarDecl(vName, vType) =>
+        if (!inHyperAssertion && vType.isInstanceOf[StateType]) throw TypeException("Variables of type State can only appear in a hyper assertion. ")
         vName.typ = vType
       // AssertVarDecl expression itself doesn't have a concrete type
       case ie@ImpliesExpr(left, right) =>
-        res = typeCheckExpr(left) && typeCheckExpr(right)
+        res = typeCheckExpr(left, inHyperAssertion) && typeCheckExpr(right, inHyperAssertion)
         res = res && checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
-      case ee@ExistsExpr(assertVarDecls, body) =>
-        res = typeCheckQuantifierExprHelper(assertVarDecls, body)
-        ee.typ = boolType
-      case fe@ForAllExpr(assertVarDecls, body) =>
-        res = typeCheckQuantifierExprHelper(assertVarDecls, body)
-        fe.typ = boolType
+      case ast@Assertion(_, assertVarDecls, body) =>
+        res = typeCheckAssertionHelper(assertVarDecls, body, inHyperAssertion)
+        ast.typ = boolType
       case gve@GetValExpr(state, id) =>
-        res = typeCheckExpr(state) && typeCheckExpr(id) && checkIfTypeMatch(state.typ, stateType)
+        if (!inHyperAssertion) throw TypeException("Expression " + gve + " can only appear in a hyper assertion. ")
+        res = typeCheckExpr(state, inHyperAssertion) && typeCheckExpr(id, inHyperAssertion) && checkIfTypeMatch(state.typ, stateType)
         gve.typ = id.typ
+      case se@StateExistsExpr(state) =>
+        if (!inHyperAssertion) throw TypeException("Expression " + se + " can only appear in a hyper assertion. ")
+        res = typeCheckExpr(state, inHyperAssertion) && checkIfTypeMatch(state.typ, stateType)
+        se.typ = boolType
     }
     if (!res) throw TypeException("The expression has a type error: " + e)
     res
   }
 
-  def typeCheckQuantifierExprHelper(assertVarDecls: Seq[AssertVarDecl], body: Expr): Boolean = {
+  def typeCheckAssertionHelper(assertVarDecls: Seq[AssertVarDecl], body: Expr, inHyperAssertion: Boolean): Boolean = {
     var res = true
-    assertVarDecls.foreach(decl => res = res && typeCheckExpr(decl))
+    assertVarDecls.foreach(decl => res = res && typeCheckExpr(decl, inHyperAssertion))
     val originalAssertVars = assertVars
     assertVars = assertVars ++ assertVarDecls.map(decl => decl.vName.name -> decl.vType).toMap
     // AssertVar will appear in the body. Update the assertVars map before type checking the body
-    res = res && typeCheckExpr(body) && checkIfTypeMatch(body.typ, boolType)
+    res = res && typeCheckExpr(body, inHyperAssertion) && checkIfTypeMatch(body.typ, boolType)
     assertVars = originalAssertVars
     res
   }
