@@ -27,7 +27,7 @@ object Main {
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
         println("Type checking successful. ")
-        sys.exit(0)
+        // sys.exit(0)
 
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)

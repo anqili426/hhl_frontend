@@ -12,7 +12,9 @@ case class BoolLit(value: Boolean) extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
-case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
+case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr {
+  var hasStateVar = assertVarDecls.exists(decl => decl.vType.isInstanceOf[StateType])
+}
 case class GetValExpr(state: AssertVar, id: Id) extends Expr
 case class StateExistsExpr(state: AssertVar) extends Expr
 case class LoopIndex() extends Expr

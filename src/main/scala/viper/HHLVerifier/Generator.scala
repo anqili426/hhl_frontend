@@ -39,6 +39,8 @@ object Generator {
 
   var ifCounter = 0
   var loopCounter = 0
+  var currLoopIndex: vpr.Exp = null
+  var currLoopIndexName = "n_loop"
 
   def generate(input: HHLProgram): vpr.Program = {
     var domains: Seq[vpr.Domain] = Seq.empty
@@ -116,18 +118,19 @@ object Generator {
           val thisVar = vpr.LocalVarDecl(name.name, translateType(typ))()
           extraVars = extraVars :+ thisVar
           return (Seq.empty, Seq.empty)
+
         case AssumeStmt(e) =>
           val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
-                                        translateExp(e, state))()
+                                        translateExp(e, state, currStates))()
           newStmts = Seq(translateAssumeWithViperExpr(exp, state, STmp, typVarMap))
 
         case AssertStmt(e) =>
             val havocSFailTmp = havocSetMethodCall(tempFailedStates.localVar)
             val exp1 = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
-                                translateExp(e, state))()
+                                translateExp(e, state, currStates))()
             val stmt1 = translateAssumeWithViperExpr(exp1, state, STmp, typVarMap)
             val exp2 = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
-                                translateExp(UnaryExpr("!", e), state))()
+                                translateExp(UnaryExpr("!", e), state, currStates))()
             val stmt2 = translateAssumeWithViperExpr(exp2, state, tempFailedStates, typVarMap)
             val updateSFail = vpr.LocalVarAssign(failedStates.localVar,
                               getSetUnionApp(Seq(failedStates.localVar, tempFailedStates.localVar), typVarMap))()
@@ -136,7 +139,7 @@ object Generator {
         case AssignStmt(left, right) =>
             val leftVar = vpr.LocalVarDecl(left.name, typVarMap.get(typeVar).get)()
             val stmt1 = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
-            val exp = vpr.EqCmp(translateExp(left, state), translateExp(right, state))()
+            val exp = vpr.EqCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
             val stmt2 = translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
             newStmts = Seq(stmt1, stmt2)
 
@@ -169,25 +172,28 @@ object Generator {
 
           newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp)
           newMethods = ifBlock._2 ++ elseBlock._2
+
+        case RequiresStmt(e) =>
+          return (Seq(vpr.Inhale(translateHyperAssertion(e, currStates, typVarMap))()), newMethods)
+
+        case EnsuresStmt(e) =>
+          return (Seq(vpr.Assert(translateHyperAssertion(e, currStates, typVarMap))()), newMethods)
+
         case WhileLoopStmt(cond, body, inv) =>
           loopCounter = loopCounter + 1
           // Connect all invariants with && to form 1 invariant
-          // TODO: invariant should take a set of states as parameter.
-          //  The invariant provided by the user doesn't specify the set of states,
-          //  so we need to add this when forming form a viper expression.
-          //  Direct translation is not correct. Maybe need in_set(s, currStates) implies invariant.
-          //  Or do we let user specify the set of states too? But in this case, user will have to know the identifier for the current states...
-          //  Maybe reserve a keyword to represent the current states
-          val invariant = getAllInvariants(inv, currStates, typVarMap)
+          currLoopIndex = vpr.IntLit(0)()
+          val I0 = getAllInvariants(inv, currStates, typVarMap)
           // Assert I(0)
-          val assertI0 = vpr.Assert(invariant)()
+          val assertI0 = vpr.Assert(I0)()
           // Verify invariant in a separate method
-          // newMethods = Seq(translateInvariantVerification(invariant, body))
+          newMethods = Seq(translateInvariantVerification(inv, body))
           // Let currStates be a union of Sn's
           val havocCurrStates = havocSetMethodCall(currStates.localVar)
           val k = vpr.LocalVarDecl("k", vpr.Int)()
           val zero = vpr.IntLit(0)()
           val Sn = vpr.LocalVarDecl("Sn", getConcreteSetStateType(typVarMap))()
+          currLoopIndex = k.localVar
           val unionStates = vpr.Exists(Seq(k, Sn), Seq.empty,
                                         vpr.And(vpr.LeCmp(k.localVar, zero)(),
                                             vpr.And(getInSetApp(Seq(state.localVar, Sn.localVar), typVarMap), getAllInvariants(inv, Sn, typVarMap))()
@@ -206,32 +212,34 @@ object Generator {
     }
 
 
-    def getAllInvariants(invs: Seq[Expr], currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Exp = {
-      // TODO: consider the case when invs is empty seq
-      val translatedInvs = invs.map(i => getInvariant(i, currStates, typVarMap))
-      val res = translatedInvs.reduceLeft((e1, e2) => vpr.And(e1, e2)())
-      res
+    def getAllInvariants(invs: Seq[Assertion], currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Exp = {
+      if (invs.isEmpty) return vpr.BoolLit(true)()
+      val translatedInvs = invs.map(i => translateHyperAssertion(i, currStates, typVarMap))
+      translatedInvs.reduceLeft((e1, e2) => vpr.And(e1, e2)())
     }
 
-    // / forall _s1: State :: in_set(_s1, currStates) ==> inv.body
-    def getInvariant(inv: Expr, currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Exp = {
-      //  Currently, inv has to be a ForAll expressions
-          assert(inv.isInstanceOf[Assertion])
-          val e = inv.asInstanceOf[Assertion]
-          val stateVars = e.assertVarDecls.filter(decl => decl.vType.isInstanceOf[StateType])
-          val otherVars = e.assertVarDecls.diff(stateVars)
+    // Given a forall expression in the language: forall _s: State :: expr
+    // Returns a forall expression in Viper: forall _s: State :: in_set(_s, currStates) ==> expr
+    def translateHyperAssertion(inv: Assertion, currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Exp = {
+          // Currently, inv has to be a ForAll expressions
+          // Since inv is a hyperassertion, it must have state variables
+          val stateVars = inv.assertVarDecls.filter(decl => decl.vType.isInstanceOf[StateType])
+          val otherVars = inv.assertVarDecls.diff(stateVars)
           val vprStateVars = stateVars.map(s => translateAssertVarDecl(s, typVarMap))
           val vprOtherVars = otherVars.map(s =>  translateAssertVarDecl(s, typVarMap))
           val statesInSet: Seq[vpr.Exp] = vprStateVars.map(s => getInSetApp(Seq(s.localVar, currStates.localVar), typVarMap))
           val statesInSetAnd = statesInSet.reduceLeft((e1, e2) => vpr.And(e1, e2)())
-
-          val body = vpr.Implies(statesInSetAnd, translateExp(e.body, null))()
+          // In translateExp, a state variable is only explicitly used when an Id instance is detected,
+          //  but hyperassertions do not contain Id instances, so it's ok to use null here
+          val body = vpr.Implies(statesInSetAnd, translateExp(inv.body, null, currStates))()
           vpr.Forall(vprStateVars ++ vprOtherVars, Seq.empty, body)()
     }
 
-    def translateInvariantVerification(inv: vpr.Exp, body: Stmt): vpr.Method = {
+    def translateInvariantVerification(inv: Seq[Assertion], body: Stmt): vpr.Method = {
+      val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
+      currLoopIndex = currLoopIndexDecl.localVar
         vpr.Method(checkInvMethodName + loopCounter,
-          Seq(),  // args
+          Seq(currLoopIndexDecl),  // args
           Seq(),  // return values
           Seq(),  // pre
           Seq(),  // post
@@ -239,7 +247,7 @@ object Generator {
         )()
     }
 
-    def translateExp(e: Expr, state: vpr.LocalVarDecl): vpr.Exp = {
+    def translateExp(e: Expr, state: vpr.LocalVarDecl, currStates: vpr.LocalVarDecl): vpr.Exp = {
       val typVarMap = if (state != null) state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap
                       else Map(typeVar -> vpr.Int)
       e match {
@@ -251,37 +259,45 @@ object Generator {
         case BoolLit(value) => vpr.BoolLit(value)()
         case BinaryExpr(left, op, right) =>
           op match {
-            case "+" => vpr.Add(translateExp(left, state), translateExp(right, state))()
-            case "-" => vpr.Sub(translateExp(left, state), translateExp(right, state))()
-            case "*" => vpr.Mul(translateExp(left, state), translateExp(right, state))()
-            case "/" => vpr.Div(translateExp(left, state), translateExp(right, state))()
-            case "&&" => vpr.And(translateExp(left, state), translateExp(right, state))()
-            case "||" => vpr.Or(translateExp(left, state), translateExp(right, state))()
-            case "==" => vpr.EqCmp(translateExp(left, state), translateExp(right, state))()
-            case "!=" => vpr.NeCmp(translateExp(left, state), translateExp(right, state))()
-            case ">" => vpr.GtCmp(translateExp(left, state), translateExp(right, state))()
-            case ">=" => vpr.GeCmp(translateExp(left, state), translateExp(right, state))()
-            case "<" => vpr.LtCmp(translateExp(left, state), translateExp(right, state))()
-            case "<=" => vpr.LeCmp(translateExp(left, state), translateExp(right, state))()
+            case "+" => vpr.Add(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "-" => vpr.Sub(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "*" => vpr.Mul(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "/" => vpr.Div(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "&&" => vpr.And(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "||" => vpr.Or(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "==" => vpr.EqCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "!=" => vpr.NeCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case ">" => vpr.GtCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case ">=" => vpr.GeCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "<" => vpr.LtCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "<=" => vpr.LeCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
           }
         case UnaryExpr(op, e) =>
           op match {
-            case "!" => vpr.Not(translateExp(e, state))()
-            case "-" => vpr.Minus(translateExp(e, state))()
+            case "!" => vpr.Not(translateExp(e, state, currStates))()
+            case "-" => vpr.Minus(translateExp(e, state, currStates))()
           }
         case av@AssertVar(name) =>
           vpr.LocalVar(name, translateType(av.typ, typVarMap))()
-        case Assertion(quantifier, vars, body) =>
+        case a@Assertion(quantifier, vars, body) =>
           val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
-          if (quantifier == "forall") vpr.Forall(variables, Seq.empty, translateExp(body, state))()
-          else if (quantifier == "exists") vpr.Exists(variables, Seq.empty, translateExp(body, state))()
+          if (quantifier == "forall") {
+            if (a.hasStateVar) translateHyperAssertion(a, currStates, typVarMap)
+            else vpr.Forall(variables, Seq.empty, translateExp(body, state, currStates))()
+          }
+          else if (quantifier == "exists") {
+            vpr.Exists(variables, Seq.empty, translateExp(body, state, currStates))()
+          }
           else throw UnknownException("Unexpected quantifier " + quantifier)
         case ImpliesExpr(left, right) =>
-          vpr.Implies(translateExp(left, state), translateExp(right, state))()
+          vpr.Implies(translateExp(left, state, currStates), translateExp(right, state, currStates))()
         case GetValExpr(s, id) =>
           val stateVar = vpr.LocalVarDecl(s.name, getConcreteStateType(typVarMap))()
-          translateExp(id, stateVar)
+          translateExp(id, stateVar, currStates)
         // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
+        // TODO:
+//        case StateExistsExpr(state) =>
+        case LoopIndex() => currLoopIndex
         case _ =>
           throw UnknownException("Unexpected expression " + e)
       }
