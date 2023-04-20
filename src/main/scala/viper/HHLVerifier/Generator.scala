@@ -1,4 +1,5 @@
 package viper.HHLVerifier
+import viper.silver.ast.{IntLit, Seqn}
 import viper.silver.{ast => vpr}
 
 object Generator {
@@ -187,7 +188,7 @@ object Generator {
           // Assert I(0)
           val assertI0 = vpr.Assert(I0)()
           // Verify invariant in a separate method
-          newMethods = Seq(translateInvariantVerification(inv, body))
+          newMethods = translateInvariantVerification(inv, body, typVarMap)
           // Let currStates be a union of Sn's
           val havocCurrStates = havocSetMethodCall(currStates.localVar)
           val k = vpr.LocalVarDecl("k", vpr.Int)()
@@ -235,16 +236,33 @@ object Generator {
           vpr.Forall(vprStateVars ++ vprOtherVars, Seq.empty, body)()
     }
 
-    def translateInvariantVerification(inv: Seq[Assertion], body: Stmt): vpr.Method = {
+    def translateInvariantVerification(inv: Seq[Assertion], body: CompositeStmt, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
       val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
+      val inputStatesName = "S0"
+      val inputStates = vpr.LocalVarDecl(inputStatesName, getConcreteSetStateType(typVarMap))()
+      val outputStatesName = "SS"
+      val outputStates = vpr.LocalVarDecl(outputStatesName, getConcreteSetStateType(typVarMap))()
       currLoopIndex = currLoopIndexDecl.localVar
-        vpr.Method(checkInvMethodName + loopCounter,
-          Seq(currLoopIndexDecl),  // args
-          Seq(),  // return values
-          Seq(),  // pre
-          Seq(),  // post
-          None    // body
+      val In = getAllInvariants(inv, inputStates, typVarMap)
+      currLoopIndex = vpr.Add(currLoopIndex, IntLit(1)())()
+      val InPlus1 = getAllInvariants(inv, outputStates, typVarMap)
+
+      // Preconditions
+      val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, IntLit(1)())()
+      val allProgVarsInBody = Seq.empty // TODO: get all program variables in the loop body -- maybe do this in symbol table?
+      // val pre2 = let all program variables are different by assigning a distinct integer value to each of them
+
+      // Translation of the loop body
+      val loopBody = translateStmt(body, inputStates)
+
+      val thisMethod =  vpr.Method(checkInvMethodName + loopCounter,
+          Seq(currLoopIndexDecl, inputStates),  // args
+          Seq(outputStates),  // return values
+          Seq(pre1, In),  // pre
+          Seq(InPlus1),  // post
+          Some(Seqn(loopBody._1, allProgVarsInBody)())    // body
         )()
+      Seq(thisMethod) ++ loopBody._2
     }
 
     def translateExp(e: Expr, state: vpr.LocalVarDecl, currStates: vpr.LocalVarDecl): vpr.Exp = {

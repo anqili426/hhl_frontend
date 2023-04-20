@@ -29,7 +29,7 @@ case class HavocStmt(id: Id) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
 case class AssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: Stmt, elseStmt: Stmt) extends Stmt
-case class WhileLoopStmt(cond: Expr, body: Stmt, inv: Seq[Assertion]) extends Stmt
+case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[Assertion]) extends Stmt
 case class RequiresStmt(e: Assertion) extends Stmt
 case class EnsuresStmt(e: Assertion) extends Stmt
 
