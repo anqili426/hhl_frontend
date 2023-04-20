@@ -37,6 +37,10 @@ object TypeChecker {
       case PVarDecl(vName, vType) =>
         vName.typ = vType
         res = true
+      case RequiresStmt(e) =>
+        res = typeCheckExpr(e, true) && checkIfTypeMatch(e.typ, boolType)
+      case EnsuresStmt(e) =>
+        res = typeCheckExpr(e, true) && checkIfTypeMatch(e.typ, boolType)
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
     res
@@ -96,6 +100,8 @@ object TypeChecker {
         if (!inHyperAssertion) throw TypeException("Expression " + se + " can only appear in a hyper assertion. ")
         res = typeCheckExpr(state, inHyperAssertion) && checkIfTypeMatch(state.typ, stateType)
         se.typ = boolType
+      case li@LoopIndex() =>
+        li.typ = intType
     }
     if (!res) throw TypeException("The expression has a type error: " + e)
     res

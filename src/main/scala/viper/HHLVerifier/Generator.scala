@@ -207,6 +207,7 @@ object Generator {
 
 
     def getAllInvariants(invs: Seq[Expr], currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Exp = {
+      // TODO: consider the case when invs is empty seq
       val translatedInvs = invs.map(i => getInvariant(i, currStates, typVarMap))
       val res = translatedInvs.reduceLeft((e1, e2) => vpr.And(e1, e2)())
       res
@@ -221,7 +222,6 @@ object Generator {
           val otherVars = e.assertVarDecls.diff(stateVars)
           val vprStateVars = stateVars.map(s => translateAssertVarDecl(s, typVarMap))
           val vprOtherVars = otherVars.map(s =>  translateAssertVarDecl(s, typVarMap))
-          // Need to check for empty sequence
           val statesInSet: Seq[vpr.Exp] = vprStateVars.map(s => getInSetApp(Seq(s.localVar, currStates.localVar), typVarMap))
           val statesInSetAnd = statesInSet.reduceLeft((e1, e2) => vpr.And(e1, e2)())
 

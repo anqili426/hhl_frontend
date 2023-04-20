@@ -4,7 +4,12 @@ import fastparse._
 import MultiLineWhitespace._
 
 object Parser {
-  def program[$: P]: P[HHLProgram] = P(Start ~ stmts ~ End).map(s => HHLProgram(s))
+  def program[$: P]: P[HHLProgram] = P(Start ~ precondition.rep ~ stmts ~ postcondition.rep ~ End).map {
+    case (Nil, stmts, Nil) => HHLProgram(stmts)
+    case (Nil, stmts, post) => HHLProgram(CompositeStmt(stmts.stmts ++ post))
+    case (pre, stmts, Nil) => HHLProgram(CompositeStmt(pre ++ stmts.stmts))
+    case (pre, stmts, post) => HHLProgram(CompositeStmt(pre ++ stmts.stmts ++ post))
+  }
 
   def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
 
@@ -23,19 +28,21 @@ object Parser {
     case "State" => StateType()
   }
 
-  def stmts[$: P] : P[Stmt] = P(stmt.rep).map(CompositeStmt)
+  def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
   def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign)
-  def assign[$: P] : P[Stmt] = P(progVar ~ ":=" ~ expr).map(e => AssignStmt(e._1, e._2))
-  def havoc[$: P] : P[Stmt] = P("havoc" ~~ spaces ~ progVar).map(e => HavocStmt(e))
-  def assume[$: P] : P[Stmt] = P("assume" ~~ spaces ~ expr).map(AssumeStmt)
-  def assert[$: P] : P[Stmt] = P("assert" ~~ spaces ~ expr).map(AssertStmt)
-  def ifElse[$: P] : P[Stmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}" ~ ("else" ~ "{" ~ stmts ~ "}").?).map{
+  def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ expr).map(e => AssignStmt(e._1, e._2))
+  def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar).map(e => HavocStmt(e))
+  def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ expr).map(AssumeStmt)
+  def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ expr).map(AssertStmt)
+  def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}" ~ ("else" ~ "{" ~ stmts ~ "}").?).map{
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
-  def whileLoop[$: P] : P[Stmt] = P("while" ~ "(" ~ expr ~ ")" ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
-    case (cond, Nil, s) => WhileLoopStmt(cond, s)
+  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~ "(" ~ expr ~ ")" ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
+    case (cond, Nil, s) => WhileLoopStmt(cond, s, Seq.empty)
     case (cond, invs, s) => WhileLoopStmt(cond, s, invs)
   }
   def loopInv[$: P]: P[Assertion] = P("invariant" ~~ spaces ~ hyperAssertExpr)
+  def precondition[$: P]: P[RequiresStmt] = P("requires" ~~ spaces ~ hyperAssertExpr).map(RequiresStmt)
+  def postcondition[$: P]: P[EnsuresStmt] = P("ensures" ~~ spaces ~ hyperAssertExpr).map(EnsuresStmt)
 
   def arithOp1[$: P]: P[String] = P("+" | "-" | "&&" | "!!").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!
@@ -68,7 +75,7 @@ object Parser {
     case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
   }
 
-  def basicExpr[$: P]: P[Expr] = P(boolean | unaryExpr | getProgVarExpr | identifier | number | stateExistsExpr | "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(loopIndex | boolean | unaryExpr | getProgVarExpr | identifier | number | stateExistsExpr | "(" ~ expr ~ ")")
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   def notExpr[$: P]: P[UnaryExpr] = P("!" ~ boolean).map(e => UnaryExpr("!", e))
@@ -88,5 +95,6 @@ object Parser {
 
   def assertVar[$: P]: P[AssertVar] = P("_" ~~ CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => AssertVar(name))
 
+  def loopIndex[$: P]: P[LoopIndex] = P("$n").map(_ => LoopIndex())
   def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(value => Num(value))
 }
