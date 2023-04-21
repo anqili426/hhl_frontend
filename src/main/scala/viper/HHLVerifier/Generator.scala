@@ -238,6 +238,7 @@ object Generator {
     }
 
     def translateInvariantVerification(inv: Seq[Assertion], body: CompositeStmt, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
+      val methodName = checkInvMethodName + loopCounter
       val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
       val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
       val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
@@ -261,7 +262,7 @@ object Generator {
       val loopBody = translateStmt(body, outputStates)
       val methodBody = Seq(tmpStatesDecl, assignToOutputStates) ++ loopBody._1
 
-      val thisMethod =  vpr.Method(checkInvMethodName + loopCounter,
+      val thisMethod = vpr.Method(methodName,
           Seq(currLoopIndexDecl, inputStates) ++ allProgVarsInBody,  // args
           Seq(outputStates),  // return values
           Seq(pre1, In) ++ pre2,  // pre
