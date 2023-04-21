@@ -6,15 +6,19 @@ object SymbolChecker {
     checkSymbolsStmt(p.stmts)
   }
 
-  def checkSymbolsStmt(stmt: Stmt): Unit = {
+  def checkSymbolsStmt(stmt: Stmt): Seq[(String, Type)] = {
     stmt match {
-      case CompositeStmt(stmts) => stmts.foreach(s => checkSymbolsStmt(s))
+      case cs@CompositeStmt(stmts) =>
+        var res: Seq[(String, Type)] = Seq.empty
+        stmts.foreach(s => res = res ++ checkSymbolsStmt(s))
+        cs.allProgVars = res.distinct.toMap
+        res.distinct
       case PVarDecl(id, typ) =>
         checkIdDup(id)
         allVars = allVars + (id.name -> typ)
+        Seq((id.name, typ))
       case AssignStmt(id, exp) =>
-        checkSymbolsExpr(id, false)
-        checkSymbolsExpr(exp, false)
+        checkSymbolsExpr(id, false) ++ checkSymbolsExpr(exp, false)
       case HavocStmt(id) =>
         checkSymbolsExpr(id, false)
       case AssumeStmt(e) =>
@@ -22,9 +26,7 @@ object SymbolChecker {
       case AssertStmt(e) =>
         checkSymbolsExpr(e, false)
       case IfElseStmt(cond, ifBlock, elseBlock) =>
-        checkSymbolsExpr(cond, false)
-        checkSymbolsStmt(ifBlock)
-        checkSymbolsStmt(elseBlock)
+        checkSymbolsExpr(cond, false) ++ checkSymbolsStmt(ifBlock) ++ checkSymbolsStmt(elseBlock)
       case WhileLoopStmt(cond, body, inv) =>
         checkSymbolsExpr(cond, false)
         inv.foreach(i => checkSymbolsExpr(i, true))
@@ -36,38 +38,45 @@ object SymbolChecker {
       case _ =>
         throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)
     }
+  }
 
-    def checkSymbolsExpr(exp: Expr, isInLoopInv: Boolean): Unit = {
+    def checkSymbolsExpr(exp: Expr, isInLoopInv: Boolean): Seq[(String, Type)] = {
       exp match {
         case id@Id(_) => // This is identifier used. Id in variable declarations are not checked here
           checkIdDefined(id)
-        case av@AssertVar(_) => checkIdDefined(av)
+          Seq((id.name, allVars.get(id.name).get))
+        case av@AssertVar(_) =>
+          checkIdDefined(av)
+          Seq.empty
         case AssertVarDecl(vName, vType) =>
           checkIdDup(vName)
           allVars = allVars + (vName.name -> vType)
-        case Num(_) =>
-        case BoolLit(_) =>
+          Seq.empty
+        case Num(_) => Seq.empty
+        case BoolLit(_) => Seq.empty
         case BinaryExpr(left, _, right) =>
-            checkSymbolsExpr(left, isInLoopInv)
-            checkSymbolsExpr(right, isInLoopInv)
+            checkSymbolsExpr(left, isInLoopInv) ++ checkSymbolsExpr(right, isInLoopInv)
         case UnaryExpr(_, e) => checkSymbolsExpr(e, isInLoopInv)
         case ImpliesExpr(left, right) =>
-            checkSymbolsExpr(left, isInLoopInv)
-            checkSymbolsExpr(right, isInLoopInv)
+            checkSymbolsExpr(left, isInLoopInv) ++ checkSymbolsExpr(right, isInLoopInv)
         case Assertion(_, assertVars, body) =>
           val originalTable = allVars
           // Assertion variables will be added to the symbol table
           assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv))
-          checkSymbolsExpr(body, isInLoopInv)
+          val varsInBody = checkSymbolsExpr(body, isInLoopInv)
           // Remove the assertion variables from the symbol table
           allVars = originalTable
+          varsInBody
         case GetValExpr(state, id) =>
             checkIdDefined(state)
             checkIdDefined(id)
+            Seq((id.name, id.typ))
         case StateExistsExpr(state) =>
             checkIdDefined(state)
+            Seq.empty
         case LoopIndex() =>
             if (!isInLoopInv) throw UnknownException("Loop index $n can only be used in a loop invariant")
+            Seq.empty
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
       }
@@ -89,9 +98,9 @@ object SymbolChecker {
         case AssertVar(name) => name
         case AssertVarDecl (vName, _) => vName.name
         case _ =>
-          throw UnknownException("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + stmt.getClass)
+          throw UnknownException("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass)
       }
     }
-  }
+
 
 }

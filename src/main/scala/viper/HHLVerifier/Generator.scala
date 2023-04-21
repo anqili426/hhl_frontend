@@ -1,5 +1,6 @@
 package viper.HHLVerifier
 import viper.silver.ast.{IntLit, Seqn}
+import viper.silver.parser.NameAnalyser
 import viper.silver.{ast => vpr}
 
 object Generator {
@@ -26,7 +27,6 @@ object Generator {
   val stateType = getConcreteStateType(defaultTypeVarMap)   // Type State[T]
   val setStateType = getConcreteSetStateType(defaultTypeVarMap) // Type SetState[T]
 
-
   val sVarName = "s"
   val s0VarName = "s0"
   val currStatesVarName = "S"
@@ -35,8 +35,6 @@ object Generator {
   val tempFailedStatesVarName = "S_fail_temp"
   var failedStates = vpr.LocalVarDecl(failedStatesVarName, setStateType)()
   var tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, setStateType)()
-
-  var extraVars: List[vpr.LocalVarDecl] = List.empty // Extra variables added to the program during translation
 
   var ifCounter = 0
   var loopCounter = 0
@@ -66,7 +64,7 @@ object Generator {
       tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, getConcreteSetStateType(typVarMap))()
       val translatedContent = translateStmt(input.content, currStates)
 
-      val localVars = Seq(currStates, tempStates, tempFailedStates, failedStates) ++ extraVars
+      val localVars = Seq(currStates, tempStates, tempFailedStates, failedStates) ++ translatedContent._3
       // TODO: Also need to assume that variables are not the same!
       val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
       // The following statement assumes that S_fail is empty
@@ -90,7 +88,7 @@ object Generator {
     //      .... (Translation uses S_temp and S)
     // S := S_temp
     // In the end, we get back S in the output
-    def translateStmt(stmt: Stmt, currStates: vpr.LocalVarDecl): (Seq[vpr.Stmt], Seq[vpr.Method]) = {
+    def translateStmt(stmt: Stmt, currStates: vpr.LocalVarDecl): (Seq[vpr.Stmt], Seq[vpr.Method], Seq[vpr.LocalVarDecl]) = {
       // A set of states
       val STmp = vpr.LocalVarDecl(tempStatesVarName, currStates.typ)()
       // A state
@@ -101,29 +99,34 @@ object Generator {
       var newMethods: Seq[vpr.Method] = Seq.empty
       // Translation of S_temp := havocSet()
       val havocSTmp = havocSetMethodCall(STmp.localVar)
+      // Translation of S := S_temp
+      val updateProgStates = vpr.LocalVarAssign(currStates.localVar, STmp.localVar)()
+
 
       stmt match {
         case CompositeStmt(stmts) =>
           // Translate each statement in the sequence
           var resStmts: Seq[vpr.Stmt] = Seq.empty
           var resMethods: Seq[vpr.Method] = Seq.empty
-          var tmpRes = (resStmts, resMethods)
+          var resNewVars: Seq[vpr.LocalVarDecl] = Seq.empty
+          var tmpRes = (resStmts, resMethods, resNewVars)
           for (s <- stmts) {
             tmpRes = translateStmt(s, currStates)
             resStmts = resStmts ++ tmpRes._1
             resMethods = resMethods ++ tmpRes._2
+            resNewVars = resNewVars ++ tmpRes._3
           }
-          return (resStmts, resMethods)
+          tmpRes
 
         case PVarDecl(name, typ) =>
-          val thisVar = vpr.LocalVarDecl(name.name, translateType(typ))()
-          extraVars = extraVars :+ thisVar
-          return (Seq.empty, Seq.empty)
+          val thisVarDeclStmt = vpr.LocalVarDeclStmt(vpr.LocalVarDecl(name.name, translateType(typ))())()
+          (Seq(thisVarDeclStmt), Seq.empty, Seq(thisVarDeclStmt.decl))
 
         case AssumeStmt(e) =>
           val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
                                         translateExp(e, state, currStates))()
-          newStmts = Seq(translateAssumeWithViperExpr(exp, state, STmp, typVarMap))
+          newStmts = Seq(havocSTmp, translateAssumeWithViperExpr(exp, state, STmp, typVarMap), updateProgStates)
+          (newStmts, Seq.empty, Seq.empty)
 
         case AssertStmt(e) =>
             val havocSFailTmp = havocSetMethodCall(tempFailedStates.localVar)
@@ -135,81 +138,82 @@ object Generator {
             val stmt2 = translateAssumeWithViperExpr(exp2, state, tempFailedStates, typVarMap)
             val updateSFail = vpr.LocalVarAssign(failedStates.localVar,
                               getSetUnionApp(Seq(failedStates.localVar, tempFailedStates.localVar), typVarMap))()
-            newStmts = Seq(havocSFailTmp, stmt1, stmt2, updateSFail)
+            newStmts = Seq(havocSTmp, havocSFailTmp, stmt1, stmt2, updateSFail, updateProgStates)
+            (newStmts, Seq.empty, Seq.empty)
 
         case AssignStmt(left, right) =>
             val leftVar = vpr.LocalVarDecl(left.name, typVarMap.get(typeVar).get)()
             val stmt1 = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
             val exp = vpr.EqCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
             val stmt2 = translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
-            newStmts = Seq(stmt1, stmt2)
+            newStmts = Seq(havocSTmp, stmt1, stmt2, updateProgStates)
+            (newStmts, Seq.empty, Seq.empty)
 
         case HavocStmt(id) =>
-          val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
-          val stmt = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
-          newStmts = Seq(stmt)
+            val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
+            val stmt = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
+            newStmts = Seq(havocSTmp, stmt, updateProgStates)
+            (newStmts, Seq.empty, Seq.empty)
 
         case IfElseStmt(cond, ifStmt, elseStmt) =>
-          // Define new variables to hold the states in the if and else blocks respectively
-          ifCounter = ifCounter + 1
-          val ifBlockStates = vpr.LocalVarDecl(currStatesVarName + ifCounter, currStates.typ)()
-          ifCounter = ifCounter + 1
-          val elseBlockStates = vpr.LocalVarDecl(currStatesVarName + ifCounter, currStates.typ)()
-          extraVars = extraVars :+ ifBlockStates :+ elseBlockStates
+            // Define new variables to hold the states in the if and else blocks respectively
+            ifCounter = ifCounter + 1
+            val ifBlockStates = vpr.LocalVarDecl(currStatesVarName + ifCounter, currStates.typ)()
+            val ifBlockStatesDecl = vpr.LocalVarDeclStmt(ifBlockStates)()
+            ifCounter = ifCounter + 1
+            val elseBlockStates = vpr.LocalVarDecl(currStatesVarName + ifCounter, currStates.typ)()
+            val elseBlockStatesDecl = vpr.LocalVarDeclStmt(elseBlockStates)()
 
-          // Cond satisfied
-          // Let ifBlockStates := S
-          val assign1 = vpr.LocalVarAssign(ifBlockStates.localVar, currStates.localVar)()
-          val assumeCond = translateStmt(AssumeStmt(cond), ifBlockStates)
-          val ifBlock = translateStmt(ifStmt, ifBlockStates)
+            // Cond satisfied
+            // Let ifBlockStates := S
+            val assign1 = vpr.LocalVarAssign(ifBlockStates.localVar, currStates.localVar)()
+            val assumeCond = translateStmt(AssumeStmt(cond), ifBlockStates)
+            val ifBlock = translateStmt(ifStmt, ifBlockStates)
 
-          // Cond not satisfied
-          // Let elseBlockStates := S
-          val assign2 = vpr.LocalVarAssign(elseBlockStates.localVar, currStates.localVar)()
-          val assumeNotCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), elseBlockStates)
-          val elseBlock = translateStmt(elseStmt, elseBlockStates)
+            // Cond not satisfied
+            // Let elseBlockStates := S
+            val assign2 = vpr.LocalVarAssign(elseBlockStates.localVar, currStates.localVar)()
+            val assumeNotCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), elseBlockStates)
+            val elseBlock = translateStmt(elseStmt, elseBlockStates)
 
-          val updateSTmp = vpr.LocalVarAssign(STmp.localVar, getSetUnionApp(Seq(ifBlockStates.localVar, elseBlockStates.localVar), typVarMap))()
+            val updateSTmp = vpr.LocalVarAssign(STmp.localVar, getSetUnionApp(Seq(ifBlockStates.localVar, elseBlockStates.localVar), typVarMap))()
 
-          newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp)
-          newMethods = ifBlock._2 ++ elseBlock._2
+            newStmts = Seq(ifBlockStatesDecl, elseBlockStatesDecl, assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp)
+            newMethods = ifBlock._2 ++ elseBlock._2
+            (newStmts, newMethods, Seq(ifBlockStates, elseBlockStates) ++ ifBlock._3 ++ elseBlock._3)
 
         case RequiresStmt(e) =>
-          return (Seq(vpr.Inhale(translateHyperAssertion(e, currStates, typVarMap))()), newMethods)
+            (Seq(vpr.Inhale(translateHyperAssertion(e, currStates, typVarMap))()), newMethods, Seq.empty)
 
         case EnsuresStmt(e) =>
-          return (Seq(vpr.Assert(translateHyperAssertion(e, currStates, typVarMap))()), newMethods)
+            (Seq(vpr.Assert(translateHyperAssertion(e, currStates, typVarMap))()), newMethods, Seq.empty)
 
         case WhileLoopStmt(cond, body, inv) =>
-          loopCounter = loopCounter + 1
-          // Connect all invariants with && to form 1 invariant
-          currLoopIndex = vpr.IntLit(0)()
-          val I0 = getAllInvariants(inv, currStates, typVarMap)
-          // Assert I(0)
-          val assertI0 = vpr.Assert(I0)()
-          // Verify invariant in a separate method
-          newMethods = translateInvariantVerification(inv, body, typVarMap)
-          // Let currStates be a union of Sn's
-          val havocCurrStates = havocSetMethodCall(currStates.localVar)
-          val k = vpr.LocalVarDecl("k", vpr.Int)()
-          val zero = vpr.IntLit(0)()
-          val Sn = vpr.LocalVarDecl("Sn", getConcreteSetStateType(typVarMap))()
-          currLoopIndex = k.localVar
-          val unionStates = vpr.Exists(Seq(k, Sn), Seq.empty,
-                                        vpr.And(vpr.LeCmp(k.localVar, zero)(),
-                                            vpr.And(getInSetApp(Seq(state.localVar, Sn.localVar), typVarMap), getAllInvariants(inv, Sn, typVarMap))()
-                                            )()
-                                      )()
-          val AssumeUnionStates = translateAssumeWithViperExpr(unionStates, state, currStates, typVarMap)
-          // Translate assume !cond
-          val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-          newStmts = Seq(assertI0, havocCurrStates, AssumeUnionStates) ++ notCond._1
-          return (newStmts, newMethods)
+            loopCounter = loopCounter + 1
+            // Connect all invariants with && to form 1 invariant
+            currLoopIndex = vpr.IntLit(0)()
+            val I0 = getAllInvariants(inv, currStates, typVarMap)
+            // Assert I(0)
+            val assertI0 = vpr.Assert(I0)()
+            // Verify invariant in a separate method
+            newMethods = translateInvariantVerification(inv, body, typVarMap)
+            // Let currStates be a union of Sn's
+            val havocCurrStates = havocSetMethodCall(currStates.localVar)
+            val k = vpr.LocalVarDecl("k", vpr.Int)()
+            val zero = vpr.IntLit(0)()
+            val Sn = vpr.LocalVarDecl("Sn", getConcreteSetStateType(typVarMap))()
+            currLoopIndex = k.localVar
+            val unionStates = vpr.Exists(Seq(k, Sn), Seq.empty,
+                                          vpr.And(vpr.LeCmp(k.localVar, zero)(),
+                                              vpr.And(getInSetApp(Seq(state.localVar, Sn.localVar), typVarMap), getAllInvariants(inv, Sn, typVarMap))()
+                                              )()
+                                        )()
+            val AssumeUnionStates = translateAssumeWithViperExpr(unionStates, state, currStates, typVarMap)
+            // Translate assume !cond
+            val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
+            newStmts = Seq(assertI0, havocCurrStates, AssumeUnionStates) ++ notCond._1
+            (newStmts, newMethods, Seq.empty)
       }
-      // Translation of S := S_temp
-      val updateProgStates = vpr.LocalVarAssign(currStates.localVar, STmp.localVar)()
-      newStmts = (havocSTmp +: newStmts) :+ updateProgStates
-      (newStmts, newMethods)
     }
 
 
@@ -238,29 +242,34 @@ object Generator {
 
     def translateInvariantVerification(inv: Seq[Assertion], body: CompositeStmt, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
       val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
-      val inputStatesName = "S0"
-      val inputStates = vpr.LocalVarDecl(inputStatesName, getConcreteSetStateType(typVarMap))()
-      val outputStatesName = "SS"
-      val outputStates = vpr.LocalVarDecl(outputStatesName, getConcreteSetStateType(typVarMap))()
+      val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
+      val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
       currLoopIndex = currLoopIndexDecl.localVar
       val In = getAllInvariants(inv, inputStates, typVarMap)
       currLoopIndex = vpr.Add(currLoopIndex, IntLit(1)())()
       val InPlus1 = getAllInvariants(inv, outputStates, typVarMap)
 
-      // Preconditions
+      val tmpStatesDecl = vpr.LocalVarDeclStmt(vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))())()
+      val assignToOutputStates = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
+
+      // Precondition 1: Loop index >= 1
       val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, IntLit(1)())()
-      val allProgVarsInBody = Seq.empty // TODO: get all program variables in the loop body -- maybe do this in symbol table?
-      // val pre2 = let all program variables are different by assigning a distinct integer value to each of them
+      // Precondition 2: All program variables are different
+      // (do so by assigning a distinct integer value to each of them)
+      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVarDecl(v._1, translateType(v._2, typVarMap))()).toList
+      val allProgVarsWithValues = allProgVarsInBody.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(allProgVarsInBody.indexOf(v))())())
+      val pre2: Seq[vpr.Exp] = if (allProgVarsWithValues.isEmpty) Seq.empty else Seq(allProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
 
       // Translation of the loop body
-      val loopBody = translateStmt(body, inputStates)
+      val loopBody = translateStmt(body, outputStates)
+      val methodBody = Seq(tmpStatesDecl, assignToOutputStates) ++ loopBody._1
 
       val thisMethod =  vpr.Method(checkInvMethodName + loopCounter,
-          Seq(currLoopIndexDecl, inputStates),  // args
+          Seq(currLoopIndexDecl, inputStates) ++ allProgVarsInBody,  // args
           Seq(outputStates),  // return values
-          Seq(pre1, In),  // pre
+          Seq(pre1, In) ++ pre2,  // pre
           Seq(InPlus1),  // post
-          Some(Seqn(loopBody._1, allProgVarsInBody)())    // body
+          Some(Seqn(methodBody, Seq(tmpStatesDecl.decl) ++ loopBody._3)())    // body
         )()
       Seq(thisMethod) ++ loopBody._2
     }
@@ -359,7 +368,9 @@ object Generator {
           case IntType() => vpr.Int
           case BoolType() => vpr.Bool
           case StateType() => getConcreteStateType(typVarMap)
-          case _ => throw UnknownException("Cannot translate type " + typ)
+          case _ =>
+
+            throw UnknownException("Cannot translate type " + typ)
         }
     }
 

@@ -44,10 +44,11 @@ object Parser {
   def precondition[$: P]: P[RequiresStmt] = P("requires" ~~ spaces ~ hyperAssertExpr).map(RequiresStmt)
   def postcondition[$: P]: P[EnsuresStmt] = P("ensures" ~~ spaces ~ hyperAssertExpr).map(EnsuresStmt)
 
-  def arithOp1[$: P]: P[String] = P("+" | "-" | "&&" | "!!").!
+  def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!
   def impliesOp[$: P]: P[String] = P("implies").!
-  def cmpOp[$: P]: P[String] = P("==" | "!=" | ">=" | "<=" | ">" | "<").!
+  def boolOp[$: P]: P[String] = P("&&" | "||" | "==" | "!=").!
+  def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
   def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
@@ -60,10 +61,20 @@ object Parser {
     case (e, Some(items)) => ImpliesExpr(e, items._2)
   }
 
-  def normalExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ normalExpr).rep(min = 0, max = 1)).map {
-    case (e, Nil) => e
-    case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
+  def normalExpr[$: P]: P[Expr] = P(compExpr ~ (boolOp ~/ normalExpr).?).map{
+    case (e, None) => e
+    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
+
+  def compExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ compExpr).rep(min = 0, max = 1)).map {
+      case (e, Nil) => e
+      case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
+    }
+
+//  def normalExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ normalExpr).rep(min = 0, max = 1)).map {
+//    case (e, Nil) => e
+//    case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
+//  }
 
   def arithExpr[$: P]: P[Expr] = P(arithTerm ~ (arithOp1 ~/ arithExpr).rep(min=0, max=1)).map{
     case (e, Nil) => e

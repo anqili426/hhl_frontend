@@ -23,7 +23,11 @@ sealed trait Decl extends Stmt
 case class PVarDecl(vName: Id, vType: Type) extends Decl
 
 sealed trait Stmt
-case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt
+case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
+  // This map stores all the program variables used in stmts
+  // It is filled in the SymbolChecker
+  var allProgVars: Map[String, Type] = Map.empty
+}
 case class AssignStmt(left: Id, right: Expr) extends Stmt
 case class HavocStmt(id: Id) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
