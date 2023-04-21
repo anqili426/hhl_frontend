@@ -71,11 +71,6 @@ object Parser {
       case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
     }
 
-//  def normalExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ normalExpr).rep(min = 0, max = 1)).map {
-//    case (e, Nil) => e
-//    case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
-//  }
-
   def arithExpr[$: P]: P[Expr] = P(arithTerm ~ (arithOp1 ~/ arithExpr).rep(min=0, max=1)).map{
     case (e, Nil) => e
     case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)

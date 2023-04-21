@@ -102,7 +102,6 @@ object Generator {
       // Translation of S := S_temp
       val updateProgStates = vpr.LocalVarAssign(currStates.localVar, STmp.localVar)()
 
-
       stmt match {
         case CompositeStmt(stmts) =>
           // Translate each statement in the sequence
@@ -116,11 +115,11 @@ object Generator {
             resMethods = resMethods ++ tmpRes._2
             resNewVars = resNewVars ++ tmpRes._3
           }
-          tmpRes
+          (resStmts, resMethods, resNewVars)
 
         case PVarDecl(name, typ) =>
-          val thisVarDeclStmt = vpr.LocalVarDeclStmt(vpr.LocalVarDecl(name.name, translateType(typ))())()
-          (Seq(thisVarDeclStmt), Seq.empty, Seq(thisVarDeclStmt.decl))
+          val thisVar = vpr.LocalVarDecl(name.name, translateType(typ))()
+          (Seq.empty, Seq.empty, Seq(thisVar))
 
         case AssumeStmt(e) =>
           val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
@@ -159,10 +158,8 @@ object Generator {
             // Define new variables to hold the states in the if and else blocks respectively
             ifCounter = ifCounter + 1
             val ifBlockStates = vpr.LocalVarDecl(currStatesVarName + ifCounter, currStates.typ)()
-            val ifBlockStatesDecl = vpr.LocalVarDeclStmt(ifBlockStates)()
             ifCounter = ifCounter + 1
             val elseBlockStates = vpr.LocalVarDecl(currStatesVarName + ifCounter, currStates.typ)()
-            val elseBlockStatesDecl = vpr.LocalVarDeclStmt(elseBlockStates)()
 
             // Cond satisfied
             // Let ifBlockStates := S
@@ -178,7 +175,7 @@ object Generator {
 
             val updateSTmp = vpr.LocalVarAssign(STmp.localVar, getSetUnionApp(Seq(ifBlockStates.localVar, elseBlockStates.localVar), typVarMap))()
 
-            newStmts = Seq(ifBlockStatesDecl, elseBlockStatesDecl, assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp)
+            newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp)
             newMethods = ifBlock._2 ++ elseBlock._2
             (newStmts, newMethods, Seq(ifBlockStates, elseBlockStates) ++ ifBlock._3 ++ elseBlock._3)
 
@@ -269,7 +266,7 @@ object Generator {
           Seq(outputStates),  // return values
           Seq(pre1, In) ++ pre2,  // pre
           Seq(InPlus1),  // post
-          Some(Seqn(methodBody, Seq(tmpStatesDecl.decl) ++ loopBody._3)())    // body
+          Some(Seqn(methodBody, Seq(tmpStatesDecl.decl) ++ loopBody._3.diff(allProgVarsInBody))())    // body
         )()
       Seq(thisMethod) ++ loopBody._2
     }
