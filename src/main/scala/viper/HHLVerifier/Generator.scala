@@ -65,7 +65,10 @@ object Generator {
       val translatedContent = translateStmt(input.content, currStates)
 
       val localVars = Seq(currStates, tempStates, tempFailedStates, failedStates) ++ translatedContent._3
-      // TODO: Also need to assume that variables are not the same!
+      // Assume that all program variables are different by assigning a distinct value to each of them
+      val allProgVars = input.content.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
+      val assignToProgVars = allProgVars.map(v => vpr.LocalVarAssign(v, vpr.IntLit(allProgVars.indexOf(v))())())
+
       val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
       // The following statement assumes that S_fail is empty
       val assumeSFailEmpty = vpr.Inhale(vpr.Forall(
@@ -76,7 +79,7 @@ object Generator {
                                             )()
                                           )()
                                         )()
-      val methodBody = assumeSFailEmpty +: translatedContent._1
+      val methodBody = assignToProgVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
       val mainMethod = vpr.Method("main", Seq.empty, Seq.empty, Seq.empty, Seq.empty,
                                   Some(vpr.Seqn(methodBody, localVars)()))()
       mainMethod +: translatedContent._2
@@ -260,7 +263,7 @@ object Generator {
 
       // Translation of the loop body
       val loopBody = translateStmt(body, outputStates)
-      val methodBody = Seq(tmpStatesDecl, assignToOutputStates) ++ loopBody._1
+      val methodBody = Seq(assignToOutputStates) ++ loopBody._1
 
       val thisMethod = vpr.Method(methodName,
           Seq(currLoopIndexDecl, inputStates) ++ allProgVarsInBody,  // args
@@ -416,8 +419,8 @@ object Generator {
               Seq.empty,
               vpr.Implies(getEqualExceptApp(Seq(s1Var.localVar, s2Var.localVar, xVar.localVar), TToTMap),
                 vpr.Implies(vpr.NeCmp(xVar.localVar, yVar.localVar)(),
-                  vpr.EqCmp(getGetApp(Seq(s1Var.localVar, xVar.localVar)),
-                    getGetApp(Seq(s2Var.localVar, xVar.localVar))
+                  vpr.EqCmp(getGetApp(Seq(s1Var.localVar, yVar.localVar)),
+                    getGetApp(Seq(s2Var.localVar, yVar.localVar))
                   )()
                 )()
               )()

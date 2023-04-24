@@ -94,7 +94,9 @@ object TypeChecker {
         ast.typ = boolType
       case gve@GetValExpr(state, id) =>
         if (!inHyperAssertion) throw TypeException("Expression " + gve + " can only appear in a hyper assertion. ")
-        res = typeCheckExpr(state, inHyperAssertion) && typeCheckExpr(id, inHyperAssertion) && checkIfTypeMatch(state.typ, stateType)
+        // When type checking for id in a GetValExpr, fix inHyperAssertion to be false to avoid exceptions
+        // Any other occurrence of Id instances should be type checked with the correct inHyperAssertion flag
+        res = typeCheckExpr(state, inHyperAssertion) && typeCheckExpr(id, false) && checkIfTypeMatch(state.typ, stateType)
         gve.typ = id.typ
       case se@StateExistsExpr(state) =>
         if (!inHyperAssertion) throw TypeException("Expression " + se + " can only appear in a hyper assertion. ")

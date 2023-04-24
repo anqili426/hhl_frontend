@@ -37,8 +37,8 @@ case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[Assertion]) e
 case class RequiresStmt(e: Assertion) extends Stmt
 case class EnsuresStmt(e: Assertion) extends Stmt
 
-case class HHLProgram(stmts: Stmt) {
-  val content: Stmt = stmts
+case class HHLProgram(stmts: CompositeStmt) {
+  val content: CompositeStmt = stmts
 }
 
 sealed trait Type
