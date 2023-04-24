@@ -17,8 +17,10 @@ object SymbolChecker {
         checkIdDup(id)
         allVars = allVars + (id.name -> typ)
         Seq((id.name, typ))
-      case AssignStmt(id, exp) =>
-        checkSymbolsExpr(id, false) ++ checkSymbolsExpr(exp, false)
+      case as@AssignStmt(id, exp) =>
+        val rightVars = checkSymbolsExpr(exp, false)
+        as.IdsOnRHS = rightVars.map(tuple => tuple._1)
+        checkSymbolsExpr(id, false) ++ rightVars
       case HavocStmt(id) =>
         checkSymbolsExpr(id, false)
       case AssumeStmt(e) =>

@@ -28,7 +28,9 @@ case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
   // It is filled in the SymbolChecker
   var allProgVars: Map[String, Type] = Map.empty
 }
-case class AssignStmt(left: Id, right: Expr) extends Stmt
+case class AssignStmt(left: Id, right: Expr) extends Stmt {
+  var IdsOnRHS: Seq[String] = Seq.empty
+}
 case class HavocStmt(id: Id) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
 case class AssertStmt(e: Expr) extends Stmt
