@@ -47,7 +47,8 @@ object Parser {
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!
   def impliesOp[$: P]: P[String] = P("implies").!
-  def boolOp[$: P]: P[String] = P("&&" | "||" | "==" | "!=").!
+  def boolOp1[$: P]: P[String] = P("&&" | "||").!
+  def boolOp2[$: P]: P[String] = P("==" | "!=").!
   def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
@@ -61,7 +62,12 @@ object Parser {
     case (e, Some(items)) => ImpliesExpr(e, items._2)
   }
 
-  def normalExpr[$: P]: P[Expr] = P(compExpr ~ (boolOp ~/ normalExpr).?).map{
+  def normalExpr[$: P]: P[Expr] = P(eqExpr ~ (boolOp1 ~/ normalExpr).?).map{
+    case (e, None) => e
+    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
+  }
+
+  def eqExpr[$: P]: P[Expr] = P(compExpr ~ (boolOp2 ~/ eqExpr).?).map {
     case (e, None) => e
     case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }

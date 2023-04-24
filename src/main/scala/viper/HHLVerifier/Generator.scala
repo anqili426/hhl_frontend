@@ -212,7 +212,7 @@ object Generator {
             val Sn = vpr.LocalVarDecl("Sn", getConcreteSetStateType(typVarMap))()
             currLoopIndex = k.localVar
             val unionStates = vpr.Exists(Seq(k, Sn), Seq.empty,
-                                          vpr.And(vpr.LeCmp(k.localVar, zero)(),
+                                          vpr.And(vpr.GeCmp(k.localVar, zero)(),
                                               vpr.And(getInSetApp(Seq(state.localVar, Sn.localVar), typVarMap), getAllInvariants(inv, Sn, typVarMap))()
                                               )()
                                         )()
@@ -423,15 +423,15 @@ object Generator {
               getEqualExceptApp(Seq(s1Var.localVar, s2Var.localVar, xVar.localVar), TToTMap)
             ))()),
             // Expression
-            vpr.Forall(
-              Seq(yVar),
-              Seq.empty,
-              vpr.Implies(getEqualExceptApp(Seq(s1Var.localVar, s2Var.localVar, xVar.localVar), TToTMap),
+            vpr.Implies(getEqualExceptApp(Seq(s1Var.localVar, s2Var.localVar, xVar.localVar), TToTMap),
+              vpr.Forall(
+                Seq(yVar),
+                Seq.empty,
                 vpr.Implies(vpr.NeCmp(xVar.localVar, yVar.localVar)(),
-                  vpr.EqCmp(getGetApp(Seq(s1Var.localVar, yVar.localVar)),
-                    getGetApp(Seq(s2Var.localVar, yVar.localVar))
-                  )()
-                )()
+                                      vpr.EqCmp(getGetApp(Seq(s1Var.localVar, yVar.localVar)),
+                                                getGetApp(Seq(s2Var.localVar, yVar.localVar))
+                                                )()
+                            )()
               )()
             )()
           )())(domainName = stateDomainName)),
