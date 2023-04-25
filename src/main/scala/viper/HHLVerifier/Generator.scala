@@ -186,7 +186,7 @@ object Generator {
 
             val updateSTmp = vpr.LocalVarAssign(STmp.localVar, getSetUnionApp(Seq(ifBlockStates.localVar, elseBlockStates.localVar), typVarMap))()
 
-            newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp)
+            newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp, updateProgStates)
             newMethods = ifBlock._2 ++ elseBlock._2
             (newStmts, newMethods, Seq(ifBlockStates, elseBlockStates) ++ ifBlock._3 ++ elseBlock._3)
 
@@ -379,7 +379,6 @@ object Generator {
           case BoolType() => vpr.Bool
           case StateType() => getConcreteStateType(typVarMap)
           case _ =>
-
             throw UnknownException("Cannot translate type " + typ)
         }
     }

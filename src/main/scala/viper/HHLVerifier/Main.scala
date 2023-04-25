@@ -5,6 +5,8 @@ import viper.silicon.Silicon
 import viper.silver.reporter.NoopReporter
 import viper.silver.verifier.{Failure, Success}
 
+import java.io.FileWriter
+
 object Main {
 
   def main(args: Array[String]): Unit = {
@@ -14,7 +16,9 @@ object Main {
       sys.exit(1)
     }
     val programAbsPath = args(0)
-    val program = scala.io.Source.fromFile(programAbsPath).mkString
+    val programSource = scala.io.Source.fromFile(programAbsPath)
+    val program = programSource.mkString
+    programSource.close()
     try {
       val res = fastparse.parse(program, Parser.program(_))
       if (res.isSuccess) {
@@ -27,10 +31,15 @@ object Main {
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
         println("Type checking successful. ")
-        // sys.exit(0)
 
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)
+        // Optionally save the Viper program to some provided file
+        if (args.length > 1) {
+          val fw = new FileWriter(args(1), false)
+          try fw.write(viperProgram.toString())
+          finally fw.close()
+        }
         println(viperProgram)
 
         val consistencyErrors = viperProgram.checkTransitively

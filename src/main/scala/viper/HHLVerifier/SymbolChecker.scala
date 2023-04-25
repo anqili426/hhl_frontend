@@ -72,7 +72,7 @@ object SymbolChecker {
         case GetValExpr(state, id) =>
             checkIdDefined(state)
             checkIdDefined(id)
-            Seq((id.name, id.typ))
+            Seq((id.name, allVars.get(id.name).get))
         case StateExistsExpr(state) =>
             checkIdDefined(state)
             Seq.empty
