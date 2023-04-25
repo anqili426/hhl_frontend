@@ -4,11 +4,9 @@ import fastparse._
 import MultiLineWhitespace._
 
 object Parser {
-  def program[$: P]: P[HHLProgram] = P(Start ~ precondition.rep ~ stmts ~ postcondition.rep ~ End).map {
-    case (Nil, stmts, Nil) => HHLProgram(stmts)
-    case (Nil, stmts, post) => HHLProgram(CompositeStmt(stmts.stmts ++ post))
-    case (pre, stmts, Nil) => HHLProgram(CompositeStmt(pre ++ stmts.stmts))
-    case (pre, stmts, post) => HHLProgram(CompositeStmt(pre ++ stmts.stmts ++ post))
+  def program[$: P]: P[HHLProgram] = P(Start ~ stmts ~ postcondition.rep ~ End).map {
+    case (stmts, Nil) => HHLProgram(stmts)
+    case (stmts, post) => HHLProgram(CompositeStmt(stmts.stmts ++ post))
   }
 
   def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
@@ -29,7 +27,7 @@ object Parser {
   }
 
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
-  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign)
+  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign | precondition)
   def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ expr).map(e => AssignStmt(e._1, e._2))
   def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar).map(e => HavocStmt(e))
   def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ expr).map(AssumeStmt)
