@@ -1,0 +1,10 @@
+var x: Int
+var y: Int
+var i: Int
+var r: Int
+
+requires forall _s1: State, _s2: State :: get(_s1, i)  == 1 && get(_s2, i) == 2 implies get(_s1, x) > get(_s2, x) && get(_s1, y) > get(_s2, y)
+
+r := x + y
+
+ensures forall _s1: State, _s2: State :: get(_s1, i)  == 1 && get(_s2, i) == 2 implies get(_s1, r) > get(_s2, r)

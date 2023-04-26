@@ -1,0 +1,10 @@
+var x: Int
+var y: Int
+
+if (x > 0) {
+    y := x + 1
+} else {
+    y := x
+}
+
+ensures forall _s1 : State, _s2: State :: get(_s1, x) == get(_s2, x) implies get(_s1, y) == get(_s2, y)

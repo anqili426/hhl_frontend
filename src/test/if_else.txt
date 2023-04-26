@@ -1,0 +1,13 @@
+var x: Int
+var y: Int
+var res: Int
+
+if (x >= y) {
+    res := 1
+} else {
+    res := 0
+}
+
+assert res == 1
+
+ensures forall _s: State :: get(_s, x) >= get(_s, y)
