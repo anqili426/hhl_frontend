@@ -30,9 +30,9 @@ object SymbolChecker {
       case IfElseStmt(cond, ifBlock, elseBlock) =>
         checkSymbolsExpr(cond, false) ++ checkSymbolsStmt(ifBlock) ++ checkSymbolsStmt(elseBlock)
       case WhileLoopStmt(cond, body, inv) =>
-        checkSymbolsExpr(cond, false)
-        inv.foreach(i => checkSymbolsExpr(i, true))
-        checkSymbolsStmt(body)
+        val allVars = checkSymbolsExpr(cond, false) ++ inv.map(i => checkSymbolsExpr(i, true)).flatten ++ checkSymbolsStmt(body)
+        body.allProgVars = allVars.distinct.toMap
+        allVars
       case EnsuresStmt(e) =>
         checkSymbolsExpr(e, false)
       case RequiresStmt(e) =>
