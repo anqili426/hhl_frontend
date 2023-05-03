@@ -2,8 +2,17 @@ package viper.HHLVerifier
 
 object SymbolChecker {
   var allVars: Map[String, Type] = Map.empty
+
   def checkSymbolsProg(p: HHLProgram): Unit = {
-    checkSymbolsStmt(p.stmts)
+    p.content.foreach(checkSymbolsMethod)
+  }
+
+  def checkSymbolsMethod(m: Method): Unit = {
+    allVars = m.argsMap
+    m.pre.foreach(p => checkSymbolsExpr(p, false))
+    m.post.foreach(p => checkSymbolsExpr(p, false))
+    checkSymbolsStmt(m.body)
+    m.allVars = allVars
   }
 
   def checkSymbolsStmt(stmt: Stmt): Seq[(String, Type)] = {
@@ -33,10 +42,6 @@ object SymbolChecker {
         val allVars = checkSymbolsExpr(cond, false) ++ inv.map(i => checkSymbolsExpr(i, true)).flatten ++ checkSymbolsStmt(body)
         body.allProgVars = allVars.distinct.toMap
         allVars
-      case EnsuresStmt(e) =>
-        checkSymbolsExpr(e, false)
-      case RequiresStmt(e) =>
-        checkSymbolsExpr(e, false)
       case _ =>
         throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)
     }

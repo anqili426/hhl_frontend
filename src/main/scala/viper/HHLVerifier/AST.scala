@@ -12,15 +12,10 @@ case class BoolLit(value: Boolean) extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
-case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr {
-  var hasStateVar = assertVarDecls.exists(decl => decl.vType.isInstanceOf[StateType])
-}
+case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
 case class GetValExpr(state: AssertVar, id: Id) extends Expr
 case class StateExistsExpr(state: AssertVar) extends Expr
 case class LoopIndex() extends Expr
-
-sealed trait Decl extends Stmt
-case class PVarDecl(vName: Id, vType: Type) extends Decl
 
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
@@ -36,11 +31,16 @@ case class AssumeStmt(e: Expr) extends Stmt
 case class AssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: Stmt, elseStmt: Stmt) extends Stmt
 case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[Assertion]) extends Stmt
-case class RequiresStmt(e: Assertion) extends Stmt
-case class EnsuresStmt(e: Assertion) extends Stmt
+case class PVarDecl(vName: Id, vType: Type) extends Stmt
 
-case class HHLProgram(stmts: CompositeStmt) {
-  val content: CompositeStmt = stmts
+sealed trait TopLevelDecl
+case class Method(mName: String, args: Seq[Id], pre: Seq[Assertion], post: Seq[Assertion], body: CompositeStmt) extends TopLevelDecl {
+  var argsMap: Map[String, Type] = args.map(arg => (arg.name -> arg.typ)).toMap
+  var allVars: Map[String, Type] = Map.empty
+}
+
+case class HHLProgram(methods: Seq[Method]) {
+  val content = methods
 }
 
 sealed trait Type

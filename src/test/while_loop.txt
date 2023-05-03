@@ -1,13 +1,36 @@
-var n: Int
-var sum :Int
-n := 0
-sum := 1
-
-while (n <= 100)
-invariant forall _s: State :: get(_s, sum) == get(_s, n) + 1 && get(_s, n) <= 101
+method test(sum: Int)
+    ensures forall _s: State :: <_s> implies get(_s, sum) == 102
 {
-        n := n + 1
-        sum := sum + 1
+
+    var n: Int
+    n := 0
+    sum := 1
+
+    while (n <= 100)
+    invariant forall _s: State :: <_s> implies (get(_s, sum) == get(_s, n) + 1) && (get(_s, n) <= 101)
+    {
+            n := n + 1
+            sum := sum + 1
+    }
+
 }
 
-assert sum == 102
+method test2(sum: Int)
+    ensures forall _s: State :: <_s> implies get(_s, sum) == 102
+{
+
+   var n: Int
+   n := 0
+   sum := 1
+
+   while (n <= 100)
+   invariant forall _s: State :: <_s> implies get(_s, n) == $n && get(_s, sum) == $n + 1 && $n <= 101
+   {
+           n := n + 1
+           sum := sum + 1
+   }
+}
+
+
+
+

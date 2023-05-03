@@ -11,8 +11,7 @@ tmp/
 .metals/
 *.smt2
 *.smt2.*
-results.txt
 *.bpl
 *.bpl.*
-*.txt
-*.vpr
+src/main/scala/viper/HHLVerifier/*.txt
+src/main/scala/viper/HHLVerifier/*.vpr

@@ -4,16 +4,31 @@ import fastparse._
 import MultiLineWhitespace._
 
 object Parser {
-  def program[$: P]: P[HHLProgram] = P(Start ~ varDecl.rep ~ precondition.rep ~ stmts ~ postcondition.rep ~ End).map{
-    items =>
-      val allSeqs = Seq(items._1, items._2, items._3.stmts, items._4)
-      val nonNilSeq = allSeqs.filter(s => s != Nil)
-      HHLProgram(CompositeStmt(nonNilSeq.reduceLeft((s1, s2) => s1 ++ s2)))
+  def program[$: P]: P[HHLProgram] = P(Start ~ method.rep ~ End).map{
+    case Nil => HHLProgram(Seq.empty)
+    case methods => HHLProgram(methods)
   }
+
+  def method[$: P]: P[Method] = P("method" ~~ spaces ~~ methodName ~ "(" ~ methodArgs.rep(sep=",") ~ ")"  ~ precondition.rep ~ postcondition.rep ~ "{" ~ stmts ~ "}").map{
+    items =>
+    val args = if (items._2 != Nil) items._2 else Seq.empty
+      val pre = if (items._3 != Nil) items._3 else Seq.empty
+      val post = if (items._4 != Nil) items._4 else Seq.empty
+      Method(items._1, args, pre, post, items._5)
+  }
+
+  def precondition[$: P]: P[Assertion] = P("requires" ~~ spaces ~ hyperAssertExpr)
+  def postcondition[$: P]: P[Assertion] = P("ensures" ~~ spaces ~ hyperAssertExpr)
+
+  def methodArgs[$: P]: P[Id] = P(progVar ~ ":" ~ progVartypeName).map{
+    items => items._1.typ = items._2
+      items._1
+  }
+  def methodName[$ :P]: P[String] =  P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
 
   def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
 
-  def varDecl[$: P] : P[Decl] = P("var" ~ progVar ~ ":" ~ progVartypeName).map(items => PVarDecl(items._1, items._2))
+  def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ progVartypeName).map(items => PVarDecl(items._1, items._2))
 
   def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ assertVarTypeName).map(items => AssertVarDecl(items._1, items._2))
 
@@ -41,8 +56,6 @@ object Parser {
     case (cond, invs, s) => WhileLoopStmt(cond, s, invs)
   }
   def loopInv[$: P]: P[Assertion] = P("invariant" ~~ spaces ~ hyperAssertExpr)
-  def precondition[$: P]: P[RequiresStmt] = P("requires" ~~ spaces ~ hyperAssertExpr).map(RequiresStmt)
-  def postcondition[$: P]: P[EnsuresStmt] = P("ensures" ~~ spaces ~ hyperAssertExpr).map(EnsuresStmt)
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!

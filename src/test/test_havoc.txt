@@ -1,9 +1,13 @@
-var x: Int
-var y: Int
+method test1(x: Int, y: Int)
+    ensures forall _s: State :: <_s> implies get(_s, x) == get(_s, y) && get(_s, x) == 1
+{
+    x := 1
+    y := 1
+}
 
-x := y
-y := 1
-havoc x
-
-ensures forall _s: State :: get(_s, y) == 1
-ensures forall _s: State :: get(_s, x) == get(_s, y)
+method test2(x: Int, y: Int)
+    ensures forall _s: State :: <_s> implies get(_s, x) == get(_s, y)
+{
+    x := y
+    havoc x
+}

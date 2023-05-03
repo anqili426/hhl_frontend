@@ -58,31 +58,62 @@ object Generator {
   }
 
   def translateProgram(input: HHLProgram, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
-      val currStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()
-      val tempStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
-      failedStates = vpr.LocalVarDecl(failedStatesVarName, getConcreteSetStateType(typVarMap))()
-      tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, getConcreteSetStateType(typVarMap))()
-      val translatedContent = translateStmt(input.content, currStates)
+      input.content.map(m => translateMethod(m, typVarMap)).flatten
+  }
 
-      val localVars = Seq(currStates, tempStates, tempFailedStates, failedStates) ++ translatedContent._3
-      // Assume that all program variables are different by assigning a distinct value to each of them
-      val allProgVars = input.content.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
-      val assignToProgVars = allProgVars.map(v => vpr.LocalVarAssign(v, vpr.IntLit(allProgVars.indexOf(v))())())
+  def translateMethod(method: Method, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
+    val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
+    val outputStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()
 
-      val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
-      // The following statement assumes that S_fail is empty
-      val assumeSFailEmpty = vpr.Inhale(vpr.Forall(
-                                            Seq(state),
-                                            Seq.empty,
-                                            vpr.Not(
-                                              getInSetApp(Seq(state.localVar, failedStates.localVar), typVarMap)
-                                            )()
-                                          )()
-                                        )()
-      val methodBody = assignToProgVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
-      val mainMethod = vpr.Method("main", Seq.empty, Seq.empty, Seq.empty, Seq.empty,
-                                  Some(vpr.Seqn(methodBody, localVars)()))()
-      mainMethod +: translatedContent._2
+    // val currStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()
+    val tempStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
+    failedStates = vpr.LocalVarDecl(failedStatesVarName, getConcreteSetStateType(typVarMap))()
+    tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, getConcreteSetStateType(typVarMap))()
+
+    val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+    // The following statement assumes that S_fail is empty
+    val assumeSFailEmpty = vpr.Inhale(vpr.Forall(
+      Seq(state),
+      Seq.empty,
+      vpr.Not(
+        getInSetApp(Seq(state.localVar, failedStates.localVar), typVarMap)
+      )()
+    )()
+    )()
+
+    // Arguments
+    val args = method.args.map(a => vpr.LocalVarDecl(a.name, translateType(a.typ, typVarMap))())
+    val translatedArgs = args :+ inputStates
+    // Forming the preconditions
+    val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(args.indexOf(v) + args.length)())())
+    val preAboutArgs = if (argsWithValues.isEmpty) Seq.empty else Seq(argsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
+    val pres = method.pre.map(p => translateExp(p, null, inputStates)) ++ preAboutArgs
+    // Forming the postconditions
+    val posts = method.post.map(p => translateExp(p, null, outputStates))
+
+    /* Method body contains the following
+    *  Local variable declaration (program variables + auxiliary variables of type SetState)
+    *  Assume all program variables used in the method are different
+    *  Assignment S := S0
+    *  Assumption that S_fail is empty
+    *  The translation of the input method body
+    */
+
+    // Let S := S0
+    val currStatesAssignment = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
+    val translatedContent = translateStmt(method.body, outputStates)
+    // This is the sequence of all variables used in the body of the translated method
+    // Which includes all program variables + auxiliary variables of type SetState
+    val localVars = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._3
+    // Assume that all program variables are different by assigning a distinct value to each of them
+    val progArgs = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1))
+    val progVarsWithValues = progArgs.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
+    val assignToProgVars = progVarsWithValues.map(v => vpr.LocalVarAssign(v, vpr.IntLit(progVarsWithValues.indexOf(v))())())
+
+    val methodBody = Seq(currStatesAssignment) ++ assignToProgVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
+    val mainMethod = vpr.Method(method.mName, translatedArgs, Seq(outputStates), pres, posts,
+      Some(vpr.Seqn(methodBody, localVars)()))()
+    mainMethod +: translatedContent._2
   }
 
     // Any statement is translated to a block of Viper code as follows:
@@ -144,7 +175,7 @@ object Generator {
             (newStmts, Seq.empty, Seq.empty)
 
         case as@AssignStmt(left, right) =>
-            val leftVar = vpr.LocalVarDecl(left.name, translateType(SymbolChecker.allVars.get(left.name).get, typVarMap))()
+            val leftVar = vpr.LocalVarDecl(left.name, translateType(left.typ, typVarMap))()
             // Check whether the identifier on the left-hand side appears in the right-hand side
             if (as.IdsOnRHS.contains(left.name)) {
               val s0 = vpr.LocalVarDecl(s0VarName, state.typ)()
@@ -189,12 +220,6 @@ object Generator {
             newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp, updateProgStates)
             newMethods = ifBlock._2 ++ elseBlock._2
             (newStmts, newMethods, Seq(ifBlockStates, elseBlockStates) ++ ifBlock._3 ++ elseBlock._3)
-
-        case RequiresStmt(e) =>
-          (Seq(vpr.Inhale(translateExp(e, null, currStates))()), newMethods, Seq.empty)
-
-        case EnsuresStmt(e) =>
-            (Seq(vpr.Assert(translateExp(e, null, currStates))()), newMethods, Seq.empty)
 
         case WhileLoopStmt(cond, body, inv) =>
             loopCounter = loopCounter + 1
@@ -272,10 +297,10 @@ object Generator {
       val typVarMap = if (state != null) state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap
                       else Map(typeVar -> vpr.Int)
       e match {
-        case Id(name) =>
+        case id@Id(name) =>
           // Any reference to a var is translated to get(state, var)
-          val id = vpr.LocalVar(name, translateType(SymbolChecker.allVars.getOrElse(name, null)))()
-          getGetApp(Seq(state.localVar, id), state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap)
+          val viperId = vpr.LocalVar(name, translateType(id.typ, typVarMap))()
+          getGetApp(Seq(state.localVar, viperId), state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap)
         case Num(value) => vpr.IntLit(value)()
         case BoolLit(value) => vpr.BoolLit(value)()
         case BinaryExpr(left, op, right) =>
@@ -300,7 +325,7 @@ object Generator {
           }
         case av@AssertVar(name) =>
           vpr.LocalVar(name, translateType(av.typ, typVarMap))()
-        case a@Assertion(quantifier, vars, body) =>
+        case Assertion(quantifier, vars, body) =>
           val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
           if (quantifier == "forall") vpr.Forall(variables, Seq.empty, translateExp(body, state, currStates))()
           else if (quantifier == "exists") vpr.Exists(variables, Seq.empty, translateExp(body, state, currStates))()
@@ -310,8 +335,8 @@ object Generator {
         case GetValExpr(s, id) =>
           val stateVar = vpr.LocalVarDecl(s.name, getConcreteStateType(typVarMap))()
           translateExp(id, stateVar, currStates)
-        case StateExistsExpr(state) =>
-          val translatedState = vpr.LocalVar(state.name, translateType(state.typ, typVarMap))()
+        case StateExistsExpr(s) =>
+          val translatedState = vpr.LocalVar(s.name, translateType(s.typ, typVarMap))()
           getInSetApp(Seq(translatedState, currStates.localVar), typVarMap)
         case LoopIndex() => currLoopIndex
         // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt

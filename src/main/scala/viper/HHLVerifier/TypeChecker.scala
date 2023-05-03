@@ -8,10 +8,19 @@ object TypeChecker {
   val intType = TypeInstance.intType
   val stateType = TypeInstance.stateType
 
+  var currMethod: Method = null
+
   var assertVars: Map[String, Type] = Map.empty
 
-  def typeCheckProg(p: HHLProgram): Boolean = {
-    typeCheckStmt(p.stmts)
+  def typeCheckProg(p: HHLProgram): Unit = {
+    p.content.foreach(m => typeCheckMethod(m))
+  }
+
+  def typeCheckMethod(m: Method): Unit = {
+    currMethod = m
+    m.pre.foreach(p => typeCheckExpr(p, true))
+    m.post.foreach(p => typeCheckExpr(p, true))
+    typeCheckStmt(m.body)
   }
 
   def typeCheckStmt(s: Stmt): Boolean = {
@@ -37,10 +46,6 @@ object TypeChecker {
       case PVarDecl(vName, vType) =>
         vName.typ = vType
         res = true
-      case RequiresStmt(e) =>
-        res = typeCheckExpr(e, true) && checkIfTypeMatch(e.typ, boolType)
-      case EnsuresStmt(e) =>
-        res = typeCheckExpr(e, true) && checkIfTypeMatch(e.typ, boolType)
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
     res
@@ -51,7 +56,7 @@ object TypeChecker {
     e match {
       case id@Id(_) =>
         if (inHyperAssertion) throw TypeException("Program variables cannot appear in a hyper assertion")
-        if (SymbolChecker.allVars.contains(id.name)) id.typ = SymbolChecker.allVars.get(id.name).get
+        if (currMethod.allVars.contains(id.name)) id.typ = currMethod.allVars.get(id.name).get
         else res = false
       case be@BinaryExpr(e1, op, e2) =>
         res = typeCheckExpr(e1, inHyperAssertion) && typeCheckExpr(e2, inHyperAssertion)
