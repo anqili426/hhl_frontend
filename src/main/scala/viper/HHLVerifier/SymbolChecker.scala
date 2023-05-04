@@ -1,6 +1,7 @@
 package viper.HHLVerifier
 
 object SymbolChecker {
+  // This map is used to keep track of the declared program variables + assertion variables for each method
   var allVars: Map[String, Type] = Map.empty
 
   def checkSymbolsProg(p: HHLProgram): Unit = {

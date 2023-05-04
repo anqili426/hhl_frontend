@@ -102,13 +102,15 @@ object Generator {
     // Let S := S0
     val currStatesAssignment = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
     val translatedContent = translateStmt(method.body, outputStates)
-    // This is the sequence of all variables used in the body of the translated method
-    // Which includes all program variables + auxiliary variables of type SetState
-    val localVars = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._3
+
     // Assume that all program variables are different by assigning a distinct value to each of them
-    val progArgs = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1))
-    val progVarsWithValues = progArgs.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
+    val progVars = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1))
+    val progVarsWithValues = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
     val assignToProgVars = progVarsWithValues.map(v => vpr.LocalVarAssign(v, vpr.IntLit(progVarsWithValues.indexOf(v))())())
+
+    val progVarDecls = progVars.map(v => vpr.LocalVarDecl(v._1, translateType(v._2, typVarMap))()).toList
+    val setStateVarDecls = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._3
+    val localVars = progVarDecls ++ setStateVarDecls
 
     val methodBody = Seq(currStatesAssignment) ++ assignToProgVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
     val mainMethod = vpr.Method(method.mName, translatedArgs, Seq(outputStates), pres, posts,
@@ -116,12 +118,12 @@ object Generator {
     mainMethod +: translatedContent._2
   }
 
-    // Any statement is translated to a block of Viper code as follows:
-    // S refers to the current program states, provided as input
-    // S_temp := havocSet()
-    //      .... (Translation uses S_temp and S)
-    // S := S_temp
-    // In the end, we get back S in the output
+    /*
+    * The following method returns:
+    * 1. the translated statement(s)
+    * 2. viper methods added during translation  (happens when translating a while loop)
+    * 3. new variables of type SetState[T] added during translation (happens when translating an if-else block)
+    */
     def translateStmt(stmt: Stmt, currStates: vpr.LocalVarDecl): (Seq[vpr.Stmt], Seq[vpr.Method], Seq[vpr.LocalVarDecl]) = {
       // A set of states
       val STmp = vpr.LocalVarDecl(tempStatesVarName, currStates.typ)()
@@ -151,9 +153,11 @@ object Generator {
           }
           (resStmts, resMethods, resNewVars)
 
-        case PVarDecl(name, typ) =>
-          val thisVar = vpr.LocalVarDecl(name.name, translateType(typ))()
-          (Seq.empty, Seq.empty, Seq(thisVar))
+        case PVarDecl(_, _) =>
+          // No translation needed here
+          // The translation of variable declarations always happens when translating a viper method
+          // Either in translateMethod or translateInvariantVerification
+          (Seq.empty, Seq.empty, Seq.empty)
 
         case AssumeStmt(e) =>
           val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),

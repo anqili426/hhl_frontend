@@ -19,8 +19,9 @@ case class LoopIndex() extends Expr
 
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
-  // This map stores all the program variables used in stmts
+  // This map stores all the program variables used in this CompositeStmt object
   // It is filled in the SymbolChecker
+  // Used as arguments when creating the method to verify a loop invariant
   var allProgVars: Map[String, Type] = Map.empty
 }
 case class AssignStmt(left: Id, right: Expr) extends Stmt {
