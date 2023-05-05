@@ -60,9 +60,9 @@ object Parser {
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!
-  def impliesOp[$: P]: P[String] = P("implies").!
+  def impliesOp[$: P]: P[String] = P("==>").!
   def boolOp1[$: P]: P[String] = P("&&" | "||").!
-  def boolOp2[$: P]: P[String] = P("==" | "!=").!
+  def boolOp2[$: P]: P[String] = P("==" ~ &(!CharIn(">")) | "!=").!
   def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
@@ -71,10 +71,10 @@ object Parser {
   def hyperAssertExpr[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(
     items => Assertion(items._1, items._2, items._3))
 
-  def otherExpr[$: P]: P[Expr] = P(normalExpr ~~ (spaces ~ impliesOp ~~/ spaces ~ expr).?).map{
-    case (e, None) => e
-    case (e, Some(items)) => ImpliesExpr(e, items._2)
-  }
+  def otherExpr[$: P]: P[Expr] = P(normalExpr ~ (impliesOp ~/ otherExpr).?).map{
+      case (e, None) => e
+      case (e, Some(items)) => ImpliesExpr(e, items._2)
+    }
 
   def normalExpr[$: P]: P[Expr] = P(eqExpr ~ (boolOp1 ~/ normalExpr).?).map{
     case (e, None) => e

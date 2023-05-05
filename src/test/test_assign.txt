@@ -1,7 +1,7 @@
-method main(x: Int, y: Int)
-    ensures forall _s: State :: <_s> implies get(_s, x) + 1 == get(_s, y)
+method main(x: Int, y: Int) returns (res: Int)
+    requires forall _s: State :: <_s> ==> get(_s, x) == get(_s, y) + 1
+    ensures forall _s: State :: <_s> ==> get(_s, res) == get(_s, y) * 2 + 1
 {
-    x := 0
-    y := 1
+    res := x + y
 }
 

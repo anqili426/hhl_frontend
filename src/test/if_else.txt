@@ -1,6 +1,6 @@
-method test(x: Int, y: Int, res: Int)
-    requires forall _s: State :: <_s> implies get(_s, x) >= get(_s, y)
-    ensures forall _s: State :: <_s> implies get(_s, res) == 1
+method test(x: Int, y: Int) returns (res: Int)
+    requires forall _s: State :: <_s> ==> get(_s, x) >= get(_s, y)
+    ensures forall _s: State :: <_s> ==> get(_s, res) == 1
 {
     if (x >= y) {
         res := 1

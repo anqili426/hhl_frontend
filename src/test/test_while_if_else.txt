@@ -1,18 +1,21 @@
-method test(x: Int, y: Int)
-    ensures forall _s: State :: <_s> implies get(_s, y) == 1
+method test(x: Int) returns (y: Int)
+    ensures forall _s: State :: <_s> ==> get(_s, y) == 1
 {
-
     assume x > 0
 
-    while (x > 0)
-        invariant forall _s: State :: <_s> implies get(_s, x) >= 0 && (get(_s, x) == 0 implies get(_s, y) == 1)
+    var i: Int
+    i := x
+
+
+    while (i > 0)
+        invariant forall _s: State :: <_s> ==> get(_s, i) >= 0 && (get(_s, i) == 0 ==> get(_s, y) == 1)
     {
-        if (x == 1) {
+        if (i == 1) {
             y := 1
         } else {
             y := 2
         }
-        x := x - 1
+        i := i - 1
     }
 
 }

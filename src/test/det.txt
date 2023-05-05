@@ -1,20 +1,4 @@
-var x: Int
-var i: Int
-var old_x: Int
-var res: Int
-
-requires forall _s: State :: get(_s, x) >= 0
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 implies get(_s1, x) >= get(_s2, x)
-
-res := 0
-old_x := x
-
-while (x > 0)
-    invariant forall _s: State :: <_s> implies get(_s, x) >= 0 && get(_s, res) == get(_s, old_x) - get(_s, x)
+method test(x: Int)
+requires forall _s: State :: <_s> ==> get(_s, x) == 1
 {
-    res := res + 1
-    x := x - 1
 }
-
-ensures forall _s: State :: <_s> implies get(_s, res) == get(_s, old_x)
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 implies get(_s1, res) >= get(_s2, res)

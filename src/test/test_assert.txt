@@ -1,7 +1,5 @@
 method test(x: Int, y: Int)
-    ensures forall _s:State :: <_s> implies get(_s, x) == get(_s, y)
+    ensures forall _s:State :: <_s> ==> get(_s, x) == get(_s, y)
 {
-    x := 0
-    y := 0
     assert x == y
 }
