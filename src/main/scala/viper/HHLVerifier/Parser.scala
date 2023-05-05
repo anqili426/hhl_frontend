@@ -9,18 +9,19 @@ object Parser {
     case methods => HHLProgram(methods)
   }
 
-  def method[$: P]: P[Method] = P("method" ~~ spaces ~~ methodName ~ "(" ~ methodArgs.rep(sep=",") ~ ")"  ~ precondition.rep ~ postcondition.rep ~ "{" ~ stmts ~ "}").map{
+  def method[$: P]: P[Method] = P("method" ~~ spaces ~~ methodName ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")"  ~ ("returns" ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")").? ~ precondition.rep ~ postcondition.rep  ~"{" ~ stmts ~ "}").map{
     items =>
-    val args = if (items._2 != Nil) items._2 else Seq.empty
-      val pre = if (items._3 != Nil) items._3 else Seq.empty
-      val post = if (items._4 != Nil) items._4 else Seq.empty
-      Method(items._1, args, pre, post, items._5)
+      val args = if (items._2 != Nil) items._2 else Seq.empty
+      val res = if (items._3 != None) items._3.get else Seq.empty
+      val pre = if (items._4 != Nil) items._4 else Seq.empty
+      val post = if (items._5 != Nil) items._5 else Seq.empty
+      Method(items._1, args, res, pre, post, items._6)
   }
 
   def precondition[$: P]: P[Assertion] = P("requires" ~~ spaces ~ hyperAssertExpr)
   def postcondition[$: P]: P[Assertion] = P("ensures" ~~ spaces ~ hyperAssertExpr)
 
-  def methodArgs[$: P]: P[Id] = P(progVar ~ ":" ~ progVartypeName).map{
+  def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ progVartypeName).map{
     items => items._1.typ = items._2
       items._1
   }

@@ -3,17 +3,31 @@ package viper.HHLVerifier
 object SymbolChecker {
   // This map is used to keep track of the declared program variables + assertion variables for each method
   var allVars: Map[String, Type] = Map.empty
+  var allArgNames: Set[String] = Set.empty
+  var allMethodNames: Seq[String] = List.empty
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
+    // Check that each method has a unique identifier
+    allMethodNames = p.content.map(m => m.mName)
+    val dupMethodNames = allMethodNames.diff(allMethodNames.distinct)
+    if (dupMethodNames.size > 0) throw DuplicateIdentifierException("Duplicate method name " + dupMethodNames)
     p.content.foreach(checkSymbolsMethod)
   }
 
   def checkSymbolsMethod(m: Method): Unit = {
-    allVars = m.argsMap
+    m.args.foreach(a => {
+      checkIdDup(a)
+      allVars = allVars + (a.name -> a.typ)
+    })
+    allArgNames = m.argsMap.keySet
     m.pre.foreach(p => checkSymbolsExpr(p, false))
+    // The return variables can only be referred to in the method body or postconditions
+    allVars = allVars ++ m.res.map(r => r.name -> r.typ)
     m.post.foreach(p => checkSymbolsExpr(p, false))
     checkSymbolsStmt(m.body)
     m.allVars = allVars
+    // Reset
+    allVars = Map.empty
   }
 
   def checkSymbolsStmt(stmt: Stmt): Seq[(String, Type)] = {
@@ -28,10 +42,13 @@ object SymbolChecker {
         allVars = allVars + (id.name -> typ)
         Seq((id.name, typ))
       case as@AssignStmt(id, exp) =>
+        // Do not allow assignment to method arguments
+        if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         val rightVars = checkSymbolsExpr(exp, false)
         as.IdsOnRHS = rightVars.map(tuple => tuple._1)
         checkSymbolsExpr(id, false) ++ rightVars
       case HavocStmt(id) =>
+        if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         checkSymbolsExpr(id, false)
       case AssumeStmt(e) =>
         checkSymbolsExpr(e, false)
@@ -92,7 +109,7 @@ object SymbolChecker {
 
     def checkIdDup(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (allVars.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
+      if (allVars.contains(idName) || allMethodNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
     }
 
     def checkIdDefined(id: Expr): Unit = {

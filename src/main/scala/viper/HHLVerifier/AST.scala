@@ -35,8 +35,9 @@ case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[Assertion]) e
 case class PVarDecl(vName: Id, vType: Type) extends Stmt
 
 sealed trait TopLevelDecl
-case class Method(mName: String, args: Seq[Id], pre: Seq[Assertion], post: Seq[Assertion], body: CompositeStmt) extends TopLevelDecl {
-  var argsMap: Map[String, Type] = args.map(arg => (arg.name -> arg.typ)).toMap
+case class Method(mName: String, args: Seq[Id], res: Seq[Id], pre: Seq[Assertion], post: Seq[Assertion], body: CompositeStmt) extends TopLevelDecl {
+  val argsMap: Map[String, Type] = args.map(arg => (arg.name -> arg.typ)).toMap
+  val resMap: Map[String, Type] = res.map(res => (res.name -> res.typ)).toMap
   var allVars: Map[String, Type] = Map.empty
 }
 

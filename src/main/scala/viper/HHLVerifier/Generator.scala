@@ -81,13 +81,19 @@ object Generator {
     )()
     )()
 
-    // Arguments
+    // Arguments of the input method
     val args = method.args.map(a => vpr.LocalVarDecl(a.name, translateType(a.typ, typVarMap))())
     val translatedArgs = args :+ inputStates
+
+    // Return variables of the input method
+    val ret = method.res.map(r => vpr.LocalVarDecl(r.name, translateType(r.typ, typVarMap))())
+    val retVars = ret.map(r => r.localVar)
+
     // Forming the preconditions
-    val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(args.indexOf(v) + args.length)())())
+    val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(args.indexOf(v))())())
     val preAboutArgs = if (argsWithValues.isEmpty) Seq.empty else Seq(argsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
     val pres = method.pre.map(p => translateExp(p, null, inputStates)) ++ preAboutArgs
+
     // Forming the postconditions
     val posts = method.post.map(p => translateExp(p, null, outputStates))
 
@@ -103,17 +109,18 @@ object Generator {
     val currStatesAssignment = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
     val translatedContent = translateStmt(method.body, outputStates)
 
-    // Assume that all program variables are different by assigning a distinct value to each of them
-    val progVars = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1))
-    val progVarsWithValues = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
-    val assignToProgVars = progVarsWithValues.map(v => vpr.LocalVarAssign(v, vpr.IntLit(progVarsWithValues.indexOf(v))())())
+    // Assume that all program variables + return variables are different by assigning a distinct value to each of them
+    val progVars = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1) && !method.resMap.keySet.contains(v._1))
+    val translatedProgVars = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
+    val allVarsToAssign = translatedProgVars ++ retVars
+    val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(allVarsToAssign.indexOf(v) + args.length)())())
 
     val progVarDecls = progVars.map(v => vpr.LocalVarDecl(v._1, translateType(v._2, typVarMap))()).toList
     val setStateVarDecls = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._3
     val localVars = progVarDecls ++ setStateVarDecls
 
-    val methodBody = Seq(currStatesAssignment) ++ assignToProgVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
-    val mainMethod = vpr.Method(method.mName, translatedArgs, Seq(outputStates), pres, posts,
+    val methodBody = Seq(currStatesAssignment) ++ assignToVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
+    val mainMethod = vpr.Method(method.mName, translatedArgs, ret :+ outputStates, pres, posts,
       Some(vpr.Seqn(methodBody, localVars)()))()
     mainMethod +: translatedContent._2
   }
