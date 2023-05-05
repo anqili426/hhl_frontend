@@ -1,4 +1,4 @@
-method test(sum: Int)
+method test() returns (sum: Int)
     ensures forall _s: State :: <_s> implies get(_s, sum) == 102
 {
 
@@ -15,7 +15,7 @@ method test(sum: Int)
 
 }
 
-method test2(sum: Int)
+method test2() returns (sum: Int)
     ensures forall _s: State :: <_s> implies get(_s, sum) == 102
 {
 
@@ -29,6 +29,26 @@ method test2(sum: Int)
            n := n + 1
            sum := sum + 1
    }
+}
+
+method test3(n: Int) returns (res: Int)
+    requires forall _s1: State, _s2:State :: <_s1> && <_s2> implies get(_s1, n) == get(_s2, n)
+    ensures forall _s1: State, _s2:State :: <_s1> && <_s2> implies get(_s1, res) == get(_s2, res)
+{
+    assume n == 11 && res == 0
+
+    var i: Int
+    i := n
+
+    while (i > 10)
+    invariant forall _s: State :: <_s> implies get(_s, i) >= 10 && get(_s, res) == get(_s, n) - get(_s, i)
+    invariant forall _s: State :: <_s> implies get(_s, n) == 11
+    {
+        i := i - 1
+        res := res + 1
+        var x: Int
+        x := 1
+    }
 }
 
 

@@ -1,6 +1,7 @@
-var x: Int
-var y: Int
-
-assume x == 0 && y == 1
-
-ensures forall _s: State :: get(_s, x) + 1 == get(_s, y)
+method main(x: Int, y: Int)
+    requires forall _s: State :: <_s> implies get(_s, x) == 0
+    ensures forall _s: State :: <_s> implies get(_s, x) == get(_s, y)
+{
+    assume x == 0 && y == 0
+    havoc x
+}

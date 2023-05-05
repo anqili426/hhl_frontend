@@ -1,10 +1,22 @@
 var x: Int
-var y: Int
 var i: Int
-var r: Int
+var old_x: Int
+var res: Int
 
-requires forall _s1: State, _s2: State :: get(_s1, i)  == 1 && get(_s2, i) == 2 implies get(_s1, x) > get(_s2, x) && get(_s1, y) > get(_s2, y)
+requires forall _s: State :: get(_s, x) >= 0
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 implies get(_s1, x) >= get(_s2, x)
 
-r := x + y
+res := 0
+old_x := x
 
-ensures forall _s1: State, _s2: State :: get(_s1, i)  == 1 && get(_s2, i) == 2 implies get(_s1, r) > get(_s2, r)
+
+
+while (x > 0)
+    invariant forall _s: State :: <_s> implies get(_s, x) >= 0 && get(_s, res) == get(_s, old_x) - get(_s, x)
+{
+    res := res + 1
+    x := x - 1
+}
+
+ensures forall _s: State :: <_s> implies get(_s, res) == get(_s, old_x)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 implies get(_s1, res) >= get(_s2, res)
