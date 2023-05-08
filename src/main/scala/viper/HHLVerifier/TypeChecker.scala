@@ -39,8 +39,9 @@ object TypeChecker {
       case IfElseStmt(cond, ifStmt, elseStmt) =>
         res = typeCheckExpr(cond, false) && checkIfTypeMatch(cond.typ, boolType)
         res = res && typeCheckStmt(ifStmt) && typeCheckStmt(elseStmt)
-      case WhileLoopStmt(cond, body, inv) =>
+      case WhileLoopStmt(cond, body, inv, frame) =>
         res = typeCheckExpr(cond, false) && checkIfTypeMatch(cond.typ, boolType)
+        frame.foreach(f => res = res && typeCheckExpr(f, true) && checkIfTypeMatch(f.typ, boolType))
         inv.foreach(i => res = res && typeCheckExpr(i, true) && checkIfTypeMatch(i.typ, boolType))
         res = res && typeCheckStmt(body)
       case PVarDecl(vName, vType) =>

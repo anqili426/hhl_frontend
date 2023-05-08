@@ -56,9 +56,13 @@ object SymbolChecker {
         checkSymbolsExpr(e, false)
       case IfElseStmt(cond, ifBlock, elseBlock) =>
         checkSymbolsExpr(cond, false) ++ checkSymbolsStmt(ifBlock) ++ checkSymbolsStmt(elseBlock)
-      case WhileLoopStmt(cond, body, inv) =>
-        val allVars = checkSymbolsExpr(cond, false) ++ inv.map(i => checkSymbolsExpr(i, true)).flatten ++ checkSymbolsStmt(body)
-        body.allProgVars = allVars.distinct.toMap
+      case WhileLoopStmt(cond, body, inv, frame) =>
+        val framedVars = frame.map(f => checkSymbolsExpr(f, false)).flatten
+        val bodyVars = checkSymbolsStmt(body)
+        val framedVarsInBody = framedVars.intersect(bodyVars)
+        if (framedVarsInBody.size > 0) throw UnknownException("Variables " + framedVarsInBody + " in framed assertions are also used in the loop body. ")
+        val allVars = checkSymbolsExpr(cond, false) ++ inv.map(i => checkSymbolsExpr(i, true)).flatten ++ bodyVars
+        body.allProgVars = allVars.distinct.toMap // Contains all program variables in the loop guard, invariant & loop body
         allVars
       case _ =>
         throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)

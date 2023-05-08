@@ -52,11 +52,14 @@ object Parser {
   def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ expr).map(AssertStmt)
   def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}" ~ ("else" ~ "{" ~ stmts ~ "}").?).map{
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
-  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~ "(" ~ expr ~ ")" ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
-    case (cond, Nil, s) => WhileLoopStmt(cond, s, Seq.empty)
-    case (cond, invs, s) => WhileLoopStmt(cond, s, invs)
+  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~ "(" ~ expr ~ ")" ~ frameInv.rep ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
+    items =>
+      val frameInv = if (items._2 == Nil) Seq.empty else items._2
+      val invs = if (items._3 == Nil) Seq.empty else items._3
+      WhileLoopStmt(items._1, items._4, invs, frameInv)
   }
   def loopInv[$: P]: P[Assertion] = P("invariant" ~~ spaces ~ hyperAssertExpr)
+  def frameInv[$: P]: P[Assertion] = P("frame" ~~ spaces ~ hyperAssertExpr)
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/").!

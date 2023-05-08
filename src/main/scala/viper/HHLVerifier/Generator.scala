@@ -232,13 +232,16 @@ object Generator {
             newMethods = ifBlock._2 ++ elseBlock._2
             (newStmts, newMethods, Seq(ifBlockStates, elseBlockStates) ++ ifBlock._3 ++ elseBlock._3)
 
-        case WhileLoopStmt(cond, body, inv) =>
+        case WhileLoopStmt(cond, body, inv, frame) =>
             loopCounter = loopCounter + 1
             // Connect all invariants with && to form 1 invariant
             currLoopIndex = vpr.IntLit(0)()
             val I0 = getAllInvariants(inv, currStates, typVarMap)
+            val framedExprs = frame.map(f => translateExp(f, state, currStates))
             // Assert I(0)
             val assertI0 = vpr.Assert(I0)()
+            // Assert all framed assertions
+            val assertFrames = framedExprs.map(f => vpr.Assert(f)())
             // Verify invariant in a separate method
             newMethods = translateInvariantVerification(inv, cond, body, typVarMap)
             // Let currStates be a union of Sn's
@@ -253,9 +256,11 @@ object Generator {
                                               )()
                                         )()
             val AssumeUnionStates = translateAssumeWithViperExpr(unionStates, state, currStates, typVarMap)
-            // Translate assume !cond
+            // Inhale frames
+            val inhaleFrames = framedExprs.map(f => vpr.Inhale(f)())
+            //  Assume !cond
             val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-            newStmts = Seq(assertI0, havocCurrStates, AssumeUnionStates) ++ notCond._1
+            newStmts = assertFrames ++ Seq(assertI0, havocCurrStates, AssumeUnionStates) ++ inhaleFrames ++ notCond._1
             (newStmts, newMethods, Seq.empty)
       }
     }
