@@ -23,6 +23,7 @@ case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
   // It is filled in the SymbolChecker
   // Used as arguments when creating the method to verify a loop invariant
   var allProgVars: Map[String, Type] = Map.empty
+  var modifiedProgVars: Map[String, Type] = Map.empty
 }
 case class AssignStmt(left: Id, right: Expr) extends Stmt {
   var IdsOnRHS: Seq[String] = Seq.empty

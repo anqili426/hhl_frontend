@@ -30,45 +30,62 @@ object SymbolChecker {
     allVars = Map.empty
   }
 
-  def checkSymbolsStmt(stmt: Stmt): Seq[(String, Type)] = {
+  // Returns
+  // 1. Sequence of all program variables that appear in the statement
+  // 2. Sequence of all program variables that are modified in the statement)
+  def checkSymbolsStmt(stmt: Stmt): (Seq[(String, Type)], Seq[(String, Type)]) = {
     stmt match {
       case cs@CompositeStmt(stmts) =>
-        var res: Seq[(String, Type)] = Seq.empty
-        stmts.foreach(s => res = res ++ checkSymbolsStmt(s))
-        cs.allProgVars = res.distinct.toMap
-        res.distinct
+        var res1: Seq[(String, Type)] = Seq.empty
+        var res2: Seq[(String, Type)] = Seq.empty
+        stmts.foreach(s => {
+          val res = checkSymbolsStmt(s)
+          res1 = res1 ++ res._1
+          res2 = res2 ++ res._2
+        })
+        cs.allProgVars = res1.distinct.toMap
+        cs.modifiedProgVars = res2.distinct.toMap
+        (res1.distinct, res2.distinct)
       case PVarDecl(id, typ) =>
         checkIdDup(id)
         allVars = allVars + (id.name -> typ)
-        Seq((id.name, typ))
+        (Seq((id.name, typ)), Seq.empty)
       case as@AssignStmt(id, exp) =>
         // Do not allow assignment to method arguments
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         val rightVars = checkSymbolsExpr(exp, false)
         as.IdsOnRHS = rightVars.map(tuple => tuple._1)
-        checkSymbolsExpr(id, false) ++ rightVars
+        val idAssignedTo = checkSymbolsExpr(id, false)
+        (idAssignedTo ++ rightVars, idAssignedTo)
       case HavocStmt(id) =>
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
-        checkSymbolsExpr(id, false)
+        val idAssignedTo = checkSymbolsExpr(id, false)
+        (idAssignedTo, idAssignedTo)
       case AssumeStmt(e) =>
-        checkSymbolsExpr(e, false)
+        (checkSymbolsExpr(e, false), Seq.empty)
       case AssertStmt(e) =>
-        checkSymbolsExpr(e, false)
+        (checkSymbolsExpr(e, false), Seq.empty)
       case IfElseStmt(cond, ifBlock, elseBlock) =>
-        checkSymbolsExpr(cond, false) ++ checkSymbolsStmt(ifBlock) ++ checkSymbolsStmt(elseBlock)
+        val condSymbols = checkSymbolsExpr(cond, false)
+        val ifSymbols = checkSymbolsStmt(ifBlock)
+        val elseSymbols = checkSymbolsStmt(elseBlock)
+        (condSymbols ++ ifSymbols._1 ++ elseSymbols._1, ifSymbols._2 ++ elseSymbols._2)
       case WhileLoopStmt(cond, body, inv, frame) =>
         val framedVars = frame.map(f => checkSymbolsExpr(f, false)).flatten
         val bodyVars = checkSymbolsStmt(body)
-        val framedVarsInBody = framedVars.intersect(bodyVars)
+        val framedVarsInBody = framedVars.intersect(bodyVars._2)
         if (framedVarsInBody.size > 0) throw UnknownException("Variables " + framedVarsInBody + " in framed assertions are also used in the loop body. ")
-        val allVars = checkSymbolsExpr(cond, false) ++ inv.map(i => checkSymbolsExpr(i, true)).flatten ++ bodyVars
-        body.allProgVars = allVars.distinct.toMap // Contains all program variables in the loop guard, invariant & loop body
-        allVars
+        val allVars = checkSymbolsExpr(cond, false) ++ inv.map(i => checkSymbolsExpr(i, true)).flatten ++ bodyVars._1
+        // The following assignment cannot be removed
+        // body.allProgVars must contain all program variables in the loop guard, invariant & loop body
+        body.allProgVars = allVars.distinct.toMap
+        (allVars, bodyVars._2)
       case _ =>
         throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)
     }
   }
 
+    // Returns a sequence of all program variables that appear in the expression
     def checkSymbolsExpr(exp: Expr, isInLoopInv: Boolean): Seq[(String, Type)] = {
       exp match {
         case id@Id(_) => // This is identifier used. Id in variable declarations are not checked here
