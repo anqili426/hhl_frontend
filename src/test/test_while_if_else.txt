@@ -1,5 +1,7 @@
 method test(x: Int) returns (y: Int)
-    ensures forall _s: State :: <_s> ==> get(_s, y) == 1
+    requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x)
+    ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
+    ensures forall _s: State :: <_s> ==> get(_s, y) == get(_s, x)
 {
     assume x > 0
 
@@ -8,10 +10,11 @@ method test(x: Int) returns (y: Int)
 
 
     while (i > 0)
-        invariant forall _s: State :: <_s> ==> get(_s, i) >= 0 && (get(_s, i) == 0 ==> get(_s, y) == 1)
+        frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x)
+        invariant forall _s: State :: <_s> ==> get(_s, i) >= 0 && (get(_s, i) == 0 ==> get(_s, y) == get(_s, x))
     {
         if (i == 1) {
-            y := 1
+            y := x
         } else {
             y := 2
         }

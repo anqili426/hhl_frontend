@@ -285,8 +285,8 @@ object Generator {
       val tmpStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
       val assignToOutputStates = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
 
-      // Precondition 1: Loop index >= 1
-      val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, IntLit(1)())()
+      // Precondition 1: Loop index >= 0
+      val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, IntLit(0)())()
       // Precondition 2: All program variables are different
       // (do so by assigning a distinct integer value to each of them)
       val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVarDecl(v._1, translateType(v._2, typVarMap))()).toList
