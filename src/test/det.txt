@@ -41,3 +41,26 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get
         res := i
     }
 }
+
+method test3(y: Int, i: Int) returns (res: Int)
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get(_s2, res)
+{
+    res := 0
+    if (y >= 0) {
+        while (res < y)
+            frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
+            invariant forall _s: State :: <_s> ==> get(_s, res) <= get(_s, y)
+        {
+            res := res + 1
+        }
+
+    } else {
+        while (res < (-1) * y)
+            frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
+            invariant forall _s: State :: <_s> ==> get(_s, res) <= (-1) * get(_s, y)
+        {
+            res := res + 1
+        }
+    }
+}
