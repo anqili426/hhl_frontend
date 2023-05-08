@@ -15,10 +15,17 @@ object Main {
       println("Please provide the program to verify. ")
       sys.exit(1)
     }
+
     val programAbsPath = args(0)
     val programSource = scala.io.Source.fromFile(programAbsPath)
     val program = programSource.mkString
     programSource.close()
+
+    val outputPath = if (args.length <= 1) "unspecified" else args(1)
+
+    println("The input program is read from " + programAbsPath)
+    println("The translated program is written to " + outputPath)
+
     try {
       val res = fastparse.parse(program, Parser.program(_))
       if (res.isSuccess) {
@@ -36,11 +43,10 @@ object Main {
         val viperProgram = Generator.generate(parsedProgram)
         // Optionally save the Viper program to some provided file
         if (args.length > 1) {
-          val fw = new FileWriter(args(1), false)
+          val fw = new FileWriter(outputPath, false)
           try fw.write(viperProgram.toString())
           finally fw.close()
         }
-        println(viperProgram)
 
         val consistencyErrors = viperProgram.checkTransitively
         //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
@@ -60,7 +66,6 @@ object Main {
             println("Verification succeeded")
           case Failure(err) =>
             println("Verification failed")
-            // TODO: fix later
             err.foreach(e => println(e.readableMessage))
         }
       } else {
