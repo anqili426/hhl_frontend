@@ -62,7 +62,7 @@ object Parser {
   def frameInv[$: P]: P[Assertion] = P("frame" ~~ spaces ~ hyperAssertExpr)
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
-  def arithOp2[$: P]: P[String] = P("*" | "/").!
+  def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
   def impliesOp[$: P]: P[String] = P("==>").!
   def boolOp1[$: P]: P[String] = P("&&" | "||").!
   def boolOp2[$: P]: P[String] = P("==" ~ &(!CharIn(">")) | "!=").!

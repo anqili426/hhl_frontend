@@ -1,0 +1,38 @@
+method test1(x: Int, y: Int, i: Int) returns (res: Int)
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, x) == get(_s3, x) && get(_s1, y) == get(_s2, x) && get(_s2, y) == get(_s3, x)
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> (get(_s1, res) == 1 && get(_s2, res) == 1 ==> get(_s3, res) == 1)
+{
+    if (x > y) {
+        res := 1
+    } else {
+        res := 0
+    }
+}
+
+method test2(x: Int, y: Int, i: Int) returns (res: Int)
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, x) == get(_s3, x) && get(_s1, y) == get(_s2, x) && get(_s2, y) == get(_s3, x)
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> (get(_s1, res) == 1 && get(_s2, res) == 1 ==> get(_s3, res) == 1)
+{
+    assume x >= y
+    assume y > 0
+    var remain_x: Int
+    remain_x := x
+
+    var ind: Int
+    ind := 0
+
+    while (remain_x >= y)
+    frame forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, x) == get(_s3, x) && get(_s1, y) == get(_s2, x) && get(_s2, y) == get(_s3, x)
+    invariant forall _s: State :: <_s> ==> get(_s, remain_x) == get(_s, x) - get(_s, ind) * get(_s, y)
+    {
+        remain_x := remain_x - y
+        ind := ind + 1
+    }
+
+    if (remain_x == 0) {
+        res := 1
+    } else {
+        res := 0
+    }
+}
+

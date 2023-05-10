@@ -325,6 +325,7 @@ object Generator {
             case "-" => vpr.Sub(translateExp(left, state, currStates), translateExp(right, state, currStates))()
             case "*" => vpr.Mul(translateExp(left, state, currStates), translateExp(right, state, currStates))()
             case "/" => vpr.Div(translateExp(left, state, currStates), translateExp(right, state, currStates))()
+            case "%" => vpr.Mod(translateExp(left, state, currStates), translateExp(right, state, currStates))()
             case "&&" => vpr.And(translateExp(left, state, currStates), translateExp(right, state, currStates))()
             case "||" => vpr.Or(translateExp(left, state, currStates), translateExp(right, state, currStates))()
             case "==" => vpr.EqCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()

@@ -3,7 +3,7 @@ package viper.HHLVerifier
 object TypeChecker {
   val boolOp = List("==", "!=", "&&", "||", "forall", "exists", "implies")
   val boolOpForNums = List(">=", "<=", ">", "<", "==", "!=")
-  val numOp = List("+", "-", "*", "/")
+  val numOp = List("+", "-", "*", "/", "%")
   val boolType = TypeInstance.boolType
   val intType = TypeInstance.intType
   val stateType = TypeInstance.stateType

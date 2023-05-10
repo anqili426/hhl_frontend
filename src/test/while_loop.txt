@@ -51,6 +51,30 @@ method test3(n: Int) returns (res: Int)
     }
 }
 
+method divisible(x: Int, y: Int, i: Int) returns (res: Int)
+requires forall _s: State :: <_s> ==> get(_s, x) >= get(_s, y) && get(_s, y) > 0 && get(_s, x) % get(_s, y) == 0
+ensures forall _s: State :: <_s> ==> get(_s, res) == 1
+{
+    var remain_x: Int
+    remain_x := x
+
+    var ind: Int
+    ind := 0
+
+    while (remain_x >= y)
+    invariant forall _s: State :: <_s> ==> get(_s, remain_x) == get(_s, x) - get(_s, ind) * get(_s, y)
+    {
+        remain_x := remain_x - y
+        ind := ind + 1
+    }
+
+    if (remain_x == 0) {
+        res := 1
+    } else {
+        res := 0
+    }
+}
+
 
 
 

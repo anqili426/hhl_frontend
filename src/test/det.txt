@@ -51,6 +51,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get
         while (res < y)
             frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
             invariant forall _s: State :: <_s> ==> get(_s, res) <= get(_s, y)
+            invariant forall _s: State :: <_s> ==> get(_s, y) >= 0
         {
             res := res + 1
         }
@@ -59,6 +60,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get
         while (res < (-1) * y)
             frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
             invariant forall _s: State :: <_s> ==> get(_s, res) <= (-1) * get(_s, y)
+            invariant forall _s: State :: <_s> ==> get(_s, y) < 0
         {
             res := res + 1
         }
