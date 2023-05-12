@@ -20,10 +20,10 @@ object SymbolChecker {
       allVars = allVars + (a.name -> a.typ)
     })
     allArgNames = m.argsMap.keySet
-    m.pre.foreach(p => checkSymbolsExpr(p, false))
+    m.pre.foreach(p => checkSymbolsExpr(p, false, false))
     // The return variables can only be referred to in the method body or postconditions
     allVars = allVars ++ m.res.map(r => r.name -> r.typ)
-    m.post.foreach(p => checkSymbolsExpr(p, false))
+    m.post.foreach(p => checkSymbolsExpr(p, false, false))
     checkSymbolsStmt(m.body)
     m.allVars = allVars
     // Reset
@@ -53,40 +53,46 @@ object SymbolChecker {
       case as@AssignStmt(id, exp) =>
         // Do not allow assignment to method arguments
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
-        val rightVars = checkSymbolsExpr(exp, false)
+        val rightVars = checkSymbolsExpr(exp, false, false)
         as.IdsOnRHS = rightVars.map(tuple => tuple._1)
-        val idAssignedTo = checkSymbolsExpr(id, false)
+        val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo ++ rightVars, idAssignedTo)
       case HavocStmt(id) =>
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
-        val idAssignedTo = checkSymbolsExpr(id, false)
+        val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo, idAssignedTo)
       case AssumeStmt(e) =>
-        (checkSymbolsExpr(e, false), Seq.empty)
+        (checkSymbolsExpr(e, false, false), Seq.empty)
       case AssertStmt(e) =>
-        (checkSymbolsExpr(e, false), Seq.empty)
+        (checkSymbolsExpr(e, false, false), Seq.empty)
       case IfElseStmt(cond, ifBlock, elseBlock) =>
-        val condSymbols = checkSymbolsExpr(cond, false)
+        val condSymbols = checkSymbolsExpr(cond, false, false)
         val ifSymbols = checkSymbolsStmt(ifBlock)
         val elseSymbols = checkSymbolsStmt(elseBlock)
         (condSymbols ++ ifSymbols._1 ++ elseSymbols._1, ifSymbols._2 ++ elseSymbols._2)
-      case WhileLoopStmt(cond, body, inv, frame) =>
-        val framedVars = frame.map(f => checkSymbolsExpr(f, false)).flatten
+      case WhileLoopStmt(cond, body, inv) =>
         val bodyVars = checkSymbolsStmt(body)
-        val framedVarsInBody = framedVars.intersect(bodyVars._2)
-        if (framedVarsInBody.size > 0) throw UnknownException("Variables " + framedVarsInBody + " in framed assertions are also used in the loop body. ")
-        val allVars = checkSymbolsExpr(cond, false) ++ inv.map(i => checkSymbolsExpr(i, true)).flatten ++ bodyVars._1
+        val allVars = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i, true, false)).flatten ++ bodyVars._1
         // The following assignment cannot be removed
         // body.allProgVars must contain all program variables in the loop guard, invariant & loop body
         body.allProgVars = allVars.distinct.toMap
         (allVars, bodyVars._2)
+      case FrameStmt(framedAssertion, body) =>
+        val framedVars = checkSymbolsExpr(framedAssertion, false, true)
+        val allBodyVars = checkSymbolsStmt(body)
+        val framedVarsModified = framedVars.intersect(allBodyVars._2)
+        // Make sure that the program variables in the frame are not modified in the body
+        if (framedVarsModified.size > 0) throw UnknownException("Variables " + framedVarsModified + " in framed assertions cannot be modified. ")
+        (framedVars ++ allBodyVars._1, allBodyVars._2)
       case _ =>
         throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)
     }
   }
 
+    // isInLoopInv: indicates whether exp is part of a loop invariant
+    // isFrame: indicates whether exp is part of a framed assertion -- used to check whether state-exists-expression can appear in exp
     // Returns a sequence of all program variables that appear in the expression
-    def checkSymbolsExpr(exp: Expr, isInLoopInv: Boolean): Seq[(String, Type)] = {
+    def checkSymbolsExpr(exp: Expr, isInLoopInv: Boolean, isFrame: Boolean): Seq[(String, Type)] = {
       exp match {
         case id@Id(_) => // This is identifier used. Id in variable declarations are not checked here
           checkIdDefined(id)
@@ -101,15 +107,16 @@ object SymbolChecker {
         case Num(_) => Seq.empty
         case BoolLit(_) => Seq.empty
         case BinaryExpr(left, _, right) =>
-            checkSymbolsExpr(left, isInLoopInv) ++ checkSymbolsExpr(right, isInLoopInv)
-        case UnaryExpr(_, e) => checkSymbolsExpr(e, isInLoopInv)
+            checkSymbolsExpr(left, isInLoopInv, isFrame) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
+        case UnaryExpr(_, e) => checkSymbolsExpr(e, isInLoopInv, isFrame)
         case ImpliesExpr(left, right) =>
-            checkSymbolsExpr(left, isInLoopInv) ++ checkSymbolsExpr(right, isInLoopInv)
+            // State-exists-expressions can appear on the left-hand side of an implication, so isFrame is fixed as false here
+            checkSymbolsExpr(left, isInLoopInv, false) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
         case Assertion(_, assertVars, body) =>
           val originalTable = allVars
           // Assertion variables will be added to the symbol table
-          assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv))
-          val varsInBody = checkSymbolsExpr(body, isInLoopInv)
+          assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv, isFrame))
+          val varsInBody = checkSymbolsExpr(body, isInLoopInv, isFrame)
           // Remove the assertion variables from the symbol table
           allVars = originalTable
           varsInBody
@@ -118,6 +125,7 @@ object SymbolChecker {
             checkIdDefined(id)
             Seq((id.name, allVars.get(id.name).get))
         case StateExistsExpr(state) =>
+            if (isFrame) throw UnknownException("Framed assertion cannot include state-exists-expression")
             checkIdDefined(state)
             Seq.empty
         case LoopIndex() =>

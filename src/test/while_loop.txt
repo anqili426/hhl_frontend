@@ -46,8 +46,6 @@ method test3(n: Int) returns (res: Int)
     {
         i := i - 1
         res := res + 1
-        var x: Int
-        x := 1
     }
 }
 
@@ -61,11 +59,13 @@ ensures forall _s: State :: <_s> ==> get(_s, res) == 1
     var ind: Int
     ind := 0
 
-    while (remain_x >= y)
-    invariant forall _s: State :: <_s> ==> get(_s, remain_x) == get(_s, x) - get(_s, ind) * get(_s, y)
-    {
-        remain_x := remain_x - y
-        ind := ind + 1
+    frame forall _s: State :: <_s> ==> get(_s, x) >= get(_s, y) && get(_s, y) > 0 && get(_s, x) % get(_s, y) == 0 {
+        while (ind < x / y)
+        invariant forall _s: State :: <_s> ==> get(_s, remain_x) == get(_s, x) - get(_s, ind) * get(_s, y) && get(_s, x) >= get(_s, y) && get(_s, y) > 0 &&  get(_s, ind) <= get(_s, x) / get(_s, y)
+        {
+            remain_x := remain_x - y
+            ind := ind + 1
+        }
     }
 
     if (remain_x == 0) {

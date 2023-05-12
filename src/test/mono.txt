@@ -11,12 +11,13 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
     var y: Int
     y := x
 
-    while (y > 0)
-        frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, old_x) >= get(_s2, old_x)
-        invariant forall _s: State :: <_s> ==> get(_s, y) >= 0 && get(_s, res) == get(_s, old_x) - get(_s, y)
-    {
-        res := res + 1
-        y := y - 1
+    frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, old_x) >= get(_s2, old_x) {
+        while (y > 0)
+            invariant forall _s: State :: <_s> ==> get(_s, y) >= 0 && get(_s, res) == get(_s, old_x) - get(_s, y)
+        {
+            res := res + 1
+            y := y - 1
+        }
     }
 }
 
@@ -29,13 +30,14 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
     new_x := x
     res := 0
 
-    while (new_x > 11)
-        frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, x) >= get(_s2, x)
-        invariant forall _s: State :: <_s> ==> get(_s, new_x) >= 11
-        invariant forall _s: State :: <_s> ==> get(_s, res) == get(_s, x) - get(_s, new_x)
-    {
-        res := res + 1
-        new_x := new_x - 1
+    frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, x) >= get(_s2, x) {
+        while (new_x > 11)
+            invariant forall _s: State :: <_s> ==> get(_s, new_x) >= 11
+            invariant forall _s: State :: <_s> ==> get(_s, res) == get(_s, x) - get(_s, new_x)
+        {
+            res := res + 1
+            new_x := new_x - 1
+        }
     }
 }
 
@@ -48,12 +50,13 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
     new_x := x
     res := 0
 
-    while (new_x > n)
-        frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, x) >= get(_s2, x) && get(_s1, n) == get(_s2, n)
-        invariant forall _s: State :: <_s> ==> get(_s, new_x) >= get(_s, n)
-        invariant forall _s: State :: <_s> ==> get(_s, res) == get(_s, x) - get(_s, new_x)
-    {
-        res := res + 1
-        new_x := new_x - 1
+    frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, x) >= get(_s2, x) && get(_s1, n) == get(_s2, n) {
+        while (new_x > n)
+            invariant forall _s: State :: <_s> ==> get(_s, new_x) >= get(_s, n)
+            invariant forall _s: State :: <_s> ==> get(_s, res) == get(_s, x) - get(_s, new_x)
+        {
+            res := res + 1
+            new_x := new_x - 1
+        }
     }
 }

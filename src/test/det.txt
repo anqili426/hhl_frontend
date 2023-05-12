@@ -9,12 +9,13 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get
 
     var t: Int
 
-    while (i < x)
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x)
-    invariant forall _s: State :: <_s> ==> get(_s, i) <= get(_s, x) && get(_s, res) == get(_s, i) * get(_s, x)
-    {
-        res := res + x
-        i := i + 1
+    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x) {
+        while (i < x)
+            invariant forall _s: State :: <_s> ==> get(_s, i) <= get(_s, x) && get(_s, res) == get(_s, i) * get(_s, x)
+        {
+            res := res + x
+            i := i + 1
+        }
     }
 }
 
@@ -29,16 +30,17 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get
     i := 0
     res := 0
 
-    while (i < x)
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x)
-    invariant forall _s: State :: <_s> ==> get(_s, i) <= get(_s, x) && get(_s, res) == get(_s, i)
-    {
+    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x) {
         while (i < x)
-        invariant forall _s: State :: <_s> ==> get(_s, i) <= get(_s, x)
+        invariant forall _s: State :: <_s> ==> get(_s, i) <= get(_s, x) && get(_s, res) == get(_s, i)
         {
-            i := i + 1
+            while (i < x)
+            invariant forall _s: State :: <_s> ==> get(_s, i) <= get(_s, x)
+            {
+                i := i + 1
+            }
+            res := i
         }
-        res := i
     }
 }
 
@@ -47,22 +49,22 @@ requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(
 ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get(_s2, res)
 {
     res := 0
-    if (y >= 0) {
-        while (res < y)
-            frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
-            invariant forall _s: State :: <_s> ==> get(_s, res) <= get(_s, y)
-            invariant forall _s: State :: <_s> ==> get(_s, y) >= 0
-        {
-            res := res + 1
-        }
+    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y) {
+        if (y >= 0) {
+            while (res < y)
+                invariant forall _s: State :: <_s> ==> get(_s, res) <= get(_s, y)
+                invariant forall _s: State :: <_s> ==> get(_s, y) >= 0
+            {
+                res := res + 1
+            }
 
-    } else {
-        while (res < (-1) * y)
-            frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
-            invariant forall _s: State :: <_s> ==> get(_s, res) <= (-1) * get(_s, y)
-            invariant forall _s: State :: <_s> ==> get(_s, y) < 0
-        {
-            res := res + 1
+        } else {
+            while (res < (-1) * y)
+                invariant forall _s: State :: <_s> ==> get(_s, res) <= (-1) * get(_s, y)
+                invariant forall _s: State :: <_s> ==> get(_s, y) < 0
+            {
+                res := res + 1
+            }
         }
     }
 }
