@@ -60,3 +60,28 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
         }
     }
 }
+
+method test4(x: Int, n: Int, i: Int) returns (y: Int)
+requires forall _s: State :: <_s> ==> get(_s, x) > 1
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, n) == get(_s2, n) && get(_s1, x) >= get(_s2, x)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, y) >= get(_s2, y)
+{
+    var ind: Int
+    ind := 0
+
+    var new_x: Int
+    new_x := x
+
+    y := 1
+
+    frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, n) == get(_s2, n) && get(_s1, x) >= get(_s2, x) {
+        while (ind < n)
+        invariant forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, new_x) >= get(_s2, new_x) && get(_s1, y) >= get(_s2, y)
+        {
+            new_x := new_x * 2 - 1
+            y := new_x + 1
+            ind := ind + 1
+        }
+    }
+
+}
