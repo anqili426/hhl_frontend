@@ -41,10 +41,13 @@ object Generator {
   var currLoopIndex: vpr.Exp = null
   var currLoopIndexName = "n_loop"
 
+  // TODO: do this for variables && methods?
+  var allFuncs: List[vpr.Function] = List.empty
+
   def generate(input: HHLProgram): vpr.Program = {
     var domains: Seq[vpr.Domain] = Seq.empty
     var fields: Seq[vpr.Field] = Seq.empty
-    var functions: Seq[vpr.Function] = Seq.empty
+    // var functions: Seq[vpr.Function] = Seq.empty
     var predicates: Seq[vpr.Predicate] = Seq.empty
     var methods: Seq[vpr.Method] = Seq.empty
     var extensions: Seq[vpr.ExtensionMember] = Seq.empty
@@ -53,7 +56,7 @@ object Generator {
     val preamble = generatePreamble(Map(typeVar -> vpr.Int))
     domains = domains ++ preamble._1
     methods = methods ++ preamble._2 ++ translateProgram(input, TtoIntMap)
-    val p = vpr.Program(domains, fields, functions, predicates, methods, extensions)()
+    val p = vpr.Program(domains, fields, allFuncs, predicates, methods, extensions)()
     p
   }
 
@@ -245,12 +248,19 @@ object Generator {
             val havocCurrStates = havocSetMethodCall(currStates.localVar)
             val k = vpr.LocalVarDecl("k", vpr.Int)()
             val zero = vpr.IntLit(0)()
-            val Sn = vpr.LocalVarDecl("Sn", getConcreteSetStateType(typVarMap))()
+            val getSkFuncName = "get_Sk_" + loopCounter
+            val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
+            allFuncs = allFuncs :+ getSkFunc
+            val getSkFuncApp = vpr.FuncApp(getSkFunc.name, Seq(k.localVar))(pos = vpr.NoPosition, info = vpr.NoInfo,
+                                                                            typ = getSkFunc.typ, errT = vpr.NoTrafos)
+            val Sk = vpr.LocalVarDecl("Sk", getConcreteSetStateType(typVarMap))()
             currLoopIndex = k.localVar
-            val unionStates = vpr.Exists(Seq(k, Sn), Seq.empty,
+            val unionStates = vpr.Exists(Seq(k, Sk), Seq.empty,
                                           vpr.And(vpr.GeCmp(k.localVar, zero)(),
-                                              vpr.And(getInSetApp(Seq(state.localVar, Sn.localVar), typVarMap), getAllInvariants(inv, Sn, typVarMap))()
-                                              )()
+                                              vpr.And(vpr.EqCmp(Sk.localVar, getSkFuncApp)(),
+                                                      vpr.And(getInSetApp(Seq(state.localVar, Sk.localVar), typVarMap), getAllInvariants(inv, Sk, typVarMap))()
+                                                      )()
+                                                  )()
                                         )()
             val AssumeUnionStates = translateAssumeWithViperExpr(unionStates, state, currStates, typVarMap)
             //  Assume !cond
@@ -266,7 +276,6 @@ object Generator {
           (Seq(assertFrame) ++ translatedBody._1 ++ Seq(inhaleFrame), translatedBody._2, translatedBody._3)
       }
     }
-
 
     def getAllInvariants(invs: Seq[Assertion], currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Exp = {
       if (invs.isEmpty) return vpr.BoolLit(true)()
