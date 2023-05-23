@@ -1,0 +1,219 @@
+domain State[T]  {
+
+  function get(s: State[T], x: T): T
+
+  function equal_on_everything_except(s1: State[T], s2: State[T], x: T): Bool
+
+  axiom equal_on_everything_except_def {
+    (forall s1: State[T], s2: State[T], x: T ::
+      { (equal_on_everything_except(s1, s2, x): Bool) }
+      (equal_on_everything_except(s1, s2, x): Bool) ==>
+      (forall y: T ::x != y ==> (get(s1, y): T) == (get(s2, y): T)))
+  }
+}
+
+domain SetState[T]  {
+
+  function in_set(s: State[T], S: SetState[T]): Bool
+
+  function set_union(S1: SetState[T], S2: SetState[T]): SetState[T]
+
+  axiom set_union_def {
+    (forall S1: SetState[T], S2: SetState[T] ::
+      { (set_union(S1, S2): SetState[T]) }
+      (forall s: State[T] ::((in_set(s, S1): Bool) || (in_set(s, S2): Bool)) ==
+        (in_set(s, (set_union(S1, S2): SetState[T])): Bool)))
+  }
+}
+
+method havocSet() returns (SS: SetState[Int])
+
+
+method test(x1: Int, x2: Int, y1: Int, y2: Int, S0: SetState[Int])
+  returns (res: Int, S: SetState[Int])
+  requires x1 == 0 && x2 == 1 && y1 == 2 && y2 == 3
+  ensures (forall _s: State[Int] ::(in_set(_s, S): Bool) &&
+      ((get(_s, x1): Int) < (get(_s, y1): Int) ||
+      (get(_s, x1): Int) == (get(_s, y1): Int) &&
+      (get(_s, x2): Int) <= (get(_s, y2): Int)) ==>
+      (get(_s, res): Int) == 1)
+{
+  var S_temp: SetState[Int]
+  var S_fail_temp: SetState[Int]
+  var S_fail: SetState[Int]
+  var S1: SetState[Int]
+  var S2: SetState[Int]
+  var S3: SetState[Int]
+  var S4: SetState[Int]
+  var S5: SetState[Int]
+  var S6: SetState[Int]
+  S := S0
+  res := 4
+  inhale (forall s: State[Int] ::!(in_set(s, S_fail): Bool))
+  S1 := S
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S1): Bool) && (get(s, x1): Int) < (get(s, y1): Int))
+  S1 := S_temp
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (exists s0: State[Int] :: (in_set(s0, S1): Bool) &&
+        (equal_on_everything_except(s0, s, res): Bool)))
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (get(s, res): Int) == 1)
+  S1 := S_temp
+  S2 := S
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S2): Bool) && !((get(s, x1): Int) < (get(s, y1): Int)))
+  S2 := S_temp
+  S3 := S2
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S3): Bool) && (get(s, x1): Int) == (get(s, y1): Int))
+  S3 := S_temp
+  S5 := S3
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S5): Bool) && (get(s, x2): Int) <= (get(s, y2): Int))
+  S5 := S_temp
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (exists s0: State[Int] :: (in_set(s0, S5): Bool) &&
+        (equal_on_everything_except(s0, s, res): Bool)))
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (get(s, res): Int) == 1)
+  S5 := S_temp
+  S6 := S3
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S6): Bool) && !((get(s, x2): Int) <= (get(s, y2): Int)))
+  S6 := S_temp
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (exists s0: State[Int] :: (in_set(s0, S6): Bool) &&
+        (equal_on_everything_except(s0, s, res): Bool)))
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (get(s, res): Int) == 0)
+  S6 := S_temp
+  S_temp := (set_union(S5, S6): SetState[Int])
+  S3 := S_temp
+  S4 := S2
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S4): Bool) && !((get(s, x1): Int) == (get(s, y1): Int)))
+  S4 := S_temp
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (exists s0: State[Int] :: (in_set(s0, S4): Bool) &&
+        (equal_on_everything_except(s0, s, res): Bool)))
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (get(s, res): Int) == 0)
+  S4 := S_temp
+  S_temp := (set_union(S3, S4): SetState[Int])
+  S2 := S_temp
+  S_temp := (set_union(S1, S2): SetState[Int])
+  S := S_temp
+}
+
+method trans(x1: Int, x2: Int, y1: Int, y2: Int, i: Int, S0: SetState[Int])
+  returns (res: Int, S: SetState[Int])
+  requires (forall _s1: State[Int], _s2: State[Int], _s3: State[Int] ::(in_set(_s1,
+      S0): Bool) &&
+      ((in_set(_s2, S0): Bool) &&
+      ((in_set(_s3, S0): Bool) &&
+      ((get(_s1, i): Int) == 1 &&
+      ((get(_s2, i): Int) == 2 && (get(_s3, i): Int) == 3)))) ==>
+      (get(_s1, x1): Int) == (get(_s3, x1): Int) &&
+      (get(_s1, x2): Int) == (get(_s3, x2): Int) &&
+      ((get(_s2, y1): Int) == (get(_s3, y1): Int) &&
+      (get(_s2, y2): Int) == (get(_s3, y2): Int) &&
+      ((get(_s1, y1): Int) == (get(_s2, x1): Int) &&
+      (get(_s1, y2): Int) == (get(_s2, x2): Int))))
+  requires x1 == 0 && x2 == 1 && y1 == 2 && y2 == 3 && i == 4
+  ensures (forall _s1: State[Int], _s2: State[Int], _s3: State[Int] ::(in_set(_s1,
+      S): Bool) &&
+      ((in_set(_s2, S): Bool) &&
+      ((in_set(_s3, S): Bool) &&
+      ((get(_s1, i): Int) == 1 &&
+      ((get(_s2, i): Int) == 2 && (get(_s3, i): Int) == 3)))) ==>
+      (get(_s1, res): Int) == 1 && (get(_s2, res): Int) == 1 ==>
+      (get(_s3, res): Int) == 1)
+{
+  var S_temp: SetState[Int]
+  var S_fail_temp: SetState[Int]
+  var S_fail: SetState[Int]
+  var S7: SetState[Int]
+  var S8: SetState[Int]
+  var S9: SetState[Int]
+  var S10: SetState[Int]
+  var S11: SetState[Int]
+  var S12: SetState[Int]
+  S := S0
+  res := 5
+  inhale (forall s: State[Int] ::!(in_set(s, S_fail): Bool))
+  S7 := S
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S7): Bool) && (get(s, x1): Int) < (get(s, y1): Int))
+  S7 := S_temp
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (exists s0: State[Int] :: (in_set(s0, S7): Bool) &&
+        (equal_on_everything_except(s0, s, res): Bool)))
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (get(s, res): Int) == 1)
+  S7 := S_temp
+  S8 := S
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S8): Bool) && !((get(s, x1): Int) < (get(s, y1): Int)))
+  S8 := S_temp
+  S9 := S8
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S9): Bool) && (get(s, x1): Int) == (get(s, y1): Int))
+  S9 := S_temp
+  S11 := S9
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S11): Bool) && (get(s, x2): Int) <= (get(s, y2): Int))
+  S11 := S_temp
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (exists s0: State[Int] :: (in_set(s0, S11): Bool) &&
+        (equal_on_everything_except(s0, s, res): Bool)))
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (get(s, res): Int) == 1)
+  S11 := S_temp
+  S12 := S9
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S12): Bool) && !((get(s, x2): Int) <= (get(s, y2): Int)))
+  S12 := S_temp
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (exists s0: State[Int] :: (in_set(s0, S12): Bool) &&
+        (equal_on_everything_except(s0, s, res): Bool)))
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (get(s, res): Int) == 0)
+  S12 := S_temp
+  S_temp := (set_union(S11, S12): SetState[Int])
+  S9 := S_temp
+  S10 := S8
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (in_set(s, S10): Bool) && !((get(s, x1): Int) == (get(s, y1): Int)))
+  S10 := S_temp
+  S_temp := havocSet()
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (exists s0: State[Int] :: (in_set(s0, S10): Bool) &&
+        (equal_on_everything_except(s0, s, res): Bool)))
+  inhale (forall s: State[Int] ::(in_set(s, S_temp): Bool) ==>
+      (get(s, res): Int) == 0)
+  S10 := S_temp
+  S_temp := (set_union(S9, S10): SetState[Int])
+  S8 := S_temp
+  S_temp := (set_union(S7, S8): SetState[Int])
+  S := S_temp
+}
