@@ -53,7 +53,12 @@ object Parser {
 
   def declareStmt[$: P]: P[DeclareStmt] = P("declare" ~~ spaces ~ blockId ~ "{" ~ stmts ~ "}").map(items => DeclareStmt(items._1, items._2))
   def reuseStmt[$: P]: P[ReuseStmt] = P("reuse" ~~ spaces ~ blockId).map(ReuseStmt)
-  def blockId[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => Id(name))
+  def blockId[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map{
+    name =>
+      val blockId = Id(name)
+      blockId.typ = TypeInstance.stmtBlockType
+      blockId
+  }
   def stmtInIf[$: P]: P[Stmt] = P(stmt | declareStmt)
   def stmtsInIf[$: P]: P[CompositeStmt] = P(stmtInIf.rep).map(CompositeStmt)
   def stmtInElse[$: P]: P[Stmt] = P(stmt | reuseStmt)

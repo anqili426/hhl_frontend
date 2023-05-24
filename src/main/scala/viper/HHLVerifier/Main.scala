@@ -38,7 +38,7 @@ object Main {
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
         println("Type checking successful. ")
-
+        
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)
         // Optionally save the Viper program to some provided file

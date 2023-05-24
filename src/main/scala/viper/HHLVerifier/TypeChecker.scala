@@ -7,6 +7,7 @@ object TypeChecker {
   val boolType = TypeInstance.boolType
   val intType = TypeInstance.intType
   val stateType = TypeInstance.stateType
+  val blockType = TypeInstance.stmtBlockType
 
   var currMethod: Method = null
 
@@ -39,6 +40,11 @@ object TypeChecker {
       case IfElseStmt(cond, ifStmt, elseStmt) =>
         res = typeCheckExpr(cond, false) && checkIfTypeMatch(cond.typ, boolType)
         res = res && typeCheckStmt(ifStmt) && typeCheckStmt(elseStmt)
+      case DeclareStmt(blockId, stmts) =>
+        res = checkIfTypeMatch(blockId.typ, blockType)
+        res = res && typeCheckStmt(stmts)
+      case ReuseStmt(blockId) =>
+        res = checkIfTypeMatch(blockId.typ, blockType)
       case WhileLoopStmt(cond, body, inv) =>
         res = typeCheckExpr(cond, false) && checkIfTypeMatch(cond.typ, boolType)
         inv.foreach(i => res = res && typeCheckExpr(i, true) && checkIfTypeMatch(i.typ, boolType))
@@ -136,7 +142,8 @@ object TypeChecker {
   def checkIfTypeMatch(t1: Type, t2: Type): Boolean = {
     (t1.isInstanceOf[IntType] && t2.isInstanceOf[IntType]) ||
       (t1.isInstanceOf[BoolType] && t2.isInstanceOf[BoolType]) ||
-      (t1.isInstanceOf[StateType] && t2.isInstanceOf[StateType])
+      (t1.isInstanceOf[StateType] && t2.isInstanceOf[StateType]) ||
+      (t1.isInstanceOf[StmtBlockType] && t2.isInstanceOf[StmtBlockType])
   }
 
 }
