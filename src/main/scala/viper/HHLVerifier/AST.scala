@@ -31,10 +31,14 @@ case class AssignStmt(left: Id, right: Expr) extends Stmt {
 case class HavocStmt(id: Id) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
 case class AssertStmt(e: Expr) extends Stmt
-case class IfElseStmt(cond: Expr, ifStmt: Stmt, elseStmt: Stmt) extends Stmt
+case class IfElseStmt(cond: Expr, ifStmt: CompositeStmt, elseStmt: CompositeStmt) extends Stmt
 case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[Assertion]) extends Stmt
 case class PVarDecl(vName: Id, vType: Type) extends Stmt
 case class FrameStmt(framedAssertion: Expr, body: CompositeStmt) extends Stmt
+case class DeclareStmt(blockName: Id, stmts: CompositeStmt) extends Stmt
+case class ReuseStmt(blockName: Id) extends Stmt {
+  var reusedBlock: CompositeStmt = CompositeStmt(Seq.empty)
+}
 
 sealed trait TopLevelDecl
 case class Method(mName: String, args: Seq[Id], res: Seq[Id], pre: Seq[Assertion], post: Seq[Assertion], body: CompositeStmt) extends TopLevelDecl {
@@ -52,11 +56,13 @@ case class UnknownType() extends Type
 case class IntType() extends Type
 case class BoolType() extends Type
 case class StateType() extends Type
+case class StmtBlockType() extends Type
 
 object TypeInstance {
   val unknownType = UnknownType()
   val boolType = BoolType()
   val intType = IntType()
   val stateType = StateType()
+  val stmtBlockType = StmtBlockType()
 }
 

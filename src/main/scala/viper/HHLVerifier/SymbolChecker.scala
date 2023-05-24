@@ -5,6 +5,7 @@ object SymbolChecker {
   var allVars: Map[String, Type] = Map.empty
   var allArgNames: Set[String] = Set.empty
   var allMethodNames: Seq[String] = List.empty
+  var allBlockNames: Seq[String] = List.empty
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
@@ -57,19 +58,52 @@ object SymbolChecker {
         as.IdsOnRHS = rightVars.map(tuple => tuple._1)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo ++ rightVars, idAssignedTo)
+
       case HavocStmt(id) =>
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo, idAssignedTo)
+
       case AssumeStmt(e) =>
         (checkSymbolsExpr(e, false, false), Seq.empty)
+
       case AssertStmt(e) =>
         (checkSymbolsExpr(e, false, false), Seq.empty)
+
       case IfElseStmt(cond, ifBlock, elseBlock) =>
+        val declareStmts = ifBlock.stmts.filter(s => s.isInstanceOf[DeclareStmt])
+        val reuseStmts = elseBlock.stmts.filter(s => s.isInstanceOf[ReuseStmt])
+        val numOfDeclareStmts = declareStmts.size
+        val numOfReuseStmts = reuseStmts.size
+        if (numOfDeclareStmts > 1) throw UnknownException("There can be at most 1 declare statement in an if-block")
+        if (numOfReuseStmts > 1) throw UnknownException("There can be at most 1 reuse statement in an else-block")
+        if (numOfDeclareStmts != numOfReuseStmts) throw UnknownException("Declare & reuse statements must both exist")
+
+        // Check that the reuse statement is using the identifier of the matching declare statement
+        if (numOfDeclareStmts == 1) {
+          val declareStmt = declareStmts[0].asInstanceOf[DeclareStmt]
+          val reuseStmt = reuseStmts[0].asInstanceOf[ReuseStmt]
+          checkIdDup(declareStmt.blockName)
+          allBlockNames = allBlockNames :+ declareStmt.blockName.name
+          if (reuseStmt.blockName.name != declareStmt.blockName.name) throw UnknownException("Reuse statement must refer to the matching declare statement")
+          reuseStmt.reusedBlock = declareStmt.stmts
+        }
+
         val condSymbols = checkSymbolsExpr(cond, false, false)
         val ifSymbols = checkSymbolsStmt(ifBlock)
         val elseSymbols = checkSymbolsStmt(elseBlock)
         (condSymbols ++ ifSymbols._1 ++ elseSymbols._1, ifSymbols._2 ++ elseSymbols._2)
+
+      case DeclareStmt(_, stmts) =>
+        // blockName should have been checked before reaching here
+        val allSymbols = checkSymbolsStmt(stmts)
+        (allSymbols._1, allSymbols._2)
+
+      case ReuseStmt(_) =>
+        // blockName should have been checked before reaching here
+        // TODO: should we return the symbols in the reused block?
+        (Seq.empty, Seq.empty)
+
       case WhileLoopStmt(cond, body, inv) =>
         val bodyVars = checkSymbolsStmt(body)
         val allVars = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i, true, false)).flatten ++ bodyVars._1
@@ -138,7 +172,7 @@ object SymbolChecker {
 
     def checkIdDup(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (allVars.contains(idName) || allMethodNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
+      if (allVars.contains(idName) || allMethodNames.contains(idName) || allBlockNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
     }
 
     def checkIdDefined(id: Expr): Unit = {

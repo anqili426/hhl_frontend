@@ -50,14 +50,24 @@ object Parser {
   def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar).map(e => HavocStmt(e))
   def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ expr).map(AssumeStmt)
   def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ expr).map(AssertStmt)
-  def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmts ~ "}" ~ ("else" ~ "{" ~ stmts ~ "}").?).map{
+
+  def declareStmt[$: P]: P[DeclareStmt] = P("declare" ~~ spaces ~ blockId ~ "{" ~ stmts ~ "}").map(items => DeclareStmt(items._1, items._2))
+  def reuseStmt[$: P]: P[ReuseStmt] = P("reuse" ~~ spaces ~ blockId).map(ReuseStmt)
+  def blockId[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => Id(name))
+  def stmtInIf[$: P]: P[Stmt] = P(stmt | declareStmt)
+  def stmtsInIf[$: P]: P[CompositeStmt] = P(stmtInIf.rep).map(CompositeStmt)
+  def stmtInElse[$: P]: P[Stmt] = P(stmt | reuseStmt)
+  def stmtsInElse[$: P]: P[CompositeStmt] = P(stmtInElse.rep).map(CompositeStmt)
+  def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmtsInIf ~ "}" ~ ("else" ~ "{" ~ stmtsInElse ~ "}").?).map{
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
+
   def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~ "(" ~ expr ~ ")"  ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
     items =>
       val invs = if (items._2 == Nil) Seq.empty else items._2
       WhileLoopStmt(items._1, items._3, invs)
   }
   def loopInv[$: P]: P[Assertion] = P("invariant" ~~ spaces ~ hyperAssertExpr)
+
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ hyperAssertExpr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
