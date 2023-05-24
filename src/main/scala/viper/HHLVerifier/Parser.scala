@@ -88,19 +88,19 @@ object Parser {
     case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
 
-  def compExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ compExpr).rep(min = 0, max = 1)).map {
-      case (e, Nil) => e
-      case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
+  def compExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ compExpr).?).map {
+      case (e, None) => e
+      case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
     }
 
-  def arithExpr[$: P]: P[Expr] = P(arithTerm ~ (arithOp1 ~/ arithExpr).rep(min=0, max=1)).map{
-    case (e, Nil) => e
-    case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
+  def arithExpr[$: P]: P[Expr] = P(arithTerm ~ (arithOp1 ~/ arithExpr).?).map{
+    case (e, None) => e
+    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
 
-  def arithTerm[$: P]: P[Expr] = P(basicExpr ~ (arithOp2 ~/ arithTerm).rep(min=0, max=1)).map{
-    case (e, Nil) => e
-    case (e, items) => BinaryExpr(e, items(0)._1, items(0)._2)
+  def arithTerm[$: P]: P[Expr] = P(basicExpr ~ (arithOp2 ~/ arithTerm).?).map{
+    case (e, None) => e
+    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
 
   def basicExpr[$: P]: P[Expr] = P(loopIndex | boolean | unaryExpr | getProgVarExpr | identifier | number | stateExistsExpr | "(" ~ expr ~ ")")
