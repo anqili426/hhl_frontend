@@ -23,6 +23,7 @@ case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
   // It is filled in the SymbolChecker
   // Used as arguments when creating the method to verify a loop invariant
   var allProgVars: Map[String, Type] = Map.empty
+  // Used when checking if a frame contains program variables that are modified
   var modifiedProgVars: Map[String, Type] = Map.empty
 }
 case class AssignStmt(left: Id, right: Expr) extends Stmt {

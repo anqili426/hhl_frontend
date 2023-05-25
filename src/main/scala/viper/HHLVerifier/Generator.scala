@@ -41,6 +41,10 @@ object Generator {
   var currLoopIndex: vpr.Exp = null
   var currLoopIndexName = "n_loop"
 
+  // Flag used when translating alignment
+  val isIfBlock = Id("isIfBlock")
+  isIfBlock.typ = TypeInstance.intType
+
   var allMethods: Seq[vpr.Method] = Seq.empty
   var allFuncs: Seq[vpr.Function] = Seq.empty
   var allDomains: Seq[vpr.Domain] = Seq.empty
@@ -217,20 +221,93 @@ object Generator {
             // Let ifBlockStates := S
             val assign1 = vpr.LocalVarAssign(ifBlockStates.localVar, currStates.localVar)()
             val assumeCond = translateStmt(AssumeStmt(cond), ifBlockStates)
-            val ifBlock = translateStmt(ifStmt, ifBlockStates)
 
             // Cond not satisfied
             // Let elseBlockStates := S
             val assign2 = vpr.LocalVarAssign(elseBlockStates.localVar, currStates.localVar)()
             val assumeNotCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), elseBlockStates)
-            val elseBlock = translateStmt(elseStmt, elseBlockStates)
 
             val updateSTmp = vpr.LocalVarAssign(STmp.localVar, getSetUnionApp(Seq(ifBlockStates.localVar, elseBlockStates.localVar), typVarMap))()
 
-            newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp, updateProgStates)
+            val declareBlock = ifStmt.stmts.find(s => s.isInstanceOf[DeclareStmt]).getOrElse(null)
+            val reuseBlock = elseStmt.stmts.find(s => s.isInstanceOf[ReuseStmt]).getOrElse(null)
 
-            (newStmts, Seq(ifBlockStates, elseBlockStates) ++ ifBlock._2 ++ elseBlock._2)
+            if (declareBlock != null) {
+              // Alignment
+              val declareBlockInd = ifStmt.stmts.indexOf(declareBlock)
+              val reuseBlockInd = elseStmt.stmts.indexOf(reuseBlock)
 
+              // Statements before & after declare block
+              val ifStmt1 = CompositeStmt(ifStmt.stmts.slice(0, declareBlockInd))
+              val ifStmt2 = CompositeStmt(ifStmt.stmts.slice(declareBlockInd + 1, ifStmt.stmts.length))
+
+              // Statements before & after reuse block
+              val elseStmt1 = CompositeStmt(elseStmt.stmts.slice(0, reuseBlockInd))
+              val elseStmt2 = CompositeStmt(elseStmt.stmts.slice(reuseBlockInd + 1, elseStmt.stmts.length))
+
+              // Translate statements before declare & reuse blocks separately
+              val ifRes1 = translateStmt(ifStmt1, ifBlockStates)
+              val elseRes1 = translateStmt(elseStmt1, elseBlockStates)
+
+              // Use an auxiliary variable to distinguish between ifBlockStates && elseBlockStates
+              // TODO: should use assume or assign?? -- I think using inhale is fine -- test this!
+              // TODO: delcare the isIfBlock variable!
+              val isIfBlockVpr = vpr.LocalVar("isIfBlock", vpr.Int)()
+              val setFlagForIf = translateStmt(AssumeStmt(BinaryExpr(isIfBlock, "==", Num(1))), ifBlockStates)
+              val setFlagForElse = translateStmt(AssumeStmt(BinaryExpr(isIfBlock, "==", Num(0))), elseBlockStates)
+
+              // Get a union of the two sets of states
+              val defineAlignedStates = vpr.LocalVarAssign(currStates.localVar, getSetUnionApp(Seq(ifBlockStates.localVar, elseBlockStates.localVar), typVarMap))()
+
+              // Verify the aligned statements
+              val alignedStmt = translateStmt(declareBlock, currStates)
+
+              // Separate the two sets of states from the union
+              // inhale forall _s: State :: in_set(_s, S1) ==> in_set(_s, SS) && get(_s, isIfBlock) == 1
+              val resumeIfBlockStates = vpr.Inhale(
+                                          vpr.Forall(Seq(state), Seq.empty,
+                                            vpr.Implies(getInSetApp(Seq(state.localVar, ifBlockStates.localVar), typVarMap),
+                                              vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+                                                vpr.EqCmp(getGetApp(Seq(state.localVar, isIfBlockVpr), typVarMap),
+                                                  IntLit(1)()
+                                                )()
+                                              )()
+                                            )()
+                                          )()
+                                        )()
+
+              val resumeElseBlockStates = vpr.Inhale(
+                                            vpr.Forall(Seq(state), Seq.empty,
+                                              vpr.Implies(getInSetApp(Seq(state.localVar, elseBlockStates.localVar), typVarMap),
+                                                vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+                                                  vpr.EqCmp(getGetApp(Seq(state.localVar, isIfBlockVpr), typVarMap),
+                                                    IntLit(0)()
+                                                  )()
+                                                )()
+                                              )()
+                                            )()
+                                          )()
+
+              // Verify the rest of the statements in if/else block separately
+              val ifRes2 = translateStmt(ifStmt2, ifBlockStates)
+              val elseRes2 = translateStmt(elseStmt2, elseBlockStates)
+
+              newStmts = Seq(assign1, assign2) ++ assumeCond._1 ++ assumeNotCond._1 ++ ifRes1._1 ++ elseRes1._1 ++ setFlagForIf._1 ++ setFlagForElse._1 ++ alignedStmt._1 ++ Seq(resumeIfBlockStates, resumeElseBlockStates) ++ ifRes2._1 ++ elseRes2._1
+              // TODO: return the right values
+              (newStmts, ifRes2._2)
+
+            } else {
+              // No alignment
+              val ifBlock = translateStmt(ifStmt, ifBlockStates)
+              val elseBlock = translateStmt(elseStmt, elseBlockStates)
+              newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp, updateProgStates)
+              (newStmts, Seq(ifBlockStates, elseBlockStates) ++ ifBlock._2 ++ elseBlock._2)
+            }
+        case DeclareStmt(_, block) =>
+            val res = translateStmt(block, currStates)
+            (res._1, res._2)
+        case ReuseStmt(_) =>
+            throw UnknownException("Reuse statement shouldn't be translated on its own")
         case WhileLoopStmt(cond, body, inv) =>
             loopCounter = loopCounter + 1
             val getSkFuncName = "get_Sk_" + loopCounter

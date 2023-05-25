@@ -1,0 +1,9 @@
+method test() {
+    if (true) {
+        declare a {
+           var b: Int
+        }
+    } else {
+        reuse a
+    }
+}
