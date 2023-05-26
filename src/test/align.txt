@@ -1,4 +1,4 @@
-method test(x: Int) returns (res: Int)
+method test1(x: Int) returns (res: Int)
 ensures forall _s: State :: <_s> && get(_s, x) > 1 ==> get(_s, res) == 1
 {
     if (x > 1) {
@@ -12,3 +12,26 @@ ensures forall _s: State :: <_s> && get(_s, x) > 1 ==> get(_s, res) == 1
     }
 }
 
+method test2(x: Int) returns (res: Int)
+ensures forall _s: State :: <_s> && get(_s, x) >= 1 && get(_s, x) <= 2 ==> get(_s, res) == 1
+ensures forall _s: State :: <_s> && get(_s, x) < 1 ==> get(_s, res) == 0
+ensures forall _s: State :: <_s> && get(_s, x) > 2 ==> get(_s, res) == 2
+{
+    res := 0
+    if (x > 1) {
+        declare testBlock {
+            if (x > 2) {
+                res := 2
+            } else {
+                res := 1
+            }
+        }
+    } else {
+        reuse testBlock
+        if (x == 1) {
+            res := 1
+        } else {
+            res := 0
+        }
+    }
+}

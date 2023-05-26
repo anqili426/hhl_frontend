@@ -299,7 +299,7 @@ object Generator {
               val elseRes2 = translateStmt(elseStmt2, elseBlockStates)
 
               newStmts = Seq(assign1, assign2) ++ assumeCond._1 ++ assumeNotCond._1 ++ ifRes1._1 ++ elseRes1._1 ++ setFlagForIf._1 ++ setFlagForElse._1 ++ Seq(defineAlignedStates) ++ alignedStmt._1 ++ resumeIfBlockStates ++ resumeElseBlockStates ++ ifRes2._1 ++ elseRes2._1 ++ Seq(updateSTmp, updateProgStates)
-              (newStmts, Seq(ifBlockStates, elseBlockStates) ++ ifRes1._2 ++ elseRes1._2 ++ alignedStmt._2 ++ ifRes2._2 ++ ifRes2._2)
+              (newStmts, Seq(ifBlockStates, elseBlockStates) ++ ifRes1._2 ++ elseRes1._2 ++ alignedStmt._2 ++ ifRes2._2 ++ elseRes2._2)
             } else {
               // No alignment
               val ifBlock = translateStmt(ifStmt, ifBlockStates)
