@@ -1,9 +1,14 @@
-method test() {
-    if (true) {
-        declare a {
-           var b: Int
+method test(x: Int) returns (res: Int)
+ensures forall _s: State :: <_s> && get(_s, x) > 1 ==> get(_s, res) == 1
+{
+    if (x > 1) {
+        declare setRes {
+            res := 1
         }
     } else {
-        reuse a
+        res := 0
+        reuse setRes
+        res := 0
     }
 }
+

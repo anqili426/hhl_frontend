@@ -42,8 +42,8 @@ object Generator {
   var currLoopIndexName = "n_loop"
 
   // Flag used when translating alignment
-  val isIfBlock = Id("isIfBlock")
-  isIfBlock.typ = TypeInstance.intType
+  val isIfBlockVarName = "isIfBlock"
+  val isIfBlockVar = vpr.LocalVarDecl(isIfBlockVarName, vpr.Int)()
 
   var allMethods: Seq[vpr.Method] = Seq.empty
   var allFuncs: Seq[vpr.Function] = Seq.empty
@@ -104,7 +104,7 @@ object Generator {
     val posts = method.post.map(p => translateExp(p, null, outputStates))
 
     /* Method body contains the following
-    *  Local variable declaration (program variables + auxiliary variables of type SetState)
+    *  Local variable declaration (program variables + auxiliary variables of type SetState + isIfBlock)
     *  Assume all program variables used in the method are different
     *  Assignment S := S0
     *  Assumption that S_fail is empty
@@ -118,12 +118,12 @@ object Generator {
     // Assume that all program variables + return variables are different by assigning a distinct value to each of them
     val progVars = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1) && !method.resMap.keySet.contains(v._1))
     val translatedProgVars = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
-    val allVarsToAssign = translatedProgVars ++ retVars
+    val allVarsToAssign = (translatedProgVars :+ isIfBlockVar.localVar) ++ retVars
     val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(allVarsToAssign.indexOf(v) + args.length)())())
 
     val progVarDecls = progVars.map(v => vpr.LocalVarDecl(v._1, translateType(v._2, typVarMap))()).toList
     val setStateVarDecls = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._2
-    val localVars = progVarDecls ++ setStateVarDecls
+    val localVars = (progVarDecls :+ isIfBlockVar) ++ setStateVarDecls
 
     val methodBody = Seq(currStatesAssignment) ++ assignToVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
     val thisMethod = vpr.Method(method.mName, translatedArgs, ret :+ outputStates, pres, posts,
@@ -251,8 +251,8 @@ object Generator {
 
               // Use an auxiliary variable to distinguish between ifBlockStates && elseBlockStates
               // TODO: should use assume or assign?? -- I think using inhale is fine -- test this!
-              // TODO: delcare the isIfBlock variable!
-              val isIfBlockVpr = vpr.LocalVar("isIfBlock", vpr.Int)()
+              val isIfBlock = Id(isIfBlockVarName)
+              isIfBlock.typ = TypeInstance.intType
               val setFlagForIf = translateStmt(AssumeStmt(BinaryExpr(isIfBlock, "==", Num(1))), ifBlockStates)
               val setFlagForElse = translateStmt(AssumeStmt(BinaryExpr(isIfBlock, "==", Num(0))), elseBlockStates)
 
@@ -263,39 +263,43 @@ object Generator {
               val alignedStmt = translateStmt(declareBlock, currStates)
 
               // Separate the two sets of states from the union
-              // inhale forall _s: State :: in_set(_s, S1) ==> in_set(_s, SS) && get(_s, isIfBlock) == 1
-              val resumeIfBlockStates = vpr.Inhale(
-                                          vpr.Forall(Seq(state), Seq.empty,
-                                            vpr.Implies(getInSetApp(Seq(state.localVar, ifBlockStates.localVar), typVarMap),
-                                              vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
-                                                vpr.EqCmp(getGetApp(Seq(state.localVar, isIfBlockVpr), typVarMap),
-                                                  IntLit(1)()
-                                                )()
-                                              )()
-                                            )()
-                                          )()
-                                        )()
-
-              val resumeElseBlockStates = vpr.Inhale(
-                                            vpr.Forall(Seq(state), Seq.empty,
-                                              vpr.Implies(getInSetApp(Seq(state.localVar, elseBlockStates.localVar), typVarMap),
-                                                vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
-                                                  vpr.EqCmp(getGetApp(Seq(state.localVar, isIfBlockVpr), typVarMap),
-                                                    IntLit(0)()
+              // S_temp := havoc_set()
+              // inhale forall _s: State :: in_set(_s, S_temp) ==> in_set(_s, S) && get(_s, isIfBlock) == 1
+              // S1 := S_temp
+              val resumeIfBlockStates = Seq(havocSTmp,
+                                            vpr.Inhale(
+                                              vpr.Forall(Seq(state), Seq.empty,
+                                                vpr.Implies(getInSetApp(Seq(state.localVar, STmp.localVar), typVarMap),
+                                                  vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+                                                    vpr.EqCmp(getGetApp(Seq(state.localVar, isIfBlockVar.localVar), typVarMap),
+                                                      IntLit(1)()
+                                                    )()
                                                   )()
                                                 )()
                                               )()
-                                            )()
-                                          )()
+                                            )(),
+                                            vpr.LocalVarAssign(ifBlockStates.localVar, STmp.localVar)())
+
+              val resumeElseBlockStates = Seq(havocSTmp,
+                                              vpr.Inhale(
+                                              vpr.Forall(Seq(state), Seq.empty,
+                                                vpr.Implies(getInSetApp(Seq(state.localVar, STmp.localVar), typVarMap),
+                                                  vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
+                                                    vpr.EqCmp(getGetApp(Seq(state.localVar, isIfBlockVar.localVar), typVarMap),
+                                                      IntLit(0)()
+                                                    )()
+                                                  )()
+                                                )()
+                                              )()
+                                            )(),
+                                            vpr.LocalVarAssign(elseBlockStates.localVar, STmp.localVar)())
 
               // Verify the rest of the statements in if/else block separately
               val ifRes2 = translateStmt(ifStmt2, ifBlockStates)
               val elseRes2 = translateStmt(elseStmt2, elseBlockStates)
 
-              newStmts = Seq(assign1, assign2) ++ assumeCond._1 ++ assumeNotCond._1 ++ ifRes1._1 ++ elseRes1._1 ++ setFlagForIf._1 ++ setFlagForElse._1 ++ alignedStmt._1 ++ Seq(resumeIfBlockStates, resumeElseBlockStates) ++ ifRes2._1 ++ elseRes2._1
-              // TODO: return the right values
-              (newStmts, ifRes2._2)
-
+              newStmts = Seq(assign1, assign2) ++ assumeCond._1 ++ assumeNotCond._1 ++ ifRes1._1 ++ elseRes1._1 ++ setFlagForIf._1 ++ setFlagForElse._1 ++ Seq(defineAlignedStates) ++ alignedStmt._1 ++ resumeIfBlockStates ++ resumeElseBlockStates ++ ifRes2._1 ++ elseRes2._1 ++ Seq(updateSTmp, updateProgStates)
+              (newStmts, Seq(ifBlockStates, elseBlockStates) ++ ifRes1._2 ++ elseRes1._2 ++ alignedStmt._2 ++ ifRes2._2 ++ ifRes2._2)
             } else {
               // No alignment
               val ifBlock = translateStmt(ifStmt, ifBlockStates)
