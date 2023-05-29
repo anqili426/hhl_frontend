@@ -44,7 +44,6 @@ object Generator {
 
   // Flag used when translating alignment
   val isIfBlockVarName = "isIfBlock"
-  // val isIfBlockVar = vpr.LocalVarDecl(isIfBlockVarName, vpr.Int)()
 
   var allMethods: Seq[vpr.Method] = Seq.empty
   var allFuncs: Seq[vpr.Function] = Seq.empty
