@@ -2,10 +2,10 @@ package viper.HHLVerifier
 
 object SymbolChecker {
   // This map is used to keep track of the declared program variables + assertion variables for each method
-  var allVars: Map[String, Type] = Map.empty
-  var allArgNames: Set[String] = Set.empty
-  var allMethodNames: Seq[String] = List.empty
-  var allBlockNames: Seq[String] = List.empty
+  var allVars: Map[String, Type] = Map.empty  // All variables used in one method
+  var allArgNames: Set[String] = Set.empty  // All arguments of one method
+  var allMethodNames: Seq[String] = List.empty  // All method names of one program
+  var allBlockNames: Seq[String] = List.empty // All block names of one program
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
@@ -174,7 +174,7 @@ object SymbolChecker {
 
     def checkIdDup(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (allVars.contains(idName) || allMethodNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
+      if (allVars.contains(idName) || allMethodNames.contains(idName) || allBlockNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
     }
 
     def checkIdDefined(id: Expr): Unit = {

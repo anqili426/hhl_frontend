@@ -13,17 +13,23 @@ ensures forall _s: State :: <_s> && get(_s, x) > 1 ==> get(_s, res) == 1
 }
 
 method test2(x: Int) returns (res: Int)
-ensures forall _s: State :: <_s> && get(_s, x) >= 1 && get(_s, x) <= 2 ==> get(_s, res) == 1
+ensures forall _s: State :: <_s> && get(_s, x) == 1 ==> get(_s, res) == 1
+ensures forall _s: State :: <_s> && get(_s, x) > 1 &&  get(_s, x) <= 2 ==> get(_s, res) == 4
 ensures forall _s: State :: <_s> && get(_s, x) < 1 ==> get(_s, res) == 0
-ensures forall _s: State :: <_s> && get(_s, x) > 2 ==> get(_s, res) == 2
+ensures forall _s: State :: <_s> && get(_s, x) > 2 ==> get(_s, res) == 3
 {
     res := 0
     if (x > 1) {
         declare testBlock {
             if (x > 2) {
                 res := 2
+                declare nestedTestBlock {
+                    res := 3
+                }
             } else {
                 res := 1
+                reuse nestedTestBlock
+                res := 4
             }
         }
     } else {
@@ -32,6 +38,33 @@ ensures forall _s: State :: <_s> && get(_s, x) > 2 ==> get(_s, res) == 2
             res := 1
         } else {
             res := 0
+        }
+    }
+}
+
+method test3(x: Int) returns (y: Int)
+    requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x)
+    ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y)
+    ensures forall _s: State :: <_s> ==> get(_s, y) == get(_s, x)
+{
+    assume x > 0
+
+    var i: Int
+    i := x
+
+    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x) {
+        while (i > 0)
+            invariant forall _s: State :: <_s> ==> get(_s, i) >= 0 && (get(_s, i) == 0 ==> get(_s, y) == get(_s, x))
+        {
+            if (i == 1) {
+                declare update {
+                    y := x
+                }
+            } else {
+                reuse update
+                y := 2
+            }
+            i := i - 1
         }
     }
 }
