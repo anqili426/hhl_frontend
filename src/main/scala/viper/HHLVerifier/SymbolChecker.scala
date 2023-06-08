@@ -5,7 +5,6 @@ object SymbolChecker {
   var allVars: Map[String, Type] = Map.empty  // All variables used in one method
   var allArgNames: Set[String] = Set.empty  // All arguments of one method
   var allMethodNames: Seq[String] = List.empty  // All method names of one program
-  var allBlockNames: Seq[String] = List.empty // All block names of one program
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
@@ -85,7 +84,6 @@ object SymbolChecker {
           val reuseStmt = reuseStmts(0).asInstanceOf[ReuseStmt]
           checkIdDup(declareStmt.blockName)
           allVars = allVars + (declareStmt.blockName.name -> declareStmt.blockName.typ)
-          allBlockNames = allBlockNames :+ declareStmt.blockName.name
           if (declareStmt.stmts.stmts.size == 0) throw UnknownException("Declare statement block cannot be empty")
           if (reuseStmt.blockName.name != declareStmt.blockName.name) throw UnknownException("Reuse statement must refer to the matching declare statement")
           reuseStmt.reusedBlock = declareStmt.stmts
@@ -174,7 +172,7 @@ object SymbolChecker {
 
     def checkIdDup(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (allVars.contains(idName) || allMethodNames.contains(idName) || allBlockNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
+      if (allVars.contains(idName) || allMethodNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
     }
 
     def checkIdDefined(id: Expr): Unit = {

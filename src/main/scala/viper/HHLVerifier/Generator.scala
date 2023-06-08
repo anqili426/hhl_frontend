@@ -328,8 +328,30 @@ object Generator {
             // Verify invariant in a separate method
             newMethods = translateInvariantVerification(inv, cond, body, typVarMap)
             allMethods = allMethods ++ newMethods
-            // Let currStates be a union of Sn's
-            val havocCurrStates = havocSetMethodCall(currStates.localVar)
+
+            // Havoc loop targets
+            val s0 = vpr.LocalVarDecl(s0VarName, state.typ)()
+            var havocLoopTargetStmts: Seq[vpr.Stmt] = Seq.empty
+            if (!body.modifiedProgVars.isEmpty) {
+              val vVar = vpr.LocalVarDecl("progVar", vpr.Int)()
+              val assignToStmp = havocSetMethodCall(STmp.localVar)
+              val loopTargets = body.modifiedProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
+              val notEqLoopTargets: Seq[vpr.Exp] = loopTargets.map(t => vpr.NeCmp(vVar.localVar, t)()).toList
+              val andNotEqLoopTargets = notEqLoopTargets.reduceLeft((e1, e2) => vpr.And(e1, e2)())
+              val havocLoopTargetsExp = vpr.Exists(Seq(s0), Seq.empty,
+                vpr.And(getInSetApp(Seq(s0.localVar, currStates.localVar), typVarMap),
+                  vpr.Forall(Seq(vVar), Seq.empty,
+                    vpr.Implies(
+                      andNotEqLoopTargets,
+                      vpr.EqCmp(getGetApp(Seq(s0.localVar, vVar.localVar), typVarMap),
+                        getGetApp(Seq(state.localVar, vVar.localVar), typVarMap))())()
+                  )()
+                )())()
+              val havocLoopTargets = translateAssumeWithViperExpr(havocLoopTargetsExp, state, STmp, typVarMap)
+              val updateCurrStates = vpr.LocalVarAssign(currStates.localVar, STmp.localVar)()
+              havocLoopTargetStmts = Seq(assignToStmp, havocLoopTargets, updateCurrStates)
+            }
+              // Let currStates be a union of Sn's
             val k = vpr.LocalVarDecl("k", vpr.Int)()
             val zero = vpr.IntLit(0)()
             val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
@@ -348,7 +370,7 @@ object Generator {
             val AssumeUnionStates = translateAssumeWithViperExpr(unionStates, state, currStates, typVarMap)
             //  Assume !cond
             val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-            newStmts =  Seq(assertI0, havocCurrStates, AssumeUnionStates) ++ notCond._1
+            newStmts =  Seq(assertI0) ++ havocLoopTargetStmts ++ Seq(AssumeUnionStates) ++ notCond._1
             (newStmts, Seq.empty)
 
         case FrameStmt(f, body) =>
