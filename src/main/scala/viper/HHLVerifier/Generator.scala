@@ -49,6 +49,8 @@ object Generator {
   var allFuncs: Seq[vpr.Function] = Seq.empty
   var allDomains: Seq[vpr.Domain] = Seq.empty
 
+  var verifierOption = 0 // 0: forall 1: exists
+
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
     var predicates: Seq[vpr.Predicate] = Seq.empty
@@ -68,10 +70,13 @@ object Generator {
   }
 
   def translateMethod(method: Method, typVarMap: Map[vpr.TypeVar, vpr.Type]): Unit = {
+    val presAndPosts = method.pre ++ method.post
+    if (presAndPosts.size == 0 || presAndPosts.count(p => p.quantifier == "forall") == presAndPosts.size) verifierOption = 0
+    else if (presAndPosts.count(p => p.quantifier == "exists") == presAndPosts.size) verifierOption = 1
+    else throw UnknownException("Method " + method.mName + " can only use hyperassertions using only either forall or exists")
+
     val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
     val outputStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()
-
-    // val currStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()
     val tempStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
     failedStates = vpr.LocalVarDecl(failedStatesVarName, getConcreteSetStateType(typVarMap))()
     tempFailedStates = vpr.LocalVarDecl(tempFailedStatesVarName, getConcreteSetStateType(typVarMap))()
@@ -176,41 +181,57 @@ object Generator {
         case AssumeStmt(e) =>
           val exp = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
                                         translateExp(e, state, currStates))()
-          newStmts = Seq(havocSTmp, translateAssumeWithViperExpr(exp, state, STmp, typVarMap), updateProgStates)
+          newStmts = {
+            // ForAll
+            if (verifierOption == 0) Seq(havocSTmp, translateAssumeWithViperExpr(exp, state, STmp, typVarMap), updateProgStates)
+            // Exists
+            else Seq(havocSTmp, translateAssumeWithViperExpr(exp, STmp, state, typVarMap), updateProgStates)
+          }
           (newStmts, Seq.empty)
 
         case AssertStmt(e) =>
             val havocSFailTmp = havocSetMethodCall(tempFailedStates.localVar)
             val exp1 = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
                                 translateExp(e, state, currStates))()
-            val stmt1 = translateAssumeWithViperExpr(exp1, state, STmp, typVarMap)
+            val stmt1 = {
+              if (verifierOption == 0) translateAssumeWithViperExpr(exp1, state, STmp, typVarMap)
+              else translateAssumeWithViperExpr(exp1, STmp, state, typVarMap)
+            }
             val exp2 = vpr.And(getInSetApp(Seq(state.localVar, currStates.localVar), typVarMap),
                                 translateExp(UnaryExpr("!", e), state, currStates))()
-            val stmt2 = translateAssumeWithViperExpr(exp2, state, tempFailedStates, typVarMap)
+            val stmt2 = {
+              if (verifierOption == 0) translateAssumeWithViperExpr(exp2, state, tempFailedStates, typVarMap)
+              else translateAssumeWithViperExpr(exp2, tempFailedStates, state, typVarMap)
+            }
             val updateSFail = vpr.LocalVarAssign(failedStates.localVar,
                               getSetUnionApp(Seq(failedStates.localVar, tempFailedStates.localVar), typVarMap))()
             newStmts = Seq(havocSTmp, havocSFailTmp, stmt1, stmt2, updateSFail, updateProgStates)
             (newStmts, Seq.empty)
 
-        case as@AssignStmt(left, right) =>
+        case AssignStmt(left, right) =>
             val leftVar = vpr.LocalVarDecl(left.name, translateType(left.typ, typVarMap))()
             // Check whether the identifier on the left-hand side appears in the right-hand side
-            if (as.IdsOnRHS.contains(left.name)) {
-              val s0 = vpr.LocalVarDecl(s0VarName, state.typ)()
-              val exp = vpr.EqCmp(translateExp(left, state, currStates), translateExp(right, s0, currStates))()
+            val s0 = vpr.LocalVarDecl(s0VarName, state.typ)()
+
+            // TODO: test both
+            if (verifierOption == 0) {
+              val exp = vpr.EqCmp(translateExp(left, state, currStates), translateExp(right, s0, STmp))()
               val stmt = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap, exp)
               newStmts = Seq(havocSTmp, stmt, updateProgStates)
             } else {
-              val stmt1 = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
-              val exp = vpr.EqCmp(translateExp(left, state, currStates), translateExp(right, state, currStates))()
-              val stmt2 = translateAssumeWithViperExpr(exp, state, STmp, typVarMap)
-              newStmts = Seq(havocSTmp, stmt1, stmt2, updateProgStates)
+              val exp = vpr.EqCmp(translateExp(left, s0, STmp), translateExp(right, state, currStates))()
+              val stmt = translateHavocVarHelper(leftVar, state, currStates, STmp, typVarMap, exp)
+              newStmts = Seq(havocSTmp, stmt, updateProgStates)
             }
+
             (newStmts, Seq.empty)
 
         case HavocStmt(id) =>
             val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
-            val stmt = translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
+            val stmt = {
+              if (verifierOption == 0) translateHavocVarHelper(leftVar, state, STmp, currStates, typVarMap)
+              else translateHavocVarHelper(leftVar, state, currStates, STmp, typVarMap)
+            }
             newStmts = Seq(havocSTmp, stmt, updateProgStates)
             (newStmts, Seq.empty)
 
@@ -236,6 +257,7 @@ object Generator {
             val declareBlock = ifStmt.stmts.find(s => s.isInstanceOf[DeclareStmt]).getOrElse(null)
             val reuseBlock = elseStmt.stmts.find(s => s.isInstanceOf[ReuseStmt]).getOrElse(null)
 
+            // This feature is only supported in forall-hhl
             if (declareBlock != null) {
               alignCounter = alignCounter + 1
               // Alignment
@@ -486,16 +508,16 @@ object Generator {
   }
 
   // This returns a Viper assume statement that expresses the following:
-  // assume forall stateVar :: in_set(stateVar, tmpStates) ==> (exists s0 :: in_set(s0, currStates) && equal_on_everything_except(s0, stateVar, leftVar) && extraExp)
-  def translateHavocVarHelper(leftVar: vpr.LocalVarDecl, stateVar: vpr.LocalVarDecl, tmpStates: vpr.LocalVarDecl,
-                              currStates: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type], extraExp: vpr.Exp = null)
+  // assume forall stateVar :: in_set(stateVar, S1) ==> (exists s0 :: in_set(s0, S2) && equal_on_everything_except(s0, stateVar, leftVar) && extraExp)
+  def translateHavocVarHelper(leftVar: vpr.LocalVarDecl, stateVar: vpr.LocalVarDecl, S1: vpr.LocalVarDecl,
+                              S2: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type], extraExp: vpr.Exp = null)
                                 : vpr.Inhale = {
     val s0 = vpr.LocalVarDecl(s0VarName, stateVar.typ)()
-    var itemsInExistsExpr: Seq[vpr.Exp] = Seq(getInSetApp(Seq(s0.localVar, currStates.localVar), typVarMap),
+    var itemsInExistsExpr: Seq[vpr.Exp] = Seq(getInSetApp(Seq(s0.localVar, S2.localVar), typVarMap),
                                 getEqualExceptApp(Seq(s0.localVar, stateVar.localVar, leftVar.localVar), typVarMap))
     if (extraExp != null) itemsInExistsExpr = itemsInExistsExpr :+ extraExp
     val existsExpr = vpr.Exists(Seq(s0), Seq.empty, itemsInExistsExpr.reduceLeft((e1, e2) => vpr.And(e1, e2)()))()
-    translateAssumeWithViperExpr(existsExpr, stateVar, tmpStates, typVarMap)
+    translateAssumeWithViperExpr(existsExpr, stateVar, S1, typVarMap)
   }
 
   // This returns a Viper assume statement of the form "assume forall stateVar: State[T] :: in_set(stateVar, pStates) => e"
