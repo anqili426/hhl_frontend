@@ -1,0 +1,38 @@
+method testForAll(x: Int) returns (y: Int)
+    ensures forall _s: State :: <_s> ==> get(_s, y) == get(_s, x)
+{
+    y := x
+}
+
+method testExistsAssign(x: Int) returns (y: Int)
+    requires exists _s: State :: <_s>
+    ensures exists _s: State :: <_s> && get(_s, y) == get(_s, x)
+{
+    y := x
+}
+
+method testAssume(x: Int)
+requires exists _s: State :: <_s> && get(_s, x) == 1
+ensures exists _s: State :: <_s> && get(_s, x) > 0
+{
+    assume x == 1
+}
+
+method testAssert(x: Int)
+requires exists _s: State :: <_s> && get(_s, x) == 2
+ensures exists _s: State :: <_s> && get(_s, x) > 1
+{
+    assert x > 1
+}
+
+method testIfElse(x: Int) returns (y: Int)
+requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, x) == 3 && get(_s2, x) == 1
+ensures exists _s: State :: <_s> && get(_s, y) == 2
+ensures exists _s: State :: <_s> && get(_s, y) == 1
+{
+    if (x > 2) {
+      y := 2
+    } else {
+      y := x
+    }
+}
