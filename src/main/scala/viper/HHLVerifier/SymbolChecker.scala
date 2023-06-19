@@ -32,7 +32,7 @@ object SymbolChecker {
 
   // Returns
   // 1. Sequence of all program variables that appear in the statement
-  // 2. Sequence of all program variables that are modified in the statement)
+  // 2. Sequence of all program variables that are modified in the statement
   def checkSymbolsStmt(stmt: Stmt): (Seq[(String, Type)], Seq[(String, Type)]) = {
     stmt match {
       case cs@CompositeStmt(stmts) =>
@@ -54,6 +54,7 @@ object SymbolChecker {
         // Do not allow assignment to method arguments
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         val rightVars = checkSymbolsExpr(exp, false, false)
+        // TODO: the following assignment can be removed, since as.IdsOnRHS is not used any more
         as.IdsOnRHS = rightVars.map(tuple => tuple._1)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo ++ rightVars, idAssignedTo)
