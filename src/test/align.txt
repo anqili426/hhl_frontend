@@ -50,6 +50,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
                 }
             }
         }
+        y := y + 1
     } else {
         reuse commonLoop
     }
