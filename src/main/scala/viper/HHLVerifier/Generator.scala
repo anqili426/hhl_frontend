@@ -364,49 +364,56 @@ object Generator {
             newMethods = translateInvariantVerification(inv, cond, body, typVarMap)
             allMethods = allMethods ++ newMethods
 
-            // TODO: update this part
-            // Havoc loop targets
-            val s0 = vpr.LocalVarDecl(s0VarName, state.typ)()
-            var havocLoopTargetStmts: Seq[vpr.Stmt] = Seq.empty
-            if (!body.modifiedProgVars.isEmpty) {
-              val vVar = vpr.LocalVarDecl("progVar", vpr.Int)()
-              val assignToStmp = havocSetMethodCall(STmp.localVar)
-              val loopTargets = body.modifiedProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
-              val notEqLoopTargets: Seq[vpr.Exp] = loopTargets.map(t => vpr.NeCmp(vVar.localVar, t)()).toList
-              val andNotEqLoopTargets = notEqLoopTargets.reduceLeft((e1, e2) => vpr.And(e1, e2)())
-              val havocLoopTargetsExp = vpr.Exists(Seq(s0), Seq.empty,
-                vpr.And(getInSetApp(Seq(s0.localVar, currStates.localVar), typVarMap),
-                  vpr.Forall(Seq(vVar), Seq.empty,
-                    vpr.Implies(
-                      andNotEqLoopTargets,
-                      vpr.EqCmp(getGetApp(Seq(s0.localVar, vVar.localVar), typVarMap),
-                        getGetApp(Seq(state.localVar, vVar.localVar), typVarMap))())()
+            // Frame all program variables that are not modified in the loop body
+            val s_prime = vpr.LocalVarDecl(if (verifierOption == 0) s0VarName else s1VarName, state.typ)()
+            val vVar = vpr.LocalVarDecl("progVar", vpr.Int)()
+            val assignToStmp = havocSetMethodCall(STmp.localVar)
+            val frameUnmodifiedVars = {
+              if (body.modifiedProgVars.isEmpty) {
+                vpr.Exists(Seq(s_prime), Seq.empty,
+                  vpr.And(getInSetApp(Seq(s_prime.localVar, currStates.localVar), typVarMap),
+                    vpr.Forall(Seq(vVar), Seq.empty,
+                        vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
+                          getGetApp(Seq(state.localVar, vVar.localVar), typVarMap))()
+                    )()
                   )()
-                )())()
-              val havocLoopTargets = translateAssumeWithViperExpr(state, STmp, havocLoopTargetsExp, typVarMap)
-              val updateCurrStates = vpr.LocalVarAssign(currStates.localVar, STmp.localVar)()
-              havocLoopTargetStmts = Seq(assignToStmp, havocLoopTargets, updateCurrStates)
+                )()
+              } else {
+                val varsModifiedByLoop = body.modifiedProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
+                val varsNotModifiedByLoop: Seq[vpr.Exp] = varsModifiedByLoop.map(t => vpr.NeCmp(vVar.localVar, t)()).toList
+                vpr.Exists(Seq(s_prime), Seq.empty,
+                  vpr.And(getInSetApp(Seq(s_prime.localVar, currStates.localVar), typVarMap),
+                    vpr.Forall(Seq(vVar), Seq.empty,
+                      vpr.Implies(
+                        varsNotModifiedByLoop.reduceLeft((e1, e2) => vpr.And(e1, e2)()),
+                        vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
+                          getGetApp(Seq(state.localVar, vVar.localVar), typVarMap))()
+                      )()
+                    )()
+                  )()
+                )()
+              }
             }
-              // Let currStates be a union of Sn's
+            val frameUnmodifiedVarsStmt = translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars, typVarMap)
+
+            // Let currStates be a union of Sn's
             val k = vpr.LocalVarDecl("k", vpr.Int)()
             val zero = vpr.IntLit(0)()
             val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
+            val getSkFuncApp = vpr.FuncApp(getSkFuncName, Seq(k.localVar))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
             allFuncs = allFuncs :+ getSkFunc
-            val getSkFuncApp = vpr.FuncApp(getSkFunc.name, Seq(k.localVar))(pos = vpr.NoPosition, info = vpr.NoInfo,
-                                                                            typ = getSkFunc.typ, errT = vpr.NoTrafos)
             val Sk = vpr.LocalVarDecl("Sk", getConcreteSetStateType(typVarMap))()
             currLoopIndex = k.localVar
-            val unionStates = vpr.Exists(Seq(k, Sk), Seq.empty,
+            val unionStates = vpr.Exists(Seq(k), Seq.empty,
                                           vpr.And(vpr.GeCmp(k.localVar, zero)(),
-                                              vpr.And(vpr.EqCmp(Sk.localVar, getSkFuncApp)(),
-                                                      vpr.And(getInSetApp(Seq(state.localVar, Sk.localVar), typVarMap), getAllInvariants(inv, Sk))()
-                                                      )()
+                                              vpr.And(getInSetApp(Seq(state.localVar, getSkFuncApp), typVarMap),
+                                                      getAllInvariants(inv, Sk))()
                                                   )()
                                         )()
-            val AssumeUnionStates = translateAssumeWithViperExpr(state, currStates, unionStates, typVarMap)
+            val AssumeUnionStates = translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap)
             //  Assume !cond
             val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-            newStmts =  Seq(assertI0) ++ havocLoopTargetStmts ++ Seq(AssumeUnionStates) ++ notCond._1
+            newStmts =  Seq(assertI0) ++  Seq(assignToStmp, frameUnmodifiedVarsStmt, AssumeUnionStates, updateProgStates) ++ notCond._1
             (newStmts, Seq.empty)
 
         case FrameStmt(f, body) =>
