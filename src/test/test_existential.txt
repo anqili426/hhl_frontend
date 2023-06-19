@@ -36,3 +36,11 @@ ensures exists _s: State :: <_s> && get(_s, y) == 1
       y := x
     }
 }
+
+method testHavoc(x: Int) returns (res: Int)
+requires exists _s: State :: <_s> && get(_s, x) == 2
+ensures exists _s: State :: <_s> && get(_s, res) == 1
+{
+    res := x
+    havoc res
+}
