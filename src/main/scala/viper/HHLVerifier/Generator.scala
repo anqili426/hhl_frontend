@@ -379,13 +379,13 @@ object Generator {
                   )()
                 )()
               } else {
+                // This is guanranteed to be non-empty
                 val varsModifiedByLoop = body.modifiedProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
-                val varsNotModifiedByLoop: Seq[vpr.Exp] = varsModifiedByLoop.map(t => vpr.NeCmp(vVar.localVar, t)()).toList
                 vpr.Exists(Seq(s_prime), Seq.empty,
                   vpr.And(getInSetApp(Seq(s_prime.localVar, currStates), typVarMap),
                     vpr.Forall(Seq(vVar), Seq.empty,
                       vpr.Implies(
-                        varsNotModifiedByLoop.reduceLeft((e1, e2) => vpr.And(e1, e2)()),
+                        getAndOfExps(varsModifiedByLoop.map(t => vpr.NeCmp(vVar.localVar, t)()).toList),
                         vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
                           getGetApp(Seq(state, vVar.localVar), typVarMap))()
                       )()
@@ -396,7 +396,7 @@ object Generator {
             }
             val frameUnmodifiedVarsStmt = translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars, typVarMap)
 
-            // Let currStates be a union of Sn's
+            // Let currStates be a union of Sk's
             val k = vpr.LocalVarDecl("k", vpr.Int)()
             val zero = vpr.IntLit(0)()
             val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
@@ -407,8 +407,9 @@ object Generator {
             val unionStates = vpr.Exists(Seq(k), Seq.empty,
                                           vpr.And(vpr.GeCmp(k.localVar, zero)(),
                                               vpr.And(getInSetApp(Seq(state, getSkFuncApp), typVarMap),
-                                                      getAllInvariants(inv, getSkFuncApp))()
-                                                  )()
+                                                      getAllInvariants(inv, getSkFuncApp)
+                                              )()
+                                          )()
                                         )()
             val AssumeUnionStates = translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap)
             //  Assume !cond
@@ -428,7 +429,7 @@ object Generator {
     def getAllInvariants(invs: Seq[Assertion], currStates: vpr.Exp): vpr.Exp = {
       if (invs.isEmpty) return vpr.BoolLit(true)()
       val translatedInvs = invs.map(i => translateExp(i, null, currStates))
-      translatedInvs.reduceLeft((e1, e2) => vpr.And(e1, e2)())
+      getAndOfExps(translatedInvs)
     }
 
     def translateInvariantVerification(inv: Seq[Assertion], loopGuard: Expr, body: CompositeStmt, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
@@ -537,7 +538,7 @@ object Generator {
     var itemsInExistsExpr: Seq[vpr.Exp] = Seq(getInSetApp(Seq(state2, S2), typVarMap),
                                               getEqualExceptApp(Seq(state1, state2, varToHavoc.localVar), typVarMap))
     if (extraExp != null) itemsInExistsExpr = itemsInExistsExpr :+ extraExp
-    val existsExpr = vpr.Exists(Seq(vpr.LocalVarDecl(state2.name, state2.typ)()), Seq.empty, itemsInExistsExpr.reduceLeft((e1, e2) => vpr.And(e1, e2)()))()
+    val existsExpr = vpr.Exists(Seq(vpr.LocalVarDecl(state2.name, state2.typ)()), Seq.empty, getAndOfExps(itemsInExistsExpr))()
     translateAssumeWithViperExpr(state1, S1, existsExpr, typVarMap, extraVarDecl=extraVar)
   }
 
@@ -563,15 +564,15 @@ object Generator {
     )()
   }
 
-    def translateType(typ: Type, typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.Type = {
-        typ match {
-          case IntType() => vpr.Int
-          case BoolType() => vpr.Bool
-          case StateType() => getConcreteStateType(typVarMap)
-          case _ =>
-            throw UnknownException("Cannot translate type " + typ)
-        }
+  def translateType(typ: Type, typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.Type = {
+    typ match {
+      case IntType() => vpr.Int
+      case BoolType() => vpr.Bool
+      case StateType() => getConcreteStateType(typVarMap)
+      case _ =>
+        throw UnknownException("Cannot translate type " + typ)
     }
+  }
 
   def generatePreamble(typVarMap: Map[vpr.TypeVar, vpr.Type]): (Seq[vpr.Domain], Seq[vpr.Method]) = {
     val sVar = vpr.LocalVarDecl(sVarName, stateType)()
@@ -667,6 +668,12 @@ object Generator {
     val havocSetMethod = vpr.Method(havocSetMethodName, Seq.empty, Seq(SS), Seq.empty, Seq.empty, Option.empty)()
 
     (Seq(stateDomain, setStateDomain), Seq(havocSetMethod))
+  }
+
+  // Connects all expressions in the input with "&&"
+  def getAndOfExps(exps: Seq[vpr.Exp]): vpr.Exp = {
+    if (exps.isEmpty) throw UnknownException("The input to getAndOfExps cannot be an empty sequence")
+    exps.reduceLeft((e1, e2) => vpr.And(e1, e2)())
   }
 
   def getConcreteSetStateType(typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Type = {
