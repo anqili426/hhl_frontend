@@ -220,6 +220,14 @@ object Generator {
             }
             (newStmts, Seq.empty)
 
+        case HyperAssumeStmt(e) =>
+          newStmts = Seq(vpr.Inhale(translateExp(e, null, currStates))())
+          (newStmts, Seq.empty)
+
+        case HyperAssertStmt(e) =>
+          newStmts = Seq(vpr.Assert(translateExp(e, null, currStates))())
+          (newStmts, Seq.empty)
+
         case AssignStmt(left, right) =>
             val leftVar = vpr.LocalVarDecl(left.name, translateType(left.typ, typVarMap))()
             val s0 = vpr.LocalVar(s0VarName, state.typ)()
@@ -485,6 +493,7 @@ object Generator {
       Seq(thisMethod)
     }
 
+    // Note that second argument, state, is only used to translate id
     def translateExp(e: Expr, state: vpr.LocalVar, currStates: vpr.Exp): vpr.Exp = {
       val typVarMap = if (state != null) state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap
                       else Map(typeVar -> vpr.Int)

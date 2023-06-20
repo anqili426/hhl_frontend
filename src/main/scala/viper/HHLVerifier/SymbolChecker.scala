@@ -68,6 +68,12 @@ object SymbolChecker {
       case AssertStmt(e) =>
         (checkSymbolsExpr(e, false, false), Seq.empty)
 
+      case HyperAssumeStmt(e) =>
+        (checkSymbolsExpr(e, false, false), Seq.empty)
+
+      case HyperAssertStmt(e) =>
+        (checkSymbolsExpr(e, false, false), Seq.empty)
+
       case IfElseStmt(cond, ifBlock, elseBlock) =>
         val declareStmts = ifBlock.stmts.filter(s => s.isInstanceOf[DeclareStmt])
         val reuseStmts = elseBlock.stmts.filter(s => s.isInstanceOf[ReuseStmt])

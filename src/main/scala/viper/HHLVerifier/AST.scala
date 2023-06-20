@@ -30,6 +30,8 @@ case class AssignStmt(left: Id, right: Expr) extends Stmt
 case class HavocStmt(id: Id) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
 case class AssertStmt(e: Expr) extends Stmt
+case class HyperAssumeStmt(e: Expr) extends Stmt
+case class HyperAssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: CompositeStmt, elseStmt: CompositeStmt) extends Stmt
 case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[Expr]) extends Stmt
 case class PVarDecl(vName: Id, vType: Type) extends Stmt

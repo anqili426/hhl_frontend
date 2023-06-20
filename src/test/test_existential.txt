@@ -60,3 +60,11 @@ ensures exists _s: State :: <_s> && get(_s, sum) == 102
         sum := sum + 1
     }
 }
+
+method testHyperAssumeAssert()
+requires exists _s : State :: <_s>
+{
+     var x: Int
+     hyperAssume forall _s: State :: <_s> && get(_s, x) == 1
+     hyperAssert exists _s: State :: <_s> && get(_s, x) == 1
+}
