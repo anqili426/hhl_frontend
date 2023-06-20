@@ -44,3 +44,19 @@ ensures exists _s: State :: <_s> && get(_s, res) == 1
     res := x
     havoc res
 }
+
+method testWhile() returns (sum: Int)
+requires exists _s: State :: <_s>
+ensures exists _s: State :: <_s> && get(_s, sum) == 102
+{
+    var n: Int
+    n := 0
+    sum := 1
+
+    while (n <= 100)
+        invariant $n <= 101 ==> exists _s: State :: <_s> && get(_s, sum) == get(_s, n) + 1 && get(_s, n) <= 101 && get(_s, n) == $n
+    {
+        n := n + 1
+        sum := sum + 1
+    }
+}

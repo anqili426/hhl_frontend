@@ -71,7 +71,7 @@ object Parser {
       val invs = if (items._2 == Nil) Seq.empty else items._2
       WhileLoopStmt(items._1, items._3, invs)
   }
-  def loopInv[$: P]: P[Assertion] = P("invariant" ~~ spaces ~ hyperAssertExpr)
+  def loopInv[$: P]: P[Expr] = P("invariant" ~~ spaces ~ expr)
 
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ hyperAssertExpr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
 
@@ -88,7 +88,7 @@ object Parser {
   def hyperAssertExpr[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(
     items => Assertion(items._1, items._2, items._3))
 
-  def otherExpr[$: P]: P[Expr] = P(normalExpr ~ (impliesOp ~/ otherExpr).?).map{
+  def otherExpr[$: P]: P[Expr] = P(normalExpr ~ (impliesOp ~/ expr).?).map{
       case (e, None) => e
       case (e, Some(items)) => ImpliesExpr(e, items._2)
     }

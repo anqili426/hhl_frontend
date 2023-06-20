@@ -367,7 +367,6 @@ object Generator {
             // Frame all program variables that are not modified in the loop body
             val s_prime = vpr.LocalVarDecl(if (verifierOption == 0) s0VarName else s1VarName, state.typ)()
             val vVar = vpr.LocalVarDecl("progVar", vpr.Int)()
-            val assignToStmp = havocSetMethodCall(STmp)
             val frameUnmodifiedVars = {
               if (body.modifiedProgVars.isEmpty) {
                 vpr.Exists(Seq(s_prime), Seq.empty,
@@ -379,7 +378,7 @@ object Generator {
                   )()
                 )()
               } else {
-                // This is guanranteed to be non-empty
+                // varsModifiedByLoop is guanranteed to be non-empty
                 val varsModifiedByLoop = body.modifiedProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
                 vpr.Exists(Seq(s_prime), Seq.empty,
                   vpr.And(getInSetApp(Seq(s_prime.localVar, currStates), typVarMap),
@@ -402,19 +401,32 @@ object Generator {
             val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
             val getSkFuncApp = vpr.FuncApp(getSkFuncName, Seq(k.localVar))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
             allFuncs = allFuncs :+ getSkFunc
-            val Sk = vpr.LocalVarDecl("Sk", getConcreteSetStateType(typVarMap))()
             currLoopIndex = k.localVar
-            val unionStates = vpr.Exists(Seq(k), Seq.empty,
-                                          vpr.And(vpr.GeCmp(k.localVar, zero)(),
-                                              vpr.And(getInSetApp(Seq(state, getSkFuncApp), typVarMap),
-                                                      getAllInvariants(inv, getSkFuncApp)
-                                              )()
-                                          )()
-                                        )()
-            val AssumeUnionStates = translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap)
+            val assumeUnionStates =  {
+              if (verifierOption == 0) {
+                val unionStates = vpr.Exists(Seq(k), Seq.empty,
+                  vpr.And(vpr.GeCmp(k.localVar, zero)(),
+                    vpr.And(getInSetApp(Seq(state, getSkFuncApp), typVarMap),
+                      getAllInvariants(inv, getSkFuncApp)
+                    )()
+                  )()
+                )()
+                Seq(translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap))
+              } else {
+                Seq(
+                  vpr.Inhale(vpr.Forall(Seq(k), Seq.empty,
+                    vpr.Implies(vpr.GeCmp(k.localVar, zero)(),
+                      getAllInvariants(inv, getSkFuncApp))())())(),
+                  vpr.Inhale(vpr.Forall(Seq(stateDecl, k), Seq.empty,
+                    vpr.Implies(vpr.And(vpr.GeCmp(k.localVar, zero)(),
+                      getInSetApp(Seq(state, getSkFuncApp), typVarMap))(),
+                      getInSetApp(Seq(state, STmp), typVarMap))())())()
+                )
+              }
+            }
             //  Assume !cond
             val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-            newStmts =  Seq(assertI0) ++  Seq(assignToStmp, frameUnmodifiedVarsStmt, AssumeUnionStates, updateProgStates) ++ notCond._1
+            newStmts =  Seq(assertI0) ++ Seq(havocSTmp, frameUnmodifiedVarsStmt) ++ assumeUnionStates ++ Seq(updateProgStates) ++ notCond._1
             (newStmts, Seq.empty)
 
         case FrameStmt(f, body) =>
@@ -426,13 +438,13 @@ object Generator {
       }
     }
 
-    def getAllInvariants(invs: Seq[Assertion], currStates: vpr.Exp): vpr.Exp = {
+    def getAllInvariants(invs: Seq[Expr], currStates: vpr.Exp): vpr.Exp = {
       if (invs.isEmpty) return vpr.BoolLit(true)()
       val translatedInvs = invs.map(i => translateExp(i, null, currStates))
       getAndOfExps(translatedInvs)
     }
 
-    def translateInvariantVerification(inv: Seq[Assertion], loopGuard: Expr, body: CompositeStmt, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
+    def translateInvariantVerification(inv: Seq[Expr], loopGuard: Expr, body: CompositeStmt, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
       val methodName = checkInvMethodName + loopCounter
       val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
       val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
