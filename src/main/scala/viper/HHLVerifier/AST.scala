@@ -26,9 +26,7 @@ case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
   // Used when checking if a frame contains program variables that are modified
   var modifiedProgVars: Map[String, Type] = Map.empty
 }
-case class AssignStmt(left: Id, right: Expr) extends Stmt {
-  var IdsOnRHS: Seq[String] = Seq.empty
-}
+case class AssignStmt(left: Id, right: Expr) extends Stmt
 case class HavocStmt(id: Id) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
 case class AssertStmt(e: Expr) extends Stmt

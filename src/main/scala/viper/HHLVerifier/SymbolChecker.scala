@@ -54,8 +54,6 @@ object SymbolChecker {
         // Do not allow assignment to method arguments
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         val rightVars = checkSymbolsExpr(exp, false, false)
-        // TODO: the following assignment can be removed, since as.IdsOnRHS is not used any more
-        as.IdsOnRHS = rightVars.map(tuple => tuple._1)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo ++ rightVars, idAssignedTo)
 
@@ -102,7 +100,6 @@ object SymbolChecker {
 
       case ReuseStmt(_) =>
         // blockName should have been checked before reaching here
-        // TODO: should we return the symbols in the reused block?
         (Seq.empty, Seq.empty)
 
       case WhileLoopStmt(cond, body, inv) =>
