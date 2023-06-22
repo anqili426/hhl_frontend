@@ -16,6 +16,7 @@ case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], bod
 case class GetValExpr(state: AssertVar, id: Id) extends Expr
 case class StateExistsExpr(state: AssertVar) extends Expr
 case class LoopIndex() extends Expr
+case class ProofVar(name: String) extends Expr
 
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
@@ -35,6 +36,7 @@ case class HyperAssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: CompositeStmt, elseStmt: CompositeStmt) extends Stmt
 case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[Expr]) extends Stmt
 case class PVarDecl(vName: Id, vType: Type) extends Stmt
+case class ProofVarDecl(proofVar: ProofVar, p: Expr) extends Stmt
 case class FrameStmt(framedAssertion: Expr, body: CompositeStmt) extends Stmt
 case class DeclareStmt(blockName: Id, stmts: CompositeStmt) extends Stmt
 case class ReuseStmt(blockName: Id) extends Stmt {

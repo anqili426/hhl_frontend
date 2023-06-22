@@ -80,6 +80,9 @@ object TypeChecker {
       case PVarDecl(vName, vType) =>
         vName.typ = vType
         res = true
+      case ProofVarDecl(_, p) =>
+        typeCheckExpr(p, true)
+        res = checkIfTypeMatch(p.typ, boolType)
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
   }
@@ -151,6 +154,10 @@ object TypeChecker {
         se.typ = boolType
       case li@LoopIndex() =>
         li.typ = intType
+      case pv@ProofVar(name) =>
+        if (currMethod.allVars.contains(name)) {
+          pv.typ = currMethod.allVars.get(name).get
+        } else res = false
     }
     if (!res) throw TypeException("The expression has a type error: " + e)
     isHyperAssertion

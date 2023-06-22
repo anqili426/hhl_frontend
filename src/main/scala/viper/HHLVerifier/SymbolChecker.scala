@@ -46,11 +46,21 @@ object SymbolChecker {
         cs.allProgVars = res1.distinct.toMap
         cs.modifiedProgVars = res2.distinct.toMap
         (res1.distinct, res2.distinct)
+
       case PVarDecl(id, typ) =>
         checkIdDup(id)
         allVars = allVars + (id.name -> typ)
         (Seq((id.name, typ)), Seq.empty)
-      case as@AssignStmt(id, exp) =>
+
+      case ProofVarDecl(pv, p) =>
+        checkIdDup(pv)
+        allVars = allVars + (pv.name -> pv.typ)
+        val allVarsInP = checkSymbolsExpr(p, false, false)
+        if (allVarsInP.filter(v => pv.name == v._1).isEmpty)
+          throw UnknownException("The proof variable " + pv.name + " must appear in the predicate")
+        (allVarsInP, Seq.empty)
+
+      case AssignStmt(id, exp) =>
         // Do not allow assignment to method arguments
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         val rightVars = checkSymbolsExpr(exp, false, false)
@@ -115,6 +125,7 @@ object SymbolChecker {
         // body.allProgVars must contain all program variables in the loop guard, invariant & loop body
         body.allProgVars = allVars.distinct.toMap
         (allVars, bodyVars._2)
+
       case FrameStmt(framedAssertion, body) =>
         val framedVars = checkSymbolsExpr(framedAssertion, false, true)
         val allBodyVars = checkSymbolsStmt(body)
@@ -138,6 +149,9 @@ object SymbolChecker {
         case av@AssertVar(_) =>
           checkIdDefined(av)
           Seq.empty
+        case pv@ProofVar(name) =>
+          checkIdDefined(pv)
+          Seq((name, allVars.get(name).get))
         case AssertVarDecl(vName, vType) =>
           checkIdDup(vName)
           allVars = allVars + (vName.name -> vType)
@@ -189,6 +203,7 @@ object SymbolChecker {
         case Id (name) => name
         case AssertVar(name) => name
         case AssertVarDecl (vName, _) => vName.name
+        case ProofVar(name) => name
         case _ =>
           throw UnknownException("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass)
       }

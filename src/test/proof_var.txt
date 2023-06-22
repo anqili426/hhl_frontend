@@ -1,0 +1,5 @@
+method test(x: Int)
+requires exists _s: State :: <_s>
+{
+    let $x: Int :: exists _s: State :: get(_s, x) == $x
+}

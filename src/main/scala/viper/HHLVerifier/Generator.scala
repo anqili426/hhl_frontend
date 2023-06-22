@@ -41,7 +41,7 @@ object Generator {
   var loopCounter = 0
   var alignCounter = 0
   var currLoopIndex: vpr.Exp = null
-  var currLoopIndexName = "n_loop"
+  var currLoopIndexName = "$n"
 
   // Flag used when translating alignment
   val isIfBlockVarName = "isIfBlock"
@@ -51,6 +51,10 @@ object Generator {
   var allDomains: Seq[vpr.Domain] = Seq.empty
 
   var verifierOption = 0 // 0: forall 1: exists
+
+  // This variable is used when translating declarations of proof variables
+  // When set to true, use an alias for the proof variable different from its declared identifier
+  var useAliasForProofVar = false
 
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
@@ -178,6 +182,17 @@ object Generator {
           // The translation of variable declarations always happens when translating a viper method
           // Either in translateMethod or translateInvariantVerification
           (Seq.empty, Seq.empty)
+
+        case ProofVarDecl(pv, p) =>
+          val proofVarDecl = vpr.LocalVarDecl(pv.name, translateType(pv.typ, typVarMap))()
+          useAliasForProofVar = true
+          val assertVarExists = vpr.Assert(
+                                  vpr.Exists(Seq(getAliasForProofVar(pv, typVarMap)), Seq.empty,
+                                      translateExp(p, state, currStates))())()
+          useAliasForProofVar = false
+          val assumeP = vpr.Inhale(translateExp(p, state, currStates))()
+          newStmts = Seq(assertVarExists, assumeP)
+          (newStmts, Seq.empty)
 
         case AssumeStmt(e) =>
           newStmts = {
@@ -493,6 +508,12 @@ object Generator {
       Seq(thisMethod)
     }
 
+    // Returns an alias that is formed by appending a $ to v's identifier
+    def getAliasForProofVar(v: ProofVar, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.LocalVarDecl = {
+      if (!useAliasForProofVar) throw UnknownException("Method getAliasForProofVar cannot be called when assertProofVar == false")
+      vpr.LocalVarDecl("$" + v.name, translateType(v.typ, typVarMap))()
+    }
+
     // Note that second argument, state, is only used to translate id
     def translateExp(e: Expr, state: vpr.LocalVar, currStates: vpr.Exp): vpr.Exp = {
       val typVarMap = if (state != null) state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap
@@ -541,6 +562,9 @@ object Generator {
           val translatedState = vpr.LocalVar(s.name, translateType(s.typ, typVarMap))()
           getInSetApp(Seq(translatedState, currStates), typVarMap)
         case LoopIndex() => currLoopIndex
+        case pv@ProofVar(name) =>
+          if (useAliasForProofVar) getAliasForProofVar(pv, typVarMap).localVar
+          else vpr.LocalVar(name, translateType(pv.typ, typVarMap))()
         // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
         case _ =>
           throw UnknownException("Unexpected expression " + e)
