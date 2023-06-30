@@ -490,10 +490,13 @@ object Generator {
       // (do so by assigning a distinct integer value to each of them)
       val auxiliaryVars = loopBody._2.filter(v => v.typ.isInstanceOf[vpr.AtomicType])
       // TODO: change here!!!
-      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList ++ auxiliaryVars
-      val allProgVarsInBodyDecl = allProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)())
-      val allProgVarsWithValues = allProgVarsInBody.map(v => vpr.EqCmp(v, vpr.IntLit(allProgVarsInBody.indexOf(v))())())
+      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))())
+      val allAtomicProgVarsInBody = allProgVarsInBody.filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList ++ auxiliaryVars
+      val nonAtomicProgVarsInBody = allProgVarsInBody.filter(v => !v.typ.isInstanceOf[vpr.AtomicType])
+      val allProgVarsInBodyDecl = allAtomicProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)())
+      val allProgVarsWithValues = allAtomicProgVarsInBody.map(v => vpr.EqCmp(v, vpr.IntLit(allAtomicProgVarsInBody.indexOf(v))())())
       val pre2: Seq[vpr.Exp] = if (allProgVarsWithValues.isEmpty) Seq.empty else Seq(allProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
+
 
       // Assume loop guard
       val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), outputStates.localVar)
@@ -505,7 +508,7 @@ object Generator {
           Seq(outputStates),  // return values
           Seq(pre1, In) ++ pre2,  // pre
           Seq(InPlus1),  // post
-          Some(Seqn(methodBody, Seq(tmpStates) ++ loopBody._2.diff(allProgVarsInBody).map(v => vpr.LocalVarDecl(v.name, v.typ)()))())    // body
+          Some(Seqn(methodBody, Seq(tmpStates) ++ (loopBody._2.diff(allAtomicProgVarsInBody) ++ nonAtomicProgVarsInBody).map(v => vpr.LocalVarDecl(v.name, v.typ)()))())    // body
         )()
       Seq(thisMethod)
     }

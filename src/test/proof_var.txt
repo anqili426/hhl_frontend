@@ -1,10 +1,13 @@
-method test(x: Int)
-requires exists _s: State :: <_s>
+method test(x: Int) returns (res: Int)
+requires exists _s: State :: <_s> && get(_s, x) == 3
+ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
 {
-    var y: Int
-    y := 1
-    while (x > 0)
-    {
-        let $s: State :: <$s>
-    }
+     let $s: State :: <$s>
+     let $x: Int :: $x == get($s, x)
+     res := 0
+    while (res < x)
+     invariant $n <= $x ==> exists _s: State :: <_s> && get(_s, res) <= get(_s, x)
+     {
+         res := res + 1
+     }
 }
