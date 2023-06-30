@@ -81,7 +81,7 @@ object TypeChecker {
         vName.typ = vType
         res = true
       case ProofVarDecl(_, p) =>
-        typeCheckExpr(p, true)
+        typeCheckExpr(p, false)
         res = checkIfTypeMatch(p.typ, boolType)
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
@@ -140,7 +140,6 @@ object TypeChecker {
         ast.typ = boolType
         isHyperAssertion = true
       case gve@GetValExpr(state, id) =>
-        if (!hyperAssertionExpected) throw TypeException("Expression " + gve + " can only appear in a hyper assertion. ")
         // When type checking for id in a GetValExpr, fix inHyperAssertion to be false to avoid exceptions
         // Any other occurrence of Id instances should be type checked with the correct inHyperAssertion flag
         typeCheckExpr(state, hyperAssertionExpected)
@@ -148,7 +147,6 @@ object TypeChecker {
         res = checkIfTypeMatch(state.typ, stateType)
         gve.typ = id.typ
       case se@StateExistsExpr(state) =>
-        if (!hyperAssertionExpected) throw TypeException("Expression " + se + " can only appear in a hyper assertion. ")
         typeCheckExpr(state, hyperAssertionExpected)
         res = checkIfTypeMatch(state.typ, stateType)
         se.typ = boolType

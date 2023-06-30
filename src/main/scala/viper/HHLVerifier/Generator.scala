@@ -130,13 +130,13 @@ object Generator {
 
     // Assume that all program variables + return variables are different by assigning a distinct value to each of them
     val progVars = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1) && !method.resMap.keySet.contains(v._1))
-    val translatedProgVars = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList
+    val translatedProgVars = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList
     val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars
     val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(allVarsToAssign.indexOf(v) + args.length)())())
 
     val progVarDecls = progVars.map(v => vpr.LocalVarDecl(v._1, translateType(v._2, typVarMap))()).toList
-    val setStateVarDecls = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
-    val localVars = progVarDecls ++ auxiliaryVarDecls ++ setStateVarDecls
+    val domainTypeVarDecls = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
+    val localVars = progVarDecls ++ auxiliaryVarDecls ++ domainTypeVarDecls
 
     val methodBody = Seq(currStatesAssignment) ++ assignToVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
     val thisMethod = vpr.Method(method.mName, translatedArgs, ret :+ outputStates, pres, posts,
@@ -483,12 +483,14 @@ object Generator {
       // Translation of the loop body
       val loopBody = translateStmt(body, outputStates.localVar)
 
+      // TODO: might need to debug this part
       // Precondition 1: Loop index >= 0
       val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, IntLit(0)())()
       // Precondition 2: All program variables + auxiliary variables are different
       // (do so by assigning a distinct integer value to each of them)
       val auxiliaryVars = loopBody._2.filter(v => v.typ.isInstanceOf[vpr.AtomicType])
-      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toList ++ auxiliaryVars
+      // TODO: change here!!!
+      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList ++ auxiliaryVars
       val allProgVarsInBodyDecl = allProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)())
       val allProgVarsWithValues = allProgVarsInBody.map(v => vpr.EqCmp(v, vpr.IntLit(allProgVarsInBody.indexOf(v))())())
       val pre2: Seq[vpr.Exp] = if (allProgVarsWithValues.isEmpty) Seq.empty else Seq(allProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
@@ -556,10 +558,10 @@ object Generator {
         case ImpliesExpr(left, right) =>
           vpr.Implies(translateExp(left, state, currStates), translateExp(right, state, currStates))()
         case GetValExpr(s, id) =>
-          val stateVar = vpr.LocalVar(s.name, getConcreteStateType(typVarMap))()
-          translateExp(id, stateVar, currStates)
+          val stateVar = translateExp(s, state, currStates)
+          translateExp(id, stateVar.asInstanceOf[vpr.LocalVar], currStates)
         case StateExistsExpr(s) =>
-          val translatedState = vpr.LocalVar(s.name, translateType(s.typ, typVarMap))()
+          val translatedState = translateExp(s, state, currStates)
           getInSetApp(Seq(translatedState, currStates), typVarMap)
         case LoopIndex() => currLoopIndex
         case pv@ProofVar(name) =>

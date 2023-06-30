@@ -1,8 +1,10 @@
 method test(x: Int)
 requires exists _s: State :: <_s>
 {
-    // loop1
-    let $s: State :: <$s>
-    let $x: Int :: get($s, x) == $x
-    hint loop1(get($s, x))
+    var y: Int
+    y := 1
+    while (x > 0)
+    {
+        let $s: State :: <$s>
+    }
 }

@@ -57,7 +57,7 @@ object SymbolChecker {
         allVars = allVars + (pv.name -> pv.typ)
         val allVarsInP = checkSymbolsExpr(p, false, false)
         if (allVarsInP.filter(v => pv.name == v._1).isEmpty)
-          throw UnknownException("The proof variable " + pv.name + " must appear in the predicate")
+          throw UnknownException("The proof variable " + pv.name + " must appear on the right-hand side of the statement")
         (allVarsInP, Seq.empty)
 
       case AssignStmt(id, exp) =>
@@ -179,7 +179,8 @@ object SymbolChecker {
         case StateExistsExpr(state) =>
             if (isFrame) throw UnknownException("Framed assertion cannot include state-exists-expression")
             checkIdDefined(state)
-            Seq.empty
+            if (state.isInstanceOf[ProofVar]) Seq((state.idName, allVars.get(state.idName).get))
+            else Seq.empty  // No need to return anything if it's an assertion variable
         case LoopIndex() =>
             if (!isInLoopInv) throw UnknownException("Loop index $n can only be used in a loop invariant")
             Seq.empty

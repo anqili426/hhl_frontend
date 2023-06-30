@@ -44,7 +44,7 @@ object Parser {
     case "State" => StateType()
   }
 
-  def proofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ progVartypeName ~ "::" ~ hyperAssertExpr).map{
+  def proofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ assertVarTypeName ~ "::" ~ expr).map{
     items =>
       items._1.typ = items._2
       ProofVarDecl(items._1, items._3)
@@ -136,11 +136,11 @@ object Parser {
   def boolTrue[$: P]: P[BoolLit] = P("true").!.map(_ => BoolLit(true))
   def boolFalse[$: P]: P[BoolLit] = P("false").!.map(_ => BoolLit(false))
 
-  def getProgVarExpr[$: P]: P[GetValExpr] = P("get(" ~ assertVar ~ "," ~ progVar ~ ")").map(items => GetValExpr(items._1, items._2))
+  def getProgVarExpr[$: P]: P[GetValExpr] = P("get(" ~ (assertVar | proofVar) ~ "," ~ progVar ~ ")").map(items => GetValExpr(items._1, items._2))
 
-  def stateExistsExpr[$: P]: P[StateExistsExpr] = P("<" ~ assertVar ~ ">").map(StateExistsExpr)
+  def stateExistsExpr[$: P]: P[StateExistsExpr] = P("<" ~ (assertVar | proofVar) ~ ">").map(StateExistsExpr)
 
-  def identifier[$: P]: P[Expr] = P(progVar | assertVar)
+  def identifier[$: P]: P[Expr] = P(progVar | assertVar | proofVar)
 
   def progVar[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => Id(name))
 
