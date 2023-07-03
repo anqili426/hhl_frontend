@@ -5,8 +5,8 @@ ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
      let $s: State :: <$s>
      let $x: Int :: $x == get($s, x)
      res := 0
-    while (res < x)
-     invariant $n <= $x ==> exists _s: State :: <_s> && get(_s, res) <= get(_s, x)
+     while (res < x)
+     invariant $n <= $x ==> exists _s: State :: <_s> && get(_s, res) <= get(_s, x) && get(_s, res) == $n && get(_s, x) == $x
      {
          res := res + 1
      }

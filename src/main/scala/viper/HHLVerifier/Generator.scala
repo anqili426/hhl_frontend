@@ -53,8 +53,10 @@ object Generator {
   var verifierOption = 0 // 0: forall 1: exists
 
   // This variable is used when translating declarations of proof variables
-  // When set to true, use an alias for the proof variable different from its declared identifier
+  // When set to true, use an alias for the proof variable referred to by currProofVar
+  // The alias is different from its declared identifier
   var useAliasForProofVar = false
+  var currProofVarName = ""
 
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
@@ -184,8 +186,8 @@ object Generator {
           (Seq.empty, Seq.empty)
 
         case ProofVarDecl(pv, p) =>
-          val proofVarDecl = vpr.LocalVarDecl(pv.name, translateType(pv.typ, typVarMap))()
           useAliasForProofVar = true
+          currProofVarName = pv.name
           val assertVarExists = vpr.Assert(
                                   vpr.Exists(Seq(getAliasForProofVar(pv, typVarMap)), Seq.empty,
                                       translateExp(p, state, currStates))())()
@@ -568,7 +570,7 @@ object Generator {
           getInSetApp(Seq(translatedState, currStates), typVarMap)
         case LoopIndex() => currLoopIndex
         case pv@ProofVar(name) =>
-          if (useAliasForProofVar) getAliasForProofVar(pv, typVarMap).localVar
+          if (useAliasForProofVar && currProofVarName==name) getAliasForProofVar(pv, typVarMap).localVar
           else vpr.LocalVar(name, translateType(pv.typ, typVarMap))()
         // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
         case _ =>
