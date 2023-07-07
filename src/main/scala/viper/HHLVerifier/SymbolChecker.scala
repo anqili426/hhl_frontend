@@ -67,7 +67,7 @@ object SymbolChecker {
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo ++ rightVars, idAssignedTo)
 
-      case HavocStmt(id) =>
+      case HavocStmt(id, _) =>
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo, idAssignedTo)

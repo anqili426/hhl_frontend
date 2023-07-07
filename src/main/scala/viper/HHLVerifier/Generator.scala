@@ -260,7 +260,7 @@ object Generator {
             }
             (newStmts, Seq.empty)
 
-        case HavocStmt(id) =>
+        case HavocStmt(id, _) =>
             val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
             val s0 = vpr.LocalVar(s0VarName, state.typ)()
             val s1 = vpr.LocalVar(s1VarName, state.typ)()

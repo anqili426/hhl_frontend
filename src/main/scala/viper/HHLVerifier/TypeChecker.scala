@@ -36,7 +36,7 @@ object TypeChecker {
         typeCheckExpr(left, false)
         typeCheckExpr(right, false)
         res =checkIfTypeMatch(left.typ, right.typ)
-      case HavocStmt(id) =>
+      case HavocStmt(id, _) =>
         typeCheckExpr(id, false)
       case AssumeStmt(e) =>
         typeCheckExpr(e, false)
