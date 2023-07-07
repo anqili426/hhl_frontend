@@ -18,8 +18,8 @@ object Parser {
       Method(items._1, args, res, pre, post, items._6)
   }
 
-  def precondition[$: P]: P[Assertion] = P("requires" ~~ spaces ~ hyperAssertExpr)
-  def postcondition[$: P]: P[Assertion] = P("ensures" ~~ spaces ~ hyperAssertExpr)
+  def precondition[$: P]: P[HyperAssertion] = P("requires" ~~ spaces ~ hyperAssertExpr)
+  def postcondition[$: P]: P[HyperAssertion] = P("ensures" ~~ spaces ~ hyperAssertExpr)
 
   def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ progVartypeName).map{
     items => items._1.typ = items._2
@@ -53,10 +53,10 @@ object Parser {
 
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
   def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign | frame | hyperAssume | hyperAssert | proofVarDecl)
-  def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ expr).map(e => AssignStmt(e._1, e._2))
+  def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ otherExpr).map(e => AssignStmt(e._1, e._2))
   def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar).map(e => HavocStmt(e))
-  def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ expr).map(AssumeStmt)
-  def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ expr).map(AssertStmt)
+  def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ otherExpr).map(AssumeStmt)
+  def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ otherExpr).map(AssertStmt)
   def hyperAssume[$: P]: P[HyperAssumeStmt] = P("hyperAssume" ~~ spaces ~ expr).map(HyperAssumeStmt)
   def hyperAssert[$: P]: P[HyperAssertStmt] = P("hyperAssert" ~~ spaces ~ expr).map(HyperAssertStmt)
   def declareStmt[$: P]: P[DeclareStmt] = P("declare" ~~ spaces ~ blockId ~ "{" ~ stmts ~ "}").map(items => DeclareStmt(items._1, items._2))
@@ -71,17 +71,25 @@ object Parser {
   def stmtsInIf[$: P]: P[CompositeStmt] = P(stmtInIf.rep).map(CompositeStmt)
   def stmtInElse[$: P]: P[Stmt] = P(stmt | reuseStmt)
   def stmtsInElse[$: P]: P[CompositeStmt] = P(stmtInElse.rep).map(CompositeStmt)
-  def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ expr ~ ")" ~ "{" ~ stmtsInIf ~ "}" ~ ("else" ~ "{" ~ stmtsInElse ~ "}").?).map{
+  def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ otherExpr ~ ")" ~ "{" ~ stmtsInIf ~ "}" ~ ("else" ~ "{" ~ stmtsInElse ~ "}").?).map{
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
 
-  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~ "(" ~ expr ~ ")"  ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
+  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~ "(" ~ otherExpr ~ ")"  ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
     items =>
       val invs = if (items._2 == Nil) Seq.empty else items._2
       WhileLoopStmt(items._1, items._3, invs)
   }
-  def loopInv[$: P]: P[Expr] = P("invariant" ~~ spaces ~ expr)
+
+  def loopInv[$: P]: P[HyperAssertion] = P("invariant" ~~ spaces ~ hyperAssertExpr)
 
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ hyperAssertExpr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
+
+//  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (generalId ~ ":" ~ assertVarTypeName).rep ~")"~ "}").map{
+//      case (id, Nil) => HintDecl(id, Seq.empty)
+//      case (id, args) => HintDecl(id, args)
+//  }
+
+//  def generalId[$: P]: P[String] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
@@ -93,8 +101,8 @@ object Parser {
 
   def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
 
-  def hyperAssertExpr[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(
-    items => Assertion(items._1, items._2, items._3))
+  def hyperAssertExpr[$: P]: P[HyperAssertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(
+    items => HyperAssertion(items._1, items._2, items._3))
 
   def otherExpr[$: P]: P[Expr] = P(normalExpr ~ (impliesOp ~/ expr).?).map{
       case (e, None) => e

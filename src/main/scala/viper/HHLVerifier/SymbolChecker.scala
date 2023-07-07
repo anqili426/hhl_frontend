@@ -164,7 +164,7 @@ object SymbolChecker {
         case ImpliesExpr(left, right) =>
             // State-exists-expressions can appear on the left-hand side of an implication, so isFrame is fixed as false here
             checkSymbolsExpr(left, isInLoopInv, false) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
-        case Assertion(_, assertVars, body) =>
+        case HyperAssertion(_, assertVars, body) =>
           val originalTable = allVars
           // Assertion variables will be added to the symbol table
           assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv, isFrame))

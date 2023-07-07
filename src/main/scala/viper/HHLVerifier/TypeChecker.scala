@@ -135,7 +135,7 @@ object TypeChecker {
         isHyperAssertion = typeCheckExpr(left, hyperAssertionExpected) || typeCheckExpr(right, hyperAssertionExpected)
         res = checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
-      case ast@Assertion(_, assertVarDecls, body) =>
+      case ast@HyperAssertion(_, assertVarDecls, body) =>
         res = typeCheckAssertionHelper(assertVarDecls, body, true)
         ast.typ = boolType
         isHyperAssertion = true
