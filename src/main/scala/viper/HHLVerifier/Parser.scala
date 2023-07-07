@@ -21,7 +21,7 @@ object Parser {
   def precondition[$: P]: P[HyperAssertion] = P("requires" ~~ spaces ~ hyperAssertExpr)
   def postcondition[$: P]: P[HyperAssertion] = P("ensures" ~~ spaces ~ hyperAssertExpr)
 
-  def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ progVartypeName).map{
+  def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ notStateTypeName).map{
     items => items._1.typ = items._2
       items._1
   }
@@ -29,22 +29,22 @@ object Parser {
 
   def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
 
-  def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ progVartypeName).map(items => PVarDecl(items._1, items._2))
+  def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ notStateTypeName).map(items => PVarDecl(items._1, items._2))
 
-  def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ assertVarTypeName).map(items => AssertVarDecl(items._1, items._2))
+  def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ anyTypeName).map(items => AssertVarDecl(items._1, items._2))
 
-  def progVartypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
+  def notStateTypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
     case "Int" => IntType()
     case "Bool" => BoolType()
   }
 
-  def assertVarTypeName[$: P]: P[Type] = P("Int" | "Bool" | "State").!.map {
+  def anyTypeName[$: P]: P[Type] = P("Int" | "Bool" | "State").!.map {
     case "Int" => IntType()
     case "Bool" => BoolType()
     case "State" => StateType()
   }
 
-  def proofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ assertVarTypeName ~ "::" ~ expr).map{
+  def proofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ anyTypeName ~ "::" ~ expr).map{
     items =>
       items._1.typ = items._2
       ProofVarDecl(items._1, items._3)
@@ -84,13 +84,6 @@ object Parser {
 
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ hyperAssertExpr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
 
-//  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (generalId ~ ":" ~ assertVarTypeName).rep ~")"~ "}").map{
-//      case (id, Nil) => HintDecl(id, Seq.empty)
-//      case (id, args) => HintDecl(id, args)
-//  }
-
-//  def generalId[$: P]: P[String] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
-
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
   def impliesOp[$: P]: P[String] = P("==>").!
@@ -101,8 +94,17 @@ object Parser {
 
   def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
 
-  def hyperAssertExpr[$: P]: P[HyperAssertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(
-    items => HyperAssertion(items._1, items._2, items._3))
+  def hyperAssertExpr[$: P]: P[HyperAssertion] = P(hintDecl.? ~ quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map{
+    case (None, quant, varDecl, body) => HyperAssertion(Option.empty, quant, varDecl, body)
+    case (hintDecl, quant, varDecl, body) => HyperAssertion(hintDecl, quant, varDecl, body)
+  }
+
+  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (generalId ~ ":" ~ anyTypeName).rep ~ ")" ~ "}").map {
+    case (id, Nil) => HintDecl(id, Seq.empty)
+    case (id, args) => HintDecl(id, args)
+  }
+
+  def generalId[$: P]: P[String] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
 
   def otherExpr[$: P]: P[Expr] = P(normalExpr ~ (impliesOp ~/ expr).?).map{
       case (e, None) => e
@@ -150,7 +152,7 @@ object Parser {
 
   def identifier[$: P]: P[Expr] = P(progVar | assertVar | proofVar)
 
-  def progVar[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => Id(name))
+  def progVar[$: P]: P[Id] = generalId.map(name => Id(name))
 
   def assertVar[$: P]: P[AssertVar] = P("_" ~~ CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => AssertVar(name))
   def loopIndex[$: P]: P[LoopIndex] = P("$n").map(_ => LoopIndex())

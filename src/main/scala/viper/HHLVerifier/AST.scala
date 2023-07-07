@@ -18,12 +18,12 @@ case class BoolLit(value: Boolean) extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
-case class HyperAssertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
+case class HyperAssertion(hintDecl: Option[HintDecl], quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
 case class StateExistsExpr(state: SpecialId) extends Expr
 case class LoopIndex() extends Expr
-//case class HintDecl(name: String, args: Seq[(String, Type)]) extends Expr
-//case class Hint(name: String, args: Seq[Expr]) extends Expr
+case class HintDecl(name: String, args: Seq[(String, Type)]) extends Expr
+case class Hint(name: String, args: Seq[Expr]) extends Expr
 
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {

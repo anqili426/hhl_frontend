@@ -555,7 +555,7 @@ object Generator {
           }
         case av@AssertVar(name) =>
           vpr.LocalVar(name, translateType(av.typ, typVarMap))()
-        case HyperAssertion(quantifier, vars, body) =>
+        case HyperAssertion(_, quantifier, vars, body) =>
           val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
           if (quantifier == "forall") vpr.Forall(variables, Seq.empty, translateExp(body, state, currStates))()
           else if (quantifier == "exists") vpr.Exists(variables, Seq.empty, translateExp(body, state, currStates))()
