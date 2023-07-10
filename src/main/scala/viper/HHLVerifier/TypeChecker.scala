@@ -66,7 +66,7 @@ object TypeChecker {
         var isHyperAssertion = true
         typeCheckExpr(cond, false)
         res = checkIfTypeMatch(cond.typ, boolType)
-        inv.foreach(i => {
+        inv.map(i => i._2).foreach(i => {
           isHyperAssertion = isHyperAssertion && typeCheckExpr(i, true)
           res = res && checkIfTypeMatch(i.typ, boolType)
         })
@@ -135,7 +135,7 @@ object TypeChecker {
         isHyperAssertion = typeCheckExpr(left, hyperAssertionExpected) || typeCheckExpr(right, hyperAssertionExpected)
         res = checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
-      case ast@HyperAssertion(_, _, assertVarDecls, body) =>
+      case ast@HyperAssertion( _, assertVarDecls, body) =>
         res = typeCheckAssertionHelper(assertVarDecls, body, true)
         ast.typ = boolType
         isHyperAssertion = true

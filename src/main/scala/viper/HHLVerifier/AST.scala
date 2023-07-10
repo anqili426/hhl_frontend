@@ -18,7 +18,7 @@ case class BoolLit(value: Boolean) extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
-case class HyperAssertion(hintDecl: Option[HintDecl], quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
+case class HyperAssertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
 case class StateExistsExpr(state: SpecialId) extends Expr
 case class LoopIndex() extends Expr
@@ -41,10 +41,10 @@ case class AssertStmt(e: Expr) extends Stmt
 case class HyperAssumeStmt(e: Expr) extends Stmt
 case class HyperAssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: CompositeStmt, elseStmt: CompositeStmt) extends Stmt
-case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[HyperAssertion]) extends Stmt
+case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)]) extends Stmt
 case class PVarDecl(vName: Id, vType: Type) extends Stmt
 case class ProofVarDecl(proofVar: ProofVar, p: Expr) extends Stmt
-case class FrameStmt(framedAssertion: HyperAssertion, body: CompositeStmt) extends Stmt
+case class FrameStmt(framedAssertion: Expr, body: CompositeStmt) extends Stmt
 case class DeclareStmt(blockName: Id, stmts: CompositeStmt) extends Stmt
 case class ReuseStmt(blockName: Id) extends Stmt {
   var reusedBlock: CompositeStmt = CompositeStmt(Seq.empty)

@@ -5,8 +5,8 @@ object SymbolChecker {
   var allVars: Map[String, Type] = Map.empty  // All variables used in one method (including method arguments)
   var allArgNames: Set[String] = Set.empty  // All arguments of one method
   var allMethodNames: Seq[String] = List.empty  // All method names of one program
-  var allHints: Map[String, Seq[(Type)]] = Map.empty // All hints declared in one method
-  var allHintArgNames: Set[String] = Set.empty // All arguments of hints declared in one method
+  var allHints: Map[String, Seq[Type]] = Map.empty // All hints declared in one program
+  var allHintArgNames: Set[String] = Set.empty // All arguments of hints declared in one program
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
@@ -33,8 +33,6 @@ object SymbolChecker {
     m.allVars = allVars
     // Reset
     allVars = Map.empty
-    allHints = Map.empty
-    allHintArgNames = Set.empty
   }
 
   // Returns
@@ -128,7 +126,9 @@ object SymbolChecker {
 
       case WhileLoopStmt(cond, body, inv) =>
         val bodyVars = checkSymbolsStmt(body)
-        val allVars = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i, true, false)).flatten ++ bodyVars._1
+        val allHintDecls = inv.map(i => i._1).filter(h => !h.isEmpty)
+        allHintDecls.map(h => checkHintDecl(h.get))
+        val allVars = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, true, false)).flatten ++ bodyVars._1
         // The following assignment cannot be removed
         // body.allProgVars must contain all program variables in the loop guard, invariant & loop body
         body.allProgVars = allVars.distinct.toMap
@@ -172,8 +172,7 @@ object SymbolChecker {
         case ImpliesExpr(left, right) =>
             // State-exists-expressions can appear on the left-hand side of an implication, so isFrame is fixed as false here
             checkSymbolsExpr(left, isInLoopInv, false) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
-        case HyperAssertion(hintDecl, _, assertVars, body) =>
-          if (!hintDecl.isEmpty) checkHintDecl(hintDecl.get)
+        case HyperAssertion(_, assertVars, body) =>
           val originalTable = allVars
           // Assertion variables will be added to the symbol table
           assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv, isFrame))

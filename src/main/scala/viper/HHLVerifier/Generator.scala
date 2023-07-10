@@ -260,15 +260,17 @@ object Generator {
             }
             (newStmts, Seq.empty)
 
-        case HavocStmt(id, _) =>
+        case HavocStmt(id, hintDecl) =>
             val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
             val s0 = vpr.LocalVar(s0VarName, state.typ)()
             val s1 = vpr.LocalVar(s1VarName, state.typ)()
             val v = vpr.LocalVarDecl("v", vpr.Int)()
+            val triggers = if (hintDecl.isEmpty) Seq.empty
+            else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, Seq(v.localVar)), getInSetApp(Seq(state, currStates), typVarMap)))())
             val stmt = {
               if (verifierOption == 0) translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap)
               else translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap,
-                                            vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), v.localVar)(), v)
+                                            vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), v.localVar)(), v, triggers=triggers)
             }
             newStmts = Seq(havocSTmp, stmt, updateProgStates)
             (newStmts, Seq.empty)
@@ -377,11 +379,12 @@ object Generator {
             (res._1, res._2)
         case ReuseStmt(_) =>
             throw UnknownException("Reuse statement shouldn't be translated on its own")
-        case WhileLoopStmt(cond, body, inv) =>
+        case WhileLoopStmt(cond, body, invWithHints) =>
             loopCounter = loopCounter + 1
             val getSkFuncName = "get_Sk_" + loopCounter
             // Connect all invariants with && to form 1 invariant
             currLoopIndex = vpr.IntLit(0)()
+            val inv = invWithHints.map(i => i._2)
             val I0 = getAllInvariants(inv, currStates)
             // Assert I(0)
             val assertI0 = vpr.Assert(I0)()
@@ -438,8 +441,12 @@ object Generator {
                 )()
                 Seq(translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap))
               } else {
+                // Get all declarations of hints
+                val allHintDecls = invWithHints.map(i => i._1).filter(h => !h.isEmpty)
+                val translatedHintDecls = allHintDecls.map(h => translateHintDecl(h.get, Seq(k.localVar)))
+                val triggers = if (translatedHintDecls.isEmpty) Seq.empty else Seq(vpr.Trigger(translatedHintDecls)())
                 Seq(
-                  vpr.Inhale(vpr.Forall(Seq(k), Seq.empty,
+                  vpr.Inhale(vpr.Forall(Seq(k), triggers,
                     vpr.Implies(vpr.GeCmp(k.localVar, zero)(),
                       getAllInvariants(inv, getSkFuncApp))())())(),
                   vpr.Inhale(vpr.Forall(Seq(stateDecl, k), Seq.empty,
@@ -555,7 +562,8 @@ object Generator {
           }
         case av@AssertVar(name) =>
           vpr.LocalVar(name, translateType(av.typ, typVarMap))()
-        case HyperAssertion(_, quantifier, vars, body) =>
+        case HyperAssertion(quantifier, vars, body) =>
+          // if (!hintDecl.isEmpty) translateHintDecl(hintDecl)
           val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
           if (quantifier == "forall") vpr.Forall(variables, Seq.empty, translateExp(body, state, currStates))()
           else if (quantifier == "exists") vpr.Exists(variables, Seq.empty, translateExp(body, state, currStates))()
@@ -578,6 +586,14 @@ object Generator {
       }
     }
 
+  def translateHintDecl(decl: HintDecl, args: Seq[vpr.Exp]): vpr.Exp = {
+    if (verifierOption == 0) throw UnknownException("Hints can only be declared when using exists-HHL")
+    // Generate a Viper function for the hint declaration
+    allFuncs = allFuncs :+ vpr.Function(decl.name, decl.args.map(a => vpr.LocalVarDecl(a.name, translateType(a.typ))()),
+                                        vpr.Bool, Seq.empty, Seq.empty, Option.empty)()
+    vpr.FuncApp(decl.name, args)(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
+  }
+
   def translateAssertVarDecl(decl: AssertVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.LocalVarDecl = {
     vpr.LocalVarDecl(decl.vName.name, translateType(decl.vType, typVarMap))()
   }
@@ -585,19 +601,19 @@ object Generator {
   // This returns a Viper assume statement that expresses the following:
   // assume forall stateVar :: in_set(state1, S1) ==> (exists state2 :: in_set(state2, S2) && equal_on_everything_except(state1, state2, varToHavoc) && extraExp)
   def translateHavocVarHelper(S1: vpr.LocalVar, S2: vpr.LocalVar, state1: vpr.LocalVar, state2: vpr.LocalVar,
-                              varToHavoc: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type], extraExp: vpr.Exp = null, extraVar: vpr.LocalVarDecl = null) : vpr.Inhale = {
+                              varToHavoc: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type], extraExp: vpr.Exp = null, extraVar: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty) : vpr.Inhale = {
 
     var itemsInExistsExpr: Seq[vpr.Exp] = Seq(getInSetApp(Seq(state2, S2), typVarMap),
                                               getEqualExceptApp(Seq(state1, state2, varToHavoc.localVar), typVarMap))
     if (extraExp != null) itemsInExistsExpr = itemsInExistsExpr :+ extraExp
     val existsExpr = vpr.Exists(Seq(vpr.LocalVarDecl(state2.name, state2.typ)()), Seq.empty, getAndOfExps(itemsInExistsExpr))()
-    translateAssumeWithViperExpr(state1, S1, existsExpr, typVarMap, extraVarDecl=extraVar)
+    translateAssumeWithViperExpr(state1, S1, existsExpr, typVarMap, extraVarDecl=extraVar, triggers=triggers)
   }
 
   // This returns a Viper assume statement of the form "assume forall state (, extraVar) :: in_set(state, S) (&& leftExp) => (rightExp)"
   // T is determined by the typVarMap(T -> someType)
   def translateAssumeWithViperExpr(state: vpr.LocalVar, S: vpr.LocalVar, rightExp: vpr.Exp,
-                                   typVarMap: Map[vpr.TypeVar, vpr.Type], leftExp: vpr.Exp = null, extraVarDecl: vpr.LocalVarDecl = null) : vpr.Inhale = {
+                                   typVarMap: Map[vpr.TypeVar, vpr.Type], leftExp: vpr.Exp = null, extraVarDecl: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty) : vpr.Inhale = {
     val lhs = {
       val inSetExp = getInSetApp(Seq(state, S), typVarMap)
       if (leftExp != null) vpr.And(inSetExp, leftExp)()
@@ -608,7 +624,7 @@ object Generator {
     vpr.Inhale(
       vpr.Forall(
         vars,
-        Seq.empty,
+        triggers,
         vpr.Implies(
           lhs, rightExp
         )()

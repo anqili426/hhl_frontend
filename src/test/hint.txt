@@ -1,8 +1,18 @@
 method test(x: Int) returns (y: Int)
+requires exists _s: State :: <_s>
+ensures exists _s: State :: <_s> && get(_s, y) == 1
 {
-    havoc y {hint1(p: Int, p2: Int)}
+    havoc y {hint1(p: Int)}
 }
 
-method test1(hint1: Int){
-
+method test2() returns (y: Int)
+requires exists _s: State :: <_s>
+ensures exists _s: State :: <_s> && get(_s, y) == 10
+{
+    y := 0
+    while(y < 10)
+    {hint2(p: Int)} invariant $n <= 10 ==> exists _s: State :: <_s> && get(_s, y) <= 10 && get(_s, y) == $n
+    {
+        y := y + 1
+    }
 }

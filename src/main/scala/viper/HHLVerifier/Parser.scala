@@ -83,9 +83,9 @@ object Parser {
       WhileLoopStmt(items._1, items._3, invs)
   }
 
-  def loopInv[$: P]: P[HyperAssertion] = P("invariant" ~~ spaces ~ hyperAssertExpr)
+  def loopInv[$: P]: P[(Option[HintDecl], Expr)] = P(hintDecl.? ~ "invariant" ~~ spaces ~ expr)
 
-  def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ hyperAssertExpr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
+  def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ expr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
@@ -97,13 +97,9 @@ object Parser {
 
   def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
 
-  def hyperAssertExpr[$: P]: P[HyperAssertion] = P(hintDecl.? ~ quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map{
-    case (None, quant, varDecl, body) => HyperAssertion(Option.empty, quant, varDecl, body)
-    case (hintDecl, quant, varDecl, body) => HyperAssertion(hintDecl, quant, varDecl, body)
-  }
+  def hyperAssertExpr[$: P]: P[HyperAssertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => HyperAssertion(items._1, items._2, items._3))
 
-  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (progVar ~ ":" ~ anyTypeName).rep(sep=",") ~ ")" ~ "}").map {
-    case (id, Nil) => HintDecl(id, Seq.empty)
+  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (progVar ~ ":" ~ anyTypeName).rep(sep=",", min=1) ~ ")" ~ "}").map {
     case (id, args) => HintDecl(id, args.map{
       arg =>
         arg._1.typ = arg._2
