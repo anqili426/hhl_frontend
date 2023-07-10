@@ -1,0 +1,8 @@
+method test(x: Int) returns (y: Int)
+{
+    havoc y {hint1(p: Int, p2: Int)}
+}
+
+method test1(hint1: Int){
+
+}

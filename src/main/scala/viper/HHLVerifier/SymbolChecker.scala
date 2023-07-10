@@ -2,9 +2,11 @@ package viper.HHLVerifier
 
 object SymbolChecker {
   // This map is used to keep track of the declared program variables + assertion variables for each method
-  var allVars: Map[String, Type] = Map.empty  // All variables used in one method
+  var allVars: Map[String, Type] = Map.empty  // All variables used in one method (including method arguments)
   var allArgNames: Set[String] = Set.empty  // All arguments of one method
   var allMethodNames: Seq[String] = List.empty  // All method names of one program
+  var allHints: Map[String, Seq[(Type)]] = Map.empty // All hints declared in one method
+  var allHintArgNames: Set[String] = Set.empty // All arguments of hints declared in one method
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
@@ -22,12 +24,17 @@ object SymbolChecker {
     allArgNames = m.argsMap.keySet
     m.pre.foreach(p => checkSymbolsExpr(p, false, false))
     // The return variables can only be referred to in the method body or postconditions
-    allVars = allVars ++ m.res.map(r => r.name -> r.typ)
+    m.res.foreach { r =>
+      checkIdDup(r)
+      allVars = allVars + (r.name -> r.typ)
+    }
     m.post.foreach(p => checkSymbolsExpr(p, false, false))
     checkSymbolsStmt(m.body)
     m.allVars = allVars
     // Reset
     allVars = Map.empty
+    allHints = Map.empty
+    allHintArgNames = Set.empty
   }
 
   // Returns
@@ -67,8 +74,9 @@ object SymbolChecker {
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo ++ rightVars, idAssignedTo)
 
-      case HavocStmt(id, _) =>
+      case HavocStmt(id, hintDecl) =>
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
+        if (!hintDecl.isEmpty) checkHintDecl(hintDecl.get)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo, idAssignedTo)
 
@@ -164,7 +172,8 @@ object SymbolChecker {
         case ImpliesExpr(left, right) =>
             // State-exists-expressions can appear on the left-hand side of an implication, so isFrame is fixed as false here
             checkSymbolsExpr(left, isInLoopInv, false) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
-        case HyperAssertion(_, _, assertVars, body) =>
+        case HyperAssertion(hintDecl, _, assertVars, body) =>
+          if (!hintDecl.isEmpty) checkHintDecl(hintDecl.get)
           val originalTable = allVars
           // Assertion variables will be added to the symbol table
           assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv, isFrame))
@@ -189,9 +198,11 @@ object SymbolChecker {
       }
     }
 
-    def checkIdDup(id: Expr): Unit = {
+    def checkIdDup(id: Expr, includeHintArgs: Boolean = true): Unit = {
       val idName = getIdName(id)
-      if (allVars.contains(idName) || allMethodNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
+      var allNames = allVars.keySet ++ allMethodNames ++ allHints.keySet
+      if (includeHintArgs) allNames = allNames ++ allHintArgNames
+      if (allNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
     }
 
     def checkIdDefined(id: Expr): Unit = {
@@ -205,10 +216,25 @@ object SymbolChecker {
         case AssertVar(name) => name
         case AssertVarDecl (vName, _) => vName.name
         case ProofVar(name) => name
+        case HintDecl(name, _) => name
         case _ =>
           throw UnknownException("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass)
       }
     }
 
-
+    def checkHintDecl(decl: HintDecl): Unit = {
+      // Check that the hint name is distinct
+      checkIdDup(decl)
+      // Update the hint map
+      allHints = allHints + (decl.name -> decl.args.map(a => a.typ))
+      // Check that the arg names are different from each other
+      val argNames = decl.args.map(a => a.name)
+      if (argNames.distinct.length < argNames.length) throw UnknownException("In declaration of the hint " + decl.name + ", arguments have non-distinct names")
+      // Check that the name of every arg is not used as a method name or variable name before
+      decl.args.foreach{
+        a =>
+          checkIdDup(a, false)
+          allHintArgNames += a.name
+      }
+    }
 }

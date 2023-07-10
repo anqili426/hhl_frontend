@@ -22,7 +22,7 @@ case class HyperAssertion(hintDecl: Option[HintDecl], quantifier: String, assert
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
 case class StateExistsExpr(state: SpecialId) extends Expr
 case class LoopIndex() extends Expr
-case class HintDecl(name: String, args: Seq[(String, Type)]) extends Expr
+case class HintDecl(name: String, args: Seq[Id]) extends Expr
 case class Hint(name: String, args: Seq[Expr]) extends Expr
 
 sealed trait Stmt

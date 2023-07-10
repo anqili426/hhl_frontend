@@ -102,9 +102,13 @@ object Parser {
     case (hintDecl, quant, varDecl, body) => HyperAssertion(hintDecl, quant, varDecl, body)
   }
 
-  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (generalId ~ ":" ~ anyTypeName).rep ~ ")" ~ "}").map {
+  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (progVar ~ ":" ~ anyTypeName).rep(sep=",") ~ ")" ~ "}").map {
     case (id, Nil) => HintDecl(id, Seq.empty)
-    case (id, args) => HintDecl(id, args)
+    case (id, args) => HintDecl(id, args.map{
+      arg =>
+        arg._1.typ = arg._2
+        arg._1
+    })
   }
 
   def generalId[$: P]: P[String] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
