@@ -162,6 +162,7 @@ object TypeChecker {
           pv.typ = currMethod.allVars.get(name).get
         } else res = false
       case h@Hint(name, args) =>
+        if (!hyperAssertionExpected) throw UnknownException("Hints can only appear in a hyper assertion or a use hint statement")
         val expectedArgs = SymbolChecker.allHints.get(name).get
         if (expectedArgs.length != args.length) throw UnknownException("The hint " + name + " is expected to be used with " + expectedArgs.length + " arguments. ")
         args.foreach(a => typeCheckExpr(a, hyperAssertionExpected))
