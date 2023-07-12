@@ -188,7 +188,9 @@ object SymbolChecker {
         case GetValExpr(state, id) =>
             checkIdDefined(state)
             checkIdDefined(id)
-            Seq((id.name, allVars.get(id.name).get))
+          var varsInExpr = Seq((id.name, allVars.get(id.name).get))
+          if (state.isInstanceOf[ProofVar]) varsInExpr = varsInExpr :+ (state.idName, allVars.get(state.idName).get)
+          varsInExpr
         case StateExistsExpr(state) =>
             if (isFrame) throw UnknownException("Framed assertion cannot include state-exists-expression")
             checkIdDefined(state)

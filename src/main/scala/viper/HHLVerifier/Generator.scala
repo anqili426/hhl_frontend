@@ -1,6 +1,5 @@
 package viper.HHLVerifier
 import viper.silver.ast.{IntLit, Seqn}
-import viper.silver.parser.NameAnalyser
 import viper.silver.{ast => vpr}
 
 object Generator {
@@ -508,18 +507,17 @@ object Generator {
       val allProgVarsWithValues = allAtomicProgVarsInBody.map(v => vpr.EqCmp(v, vpr.IntLit(allAtomicProgVarsInBody.indexOf(v))())())
       val pre2: Seq[vpr.Exp] = if (allProgVarsWithValues.isEmpty) Seq.empty else Seq(allProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
 
-
       // Assume loop guard
       val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), outputStates.localVar)
 
       val methodBody = Seq(assignToOutputStates) ++ assumeLoopGuard._1 ++ loopBody._1
 
       val thisMethod = vpr.Method(methodName,
-          Seq(currLoopIndexDecl, inputStates) ++ allProgVarsInBodyDecl,  // args
+          Seq(currLoopIndexDecl, inputStates) ++ allProgVarsInBodyDecl ++ nonAtomicProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)()),  // args
           Seq(outputStates),  // return values
           Seq(pre1, In) ++ pre2,  // pre
           Seq(InPlus1),  // post
-          Some(Seqn(methodBody, Seq(tmpStates) ++ (loopBody._2.diff(allAtomicProgVarsInBody) ++ nonAtomicProgVarsInBody).map(v => vpr.LocalVarDecl(v.name, v.typ)()))())    // body
+          Some(Seqn(methodBody, Seq(tmpStates) ++ loopBody._2.diff(allAtomicProgVarsInBody).map(v => vpr.LocalVarDecl(v.name, v.typ)()))())    // body
         )()
       Seq(thisMethod)
     }
