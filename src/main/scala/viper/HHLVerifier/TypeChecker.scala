@@ -45,8 +45,8 @@ object TypeChecker {
         typeCheckExpr(e, false)
         res = checkIfTypeMatch(e.typ, boolType)
       case HyperAssumeStmt(e) =>
-        val isHyperAssertion = typeCheckExpr(e, true)
-        if (!isHyperAssertion) throw UnknownException("Only hyper assertions can be used in a hyper-assume statement")
+        val isHyperAssertion = typeCheckExpr(e, false)
+        // if (!isHyperAssertion) throw UnknownException("Only hyper assertions can be used in a hyper-assume statement")
         res = checkIfTypeMatch(e.typ, boolType)
       case HyperAssertStmt(e) =>
         val isHyperAssertion = typeCheckExpr(e, true)
@@ -83,18 +83,23 @@ object TypeChecker {
       case ProofVarDecl(_, p) =>
         typeCheckExpr(p, false)
         res = checkIfTypeMatch(p.typ, boolType)
+      case UseHintStmt(hint) =>
+        // Program variables cannot appear as a hint argument
+        // So we set hyperAssertionExpected to true, without verifying if we indeed have a hyper assertion
+        typeCheckExpr(hint, true)
+        res = checkIfTypeMatch(hint.typ, boolType)
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
   }
 
   // hyperAssertionExpected is true if e is expected to be (part of) a hyper assertion
   // Returns true if e indeed is (or contains) a hyper assertion
-  def typeCheckExpr(e: Expr, hyperAssertionExpected: Boolean) : Boolean = {
+  def typeCheckExpr(e: Expr, hyperAssertionExpected: Boolean, inHintUse: Boolean = false) : Boolean = {
     var res = true
     var isHyperAssertion = false
     e match {
       case id@Id(_) =>
-        if (hyperAssertionExpected) throw TypeException("Program variables cannot appear in a hyper assertion")
+        if (hyperAssertionExpected) throw TypeException("Program variables cannot appear in a hyper assertion or a hint")
         if (currMethod.allVars.contains(id.name)) id.typ = currMethod.allVars.get(id.name).get
         else res = false
       case be@BinaryExpr(e1, op, e2) =>
@@ -135,7 +140,7 @@ object TypeChecker {
         isHyperAssertion = typeCheckExpr(left, hyperAssertionExpected) || typeCheckExpr(right, hyperAssertionExpected)
         res = checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
-      case ast@HyperAssertion( _, assertVarDecls, body) =>
+      case ast@Assertion( _, assertVarDecls, body) =>
         res = typeCheckAssertionHelper(assertVarDecls, body, true)
         ast.typ = boolType
         isHyperAssertion = true
@@ -156,6 +161,14 @@ object TypeChecker {
         if (currMethod.allVars.contains(name)) {
           pv.typ = currMethod.allVars.get(name).get
         } else res = false
+      case h@Hint(name, args) =>
+        val expectedArgs = SymbolChecker.allHints.get(name).get
+        if (expectedArgs.length != args.length) throw UnknownException("The hint " + name + " is expected to be used with " + expectedArgs.length + " arguments. ")
+        args.foreach(a => typeCheckExpr(a, hyperAssertionExpected))
+        expectedArgs.foreach(
+          a => checkIfTypeMatch(a, args(expectedArgs.indexOf(a)).typ)
+        )
+        h.typ = boolType
     }
     if (!res) throw TypeException("The expression has a type error: " + e)
     isHyperAssertion

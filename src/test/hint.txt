@@ -3,6 +3,7 @@ requires exists _s: State :: <_s>
 ensures exists _s: State :: <_s> && get(_s, y) == 1
 {
     havoc y {hint1(p: Int)}
+    use hint1(1)
 }
 
 method test2() returns (y: Int)
@@ -15,4 +16,6 @@ ensures exists _s: State :: <_s> && get(_s, y) == 10
     {
         y := y + 1
     }
+
+    use hint2(10)
 }

@@ -18,7 +18,7 @@ case class BoolLit(value: Boolean) extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
-case class HyperAssertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
+case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
 case class StateExistsExpr(state: SpecialId) extends Expr
 case class LoopIndex() extends Expr
@@ -49,9 +49,10 @@ case class DeclareStmt(blockName: Id, stmts: CompositeStmt) extends Stmt
 case class ReuseStmt(blockName: Id) extends Stmt {
   var reusedBlock: CompositeStmt = CompositeStmt(Seq.empty)
 }
+case class UseHintStmt(hint: Hint) extends Stmt
 
 sealed trait TopLevelDecl
-case class Method(mName: String, args: Seq[Id], res: Seq[Id], pre: Seq[HyperAssertion], post: Seq[HyperAssertion], body: CompositeStmt) extends TopLevelDecl {
+case class Method(mName: String, args: Seq[Id], res: Seq[Id], pre: Seq[Assertion], post: Seq[Assertion], body: CompositeStmt) extends TopLevelDecl {
   val argsMap: Map[String, Type] = args.map(arg => (arg.name -> arg.typ)).toMap
   val resMap: Map[String, Type] = res.map(res => (res.name -> res.typ)).toMap
   var allVars: Map[String, Type] = Map.empty

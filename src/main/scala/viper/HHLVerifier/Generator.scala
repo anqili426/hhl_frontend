@@ -467,6 +467,10 @@ object Generator {
           val translatedBody = translateStmt(body, currStates)
           val inhaleFrame = vpr.Inhale(framedExpr)()
           (Seq(assertFrame) ++ translatedBody._1 ++ Seq(inhaleFrame), translatedBody._2)
+
+        case UseHintStmt(hint) =>
+          newStmts = Seq(vpr.Inhale(translateExp(hint, state, currStates))())
+          (newStmts, Seq.empty)
       }
     }
 
@@ -492,13 +496,11 @@ object Generator {
       // Translation of the loop body
       val loopBody = translateStmt(body, outputStates.localVar)
 
-      // TODO: might need to debug this part
       // Precondition 1: Loop index >= 0
       val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, IntLit(0)())()
       // Precondition 2: All program variables + auxiliary variables are different
       // (do so by assigning a distinct integer value to each of them)
       val auxiliaryVars = loopBody._2.filter(v => v.typ.isInstanceOf[vpr.AtomicType])
-      // TODO: change here!!!
       val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))())
       val allAtomicProgVarsInBody = allProgVarsInBody.filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList ++ auxiliaryVars
       val nonAtomicProgVarsInBody = allProgVarsInBody.filter(v => !v.typ.isInstanceOf[vpr.AtomicType])
@@ -562,7 +564,7 @@ object Generator {
           }
         case av@AssertVar(name) =>
           vpr.LocalVar(name, translateType(av.typ, typVarMap))()
-        case HyperAssertion(quantifier, vars, body) =>
+        case Assertion(quantifier, vars, body) =>
           // if (!hintDecl.isEmpty) translateHintDecl(hintDecl)
           val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
           if (quantifier == "forall") vpr.Forall(variables, Seq.empty, translateExp(body, state, currStates))()
@@ -580,6 +582,9 @@ object Generator {
         case pv@ProofVar(name) =>
           if (useAliasForProofVar && currProofVarName==name) getAliasForProofVar(pv, typVarMap).localVar
           else vpr.LocalVar(name, translateType(pv.typ, typVarMap))()
+        case Hint(name, args) =>
+          vpr.FuncApp(name, args.map(a => translateExp(a, state, currStates)))(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
+        // case HintDecl(name, args) => This is translated in a separate method
         // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
         case _ =>
           throw UnknownException("Unexpected expression " + e)

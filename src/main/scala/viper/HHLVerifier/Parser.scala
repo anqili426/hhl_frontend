@@ -18,8 +18,8 @@ object Parser {
       Method(items._1, args, res, pre, post, items._6)
   }
 
-  def precondition[$: P]: P[HyperAssertion] = P("requires" ~~ spaces ~ hyperAssertExpr)
-  def postcondition[$: P]: P[HyperAssertion] = P("ensures" ~~ spaces ~ hyperAssertExpr)
+  def precondition[$: P]: P[Assertion] = P("requires" ~~ spaces ~ hyperAssertExpr)
+  def postcondition[$: P]: P[Assertion] = P("ensures" ~~ spaces ~ hyperAssertExpr)
 
   def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ notStateTypeName).map{
     items => items._1.typ = items._2
@@ -52,7 +52,7 @@ object Parser {
   def proofVar[$: P]: P[ProofVar] = P("$" ~~ CharIn("a-mo-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(ProofVar)
 
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
-  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign | frame | hyperAssume | hyperAssert | proofVarDecl)
+  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt)
   def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ otherExpr).map(e => AssignStmt(e._1, e._2))
   def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar ~ hintDecl.?).map{
     case(v, None) => HavocStmt(v, Option.empty)
@@ -86,6 +86,10 @@ object Parser {
   def loopInv[$: P]: P[(Option[HintDecl], Expr)] = P(hintDecl.? ~ "invariant" ~~ spaces ~ expr)
 
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ expr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
+  def useHintStmt[$: P]: P[UseHintStmt] = P("use" ~~ spaces ~ useHint).map(UseHintStmt)
+  def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr.rep(sep = ",", min = 1) ~ ")").map {
+    items => Hint(items._1, items._2)
+  }
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
@@ -97,7 +101,7 @@ object Parser {
 
   def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
 
-  def hyperAssertExpr[$: P]: P[HyperAssertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => HyperAssertion(items._1, items._2, items._3))
+  def hyperAssertExpr[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
 
   def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (progVar ~ ":" ~ anyTypeName).rep(sep=",", min=1) ~ ")" ~ "}").map {
     case (id, args) => HintDecl(id, args.map{

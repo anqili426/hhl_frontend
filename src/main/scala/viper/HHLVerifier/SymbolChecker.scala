@@ -14,6 +14,7 @@ object SymbolChecker {
     val dupMethodNames = allMethodNames.diff(allMethodNames.distinct)
     if (dupMethodNames.size > 0) throw DuplicateIdentifierException("Duplicate method name " + dupMethodNames)
     p.content.foreach(checkSymbolsMethod)
+
   }
 
   def checkSymbolsMethod(m: Method): Unit = {
@@ -141,6 +142,10 @@ object SymbolChecker {
         // Make sure that the program variables in the frame are not modified in the body
         if (framedVarsModified.size > 0) throw UnknownException("Variables " + framedVarsModified + " in framed assertions cannot be modified. ")
         (framedVars ++ allBodyVars._1, allBodyVars._2)
+
+      case UseHintStmt(hint) =>
+        val varsInHint = checkSymbolsExpr(hint, false, false)
+        (varsInHint, Seq.empty)
       case _ =>
         throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)
     }
@@ -172,7 +177,7 @@ object SymbolChecker {
         case ImpliesExpr(left, right) =>
             // State-exists-expressions can appear on the left-hand side of an implication, so isFrame is fixed as false here
             checkSymbolsExpr(left, isInLoopInv, false) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
-        case HyperAssertion(_, assertVars, body) =>
+        case Assertion(_, assertVars, body) =>
           val originalTable = allVars
           // Assertion variables will be added to the symbol table
           assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv, isFrame))
@@ -192,6 +197,11 @@ object SymbolChecker {
         case LoopIndex() =>
             if (!isInLoopInv) throw UnknownException("Loop index $n can only be used in a loop invariant")
             Seq.empty
+        case h@Hint(_, args) =>
+            checkHintDefined(h)
+            var varsInArgs: Seq[(String, Type)] = Seq.empty
+            args.foreach(a => varsInArgs = varsInArgs ++ checkSymbolsExpr(a, isInLoopInv, isFrame))
+            varsInArgs
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
       }
@@ -202,6 +212,10 @@ object SymbolChecker {
       var allNames = allVars.keySet ++ allMethodNames ++ allHints.keySet
       if (includeHintArgs) allNames = allNames ++ allHintArgNames
       if (allNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
+    }
+
+    def checkHintDefined(hint: Hint): Unit = {
+      if (!allHints.contains(hint.name)) throw IdentifierNotFoundException("Hint " + hint.name + " not found")
     }
 
     def checkIdDefined(id: Expr): Unit = {
@@ -216,6 +230,7 @@ object SymbolChecker {
         case AssertVarDecl (vName, _) => vName.name
         case ProofVar(name) => name
         case HintDecl(name, _) => name
+        case Hint(name, _) => name
         case _ =>
           throw UnknownException("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass)
       }
