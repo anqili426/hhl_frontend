@@ -2,12 +2,12 @@ method test(x: Int) returns (res: Int)
 requires exists _s: State :: <_s> && get(_s, x) == 3
 ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
 {
-     let $s: State :: <$s>
-     let $x: Int :: $x == get($s, x)
+     let $s: State :: <$s> && get($s, x) == 3
      res := 0
      while (res < x)
-     invariant $n <= $x ==> exists _s: State :: <_s> && get(_s, res) <= get(_s, x) && get(_s, res) == $n && get(_s, x) == $x
+     {hint(p: Int)} invariant $n <= get($s, x) ==> exists _s: State :: <_s> && get(_s, res) <= get(_s, x) && get(_s, res) == $n && get(_s, x) == get($s, x)
      {
          res := res + 1
      }
+     use hint(get($s, x))
 }
