@@ -22,6 +22,7 @@ object Main {
     programSource.close()
 
     val outputPath = if (args.length <= 1) "unspecified" else args(1)
+    val inlineOpt = if (args.contains("--inline")) Generator.inline = true
 
     println("The input program is read from " + programAbsPath)
     println("The translated program is written to " + outputPath)

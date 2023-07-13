@@ -19,6 +19,7 @@ object Generator {
                                 setUnionFuncName -> setStateDomainName)
 
   val havocSetMethodName = "havocSet"
+  val havocIntMethodName = "havocInt"
   val checkInvMethodName = "check_inv"
 
   val typeVar = vpr.TypeVar("T")
@@ -41,6 +42,7 @@ object Generator {
   var alignCounter = 0
   var currLoopIndex: vpr.Exp = null
   var currLoopIndexName = "$n"
+  val nonDetBoolName = "check_inv_cond"
 
   // Flag used when translating alignment
   val isIfBlockVarName = "isIfBlock"
@@ -50,6 +52,7 @@ object Generator {
   var allDomains: Seq[vpr.Domain] = Seq.empty
 
   var verifierOption = 0 // 0: forall 1: exists
+  var inline = false  // true: verification of the loop invariant will be inline
 
   // This variable is used when translating declarations of proof variables
   // When set to true, use an alias for the proof variable referred to by currProofVar
@@ -126,22 +129,24 @@ object Generator {
     val currStatesAssignment = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
     val translatedContent = translateStmt(method.body, outputStates.localVar)
 
-    val auxiliaryVars = translatedContent._2.filter(v => v.typ.isInstanceOf[vpr.AtomicType])
+    // Aux variables of type Int generated during translation of the method body
+    val auxiliaryVars = translatedContent._2.filter(v => v.typ == vpr.Int)
     val auxiliaryVarDecls = auxiliaryVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
 
     // Assume that all program variables + return variables are different by assigning a distinct value to each of them
+    // Program variables that are not method arguments or return values
     val progVars = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1) && !method.resMap.keySet.contains(v._1))
-    val translatedProgVars = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList
+    // Currently, we only support program variables of type Integer, so pick them out
+    val translatedProgVars = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).filter(v => v.typ == vpr.Int).toList
     val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars
     val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(allVarsToAssign.indexOf(v) + args.length)())())
 
     val progVarDecls = progVars.map(v => vpr.LocalVarDecl(v._1, translateType(v._2, typVarMap))()).toList
-    val domainTypeVarDecls = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
-    val localVars = progVarDecls ++ auxiliaryVarDecls ++ domainTypeVarDecls
+    val nonIntAuxVars = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
+    val localVars = progVarDecls ++ auxiliaryVarDecls ++ nonIntAuxVars
 
     val methodBody = Seq(currStatesAssignment) ++ assignToVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
-    val thisMethod = vpr.Method(method.mName, translatedArgs, ret :+ outputStates, pres, posts,
-      Some(vpr.Seqn(methodBody, localVars)()))()
+    val thisMethod = vpr.Method(method.mName, translatedArgs, ret :+ outputStates, pres, posts, Some(vpr.Seqn(methodBody, localVars)()))()
     allMethods = allMethods :+ thisMethod
   }
 
@@ -388,8 +393,16 @@ object Generator {
             // Assert I(0)
             val assertI0 = vpr.Assert(I0)()
             // Verify invariant in a separate method
-            newMethods = translateInvariantVerification(inv, cond, body, typVarMap)
-            allMethods = allMethods ++ newMethods
+            var invVerificationStmts: Seq[vpr.Stmt] = Seq.empty
+            var invVerificationVars: Seq[vpr.LocalVar] = Seq.empty
+            if (!inline) {
+              newMethods = translateInvariantVerification(inv, cond, body, typVarMap)
+              allMethods = allMethods ++ newMethods
+            } else {
+              val invVerification = translateInvariantVerificationInline(inv, cond, body, currStates)
+              invVerificationStmts = invVerification._1
+              invVerificationVars = invVerification._2
+            }
 
             // Frame all program variables that are not modified in the loop body
             val s_prime = vpr.LocalVarDecl(if (verifierOption == 0) s0VarName else s1VarName, state.typ)()
@@ -457,8 +470,8 @@ object Generator {
             }
             //  Assume !cond
             val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-            newStmts =  Seq(assertI0) ++ Seq(havocSTmp, frameUnmodifiedVarsStmt) ++ assumeUnionStates ++ Seq(updateProgStates) ++ notCond._1
-            (newStmts, Seq.empty)
+            newStmts =  Seq(assertI0) ++ invVerificationStmts ++ Seq(havocSTmp, frameUnmodifiedVarsStmt) ++ assumeUnionStates ++ Seq(updateProgStates) ++ notCond._1
+            (newStmts, invVerificationVars)
 
         case FrameStmt(f, body) =>
           val framedExpr = translateExp(f, state, currStates)
@@ -520,6 +533,30 @@ object Generator {
           Some(Seqn(methodBody, Seq(tmpStates) ++ loopBody._2.diff(allAtomicProgVarsInBody).map(v => vpr.LocalVarDecl(v.name, v.typ)()))())    // body
         )()
       Seq(thisMethod)
+    }
+
+    def translateInvariantVerificationInline(inv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, currStates: vpr.LocalVar): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
+        // Assume loop index $n >= 0
+        val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
+        currLoopIndex = currLoopIndexDecl.localVar
+        val nonDetBool = vpr.LocalVar(nonDetBoolName + loopCounter, vpr.Bool)()
+
+        val havocIndex = havocIntMethodCall(currLoopIndexDecl.localVar)
+        val indexNonNeg = vpr.Inhale(vpr.GeCmp(currLoopIndex, vpr.IntLit(0)())())()
+        // Assume I(n)
+        val inhaleIn = vpr.Inhale(getAllInvariants(inv, currStates))()
+        // Update loop index to be $n + 1
+        currLoopIndex = vpr.Add(currLoopIndex, IntLit(1)())()
+        val inhaleLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates)._1
+        val translatedLoopBody = translateStmt(loopBody, currStates)
+        // Assert I(n+1)
+        val assertIn1 = vpr.Assert(getAllInvariants(inv, currStates))()
+        val assumeFalse = vpr.Inhale(vpr.FalseLit()())()
+        val ifBody = Seq(inhaleIn) ++ inhaleLoopGuard ++ translatedLoopBody._1 ++ Seq(assertIn1, assumeFalse)
+        val ifStmt = vpr.If(nonDetBool, vpr.Seqn(ifBody, Seq.empty)(), vpr.Seqn(Seq.empty, Seq.empty)())()
+        val newVars = Seq(nonDetBool, currLoopIndexDecl.localVar) ++ translatedLoopBody._2
+        val newStmts = Seq(havocIndex, indexNonNeg, ifStmt)
+        (newStmts, newVars)
     }
 
     // Returns an alias that is formed by appending a $ to v's identifier
@@ -736,9 +773,10 @@ object Generator {
     )()
 
     val SS = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
+    val x = vpr.LocalVarDecl("x", vpr.Int)()
     val havocSetMethod = vpr.Method(havocSetMethodName, Seq.empty, Seq(SS), Seq.empty, Seq.empty, Option.empty)()
-
-    (Seq(stateDomain, setStateDomain), Seq(havocSetMethod))
+    val havocIntMethod = vpr.Method(havocIntMethodName, Seq.empty, Seq(x), Seq.empty, Seq.empty, Option.empty)()
+    (Seq(stateDomain, setStateDomain), Seq(havocSetMethod, havocIntMethod))
   }
 
   // Connects all expressions in the input with "&&"
@@ -757,6 +795,10 @@ object Generator {
 
   def havocSetMethodCall(set: vpr.LocalVar): vpr.MethodCall = {
     vpr.MethodCall(havocSetMethodName, Seq.empty, Seq(set))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
+  }
+
+  def havocIntMethodCall(i: vpr.LocalVar): vpr.MethodCall = {
+    vpr.MethodCall(havocIntMethodName, Seq.empty, Seq(i))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
   }
 
   def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {
