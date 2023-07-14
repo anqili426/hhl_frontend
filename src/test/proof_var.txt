@@ -1,13 +1,32 @@
-method test(x: Int) returns (res: Int)
+/*method test(x: Int) returns (res: Int)
 requires exists _s: State :: <_s> && get(_s, x) == 3
 ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
 {
      let $s: State :: <$s> && get($s, x) == 3
      res := 0
      while (res < x)
-     {hint(p: Int)} invariant $n <= get($s, x) ==> exists _s: State :: <_s> && get(_s, res) <= get(_s, x) && get(_s, res) == $n && get(_s, x) == get($s, x)
+     {hint(p: Int)} invariant $n <= get($s, x) ==> exists _s: State :: <_s>
+     && get(_s, res) <= get(_s, x) && get(_s, res) == $n && get(_s, x) == get($s, x)
      {
          res := res + 1
      }
-     use hint(get($s, x))
-}
+     hyperAssume forall _s: State :: <_s> ==> hint(get(_s, x))
+}*/
+
+/*method test1(x: Int) returns (res: Int)
+   requires exists _s: State :: <_s> && (exists _n: Int :: _n > 0)
+   // ensures forall _n: Int :: _n < 9 && _n > 0 ==> exists _s: State :: <_s> && get(_s, x) == _n
+   {
+      // havoc x {hint1(p: Int)}
+      assume x < 9 && x > 0
+      // use forall _n: Int :: _n < 9 && _n > 0 ==> hint1(_n)
+   }*/
+
+method testHavoc(x: Int) returns (res: Int)
+   requires exists _s: State :: <_s> && get(_s, x) == 1
+   ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
+   {
+      havoc res {hint1(p: Int)}
+      // Need to change to use stmt later
+      hyperAssume forall _s: State :: <_s> ==> hint1(get(_s, x))
+   }

@@ -270,12 +270,16 @@ object Generator {
             val v = vpr.LocalVarDecl("v", vpr.Int)()
             val triggers = if (hintDecl.isEmpty) Seq.empty
             else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, Seq(v.localVar)), getInSetApp(Seq(state, currStates), typVarMap)))())
-            val stmt = {
-              if (verifierOption == 0) translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap)
-              else translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap,
-                                            vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), v.localVar)(), v, triggers=triggers)
+            val havocStmts = {
+              if (verifierOption == 0) Seq(translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap))
+              else {
+                val stmt1 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap)
+                val stmt2 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap,
+                  vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), v.localVar)(), v, triggers=triggers)
+                Seq(stmt1, stmt2)
+              }
             }
-            newStmts = Seq(havocSTmp, stmt, updateProgStates)
+            newStmts = Seq(havocSTmp) ++ havocStmts ++ Seq(updateProgStates)
             (newStmts, Seq.empty)
 
         case IfElseStmt(cond, ifStmt, elseStmt) =>
@@ -641,7 +645,6 @@ object Generator {
   // assume forall stateVar :: in_set(state1, S1) ==> (exists state2 :: in_set(state2, S2) && equal_on_everything_except(state1, state2, varToHavoc) && extraExp)
   def translateHavocVarHelper(S1: vpr.LocalVar, S2: vpr.LocalVar, state1: vpr.LocalVar, state2: vpr.LocalVar,
                               varToHavoc: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type], extraExp: vpr.Exp = null, extraVar: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty) : vpr.Inhale = {
-
     var itemsInExistsExpr: Seq[vpr.Exp] = Seq(getInSetApp(Seq(state2, S2), typVarMap),
                                               getEqualExceptApp(Seq(state1, state2, varToHavoc.localVar), typVarMap))
     if (extraExp != null) itemsInExistsExpr = itemsInExistsExpr :+ extraExp
