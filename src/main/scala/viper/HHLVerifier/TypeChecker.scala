@@ -45,8 +45,8 @@ object TypeChecker {
         typeCheckExpr(e, false)
         res = checkIfTypeMatch(e.typ, boolType)
       case HyperAssumeStmt(e) =>
-        val isHyperAssertion = typeCheckExpr(e, false)
-        // if (!isHyperAssertion) throw UnknownException("Only hyper assertions can be used in a hyper-assume statement")
+        val isHyperAssertion = typeCheckExpr(e, true)
+        if (!isHyperAssertion) throw UnknownException("Only hyper assertions can be used in a hyper-assume statement")
         res = checkIfTypeMatch(e.typ, boolType)
       case HyperAssertStmt(e) =>
         val isHyperAssertion = typeCheckExpr(e, true)
@@ -133,7 +133,7 @@ object TypeChecker {
         if (assertVars.keySet.contains(name)) av.typ = assertVars.get(name).get
         else res = false
       case AssertVarDecl(vName, vType) =>
-        if (!hyperAssertionExpected && vType.isInstanceOf[StateType]) throw TypeException("Variables of type State can only appear in a hyper assertion. ")
+        if (!hyperAssertionExpected && vType.isInstanceOf[StateType]) throw TypeException("Variables of type State" + vName +" can only appear in a hyper assertion. ")
         vName.typ = vType
       // AssertVarDecl expression itself doesn't have a concrete type
       case ie@ImpliesExpr(left, right) =>
@@ -141,11 +141,10 @@ object TypeChecker {
         res = checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
       case ast@Assertion( _, assertVarDecls, body) =>
-        res = typeCheckAssertionHelper(assertVarDecls, body, true)
+        isHyperAssertion = typeCheckAssertionHelper(assertVarDecls, body, hyperAssertionExpected)
         ast.typ = boolType
-        isHyperAssertion = true
       case gve@GetValExpr(state, id) =>
-        // When type checking for id in a GetValExpr, fix inHyperAssertion to be false to avoid exceptions
+        // When type checking for id in a GetValExpr, fix hyperAssertionExpected to be false
         // Any other occurrence of Id instances should be type checked with the correct inHyperAssertion flag
         typeCheckExpr(state, hyperAssertionExpected)
         typeCheckExpr(id, false)
@@ -175,21 +174,18 @@ object TypeChecker {
     isHyperAssertion
   }
 
-  def typeCheckAssertionHelper(assertVarDecls: Seq[AssertVarDecl], body: Expr, inHyperAssertion: Boolean): Boolean = {
-    var res = true
-    assertVarDecls.foreach(decl => typeCheckExpr(decl, inHyperAssertion))
-    if (inHyperAssertion
-        && !assertVarDecls.exists(decl => decl.vType.isInstanceOf[StateType])
-        && !assertVars.exists(v => v._2.isInstanceOf[StateType]))
-      throw TypeException("Hyper assertions must quantifier over states. ")
-
+  def typeCheckAssertionHelper(assertVarDecls: Seq[AssertVarDecl], body: Expr, hyperAssertionExpected: Boolean): Boolean = {
+    // Check whether at least one assertion variable has type State
+    var isHyperAssertion = assertVarDecls.exists(decl => decl.vType.isInstanceOf[StateType])
+    assertVarDecls.foreach(decl => typeCheckExpr(decl, hyperAssertionExpected))
     val originalAssertVars = assertVars
-    assertVars = assertVars ++ assertVarDecls.map(decl => decl.vName.name -> decl.vType).toMap
     // AssertVar will appear in the body. Update the assertVars map before type checking the body
-    typeCheckExpr(body, inHyperAssertion)
-    res = checkIfTypeMatch(body.typ, boolType)
+    assertVars = assertVars ++ assertVarDecls.map(decl => decl.vName.name -> decl.vType).toMap
+    val bodyIsHyperAssertion = typeCheckExpr(body, hyperAssertionExpected)
+    isHyperAssertion = isHyperAssertion || bodyIsHyperAssertion
+    if (!checkIfTypeMatch(body.typ, boolType)) throw TypeException("The expression " + body + " should have type Bool")
     assertVars = originalAssertVars
-    res
+    isHyperAssertion
   }
 
   def checkIfTypeMatch(t1: Type, t2: Type): Boolean = {

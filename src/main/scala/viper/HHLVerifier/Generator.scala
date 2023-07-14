@@ -80,9 +80,11 @@ object Generator {
 
   def translateMethod(method: Method, typVarMap: Map[vpr.TypeVar, vpr.Type]): Unit = {
     val presAndPosts = method.pre ++ method.post
-    if (presAndPosts.size == 0 || presAndPosts.count(p => p.quantifier == "forall") == presAndPosts.size) verifierOption = 0
-    else if (presAndPosts.count(p => p.quantifier == "exists") == presAndPosts.size) verifierOption = 1
-    else throw UnknownException("Method " + method.mName + " can only use hyperassertions using only either forall or exists")
+    // TODO: change this
+    verifierOption = 1
+//    if (presAndPosts.size == 0 || presAndPosts.count(p => p.quantifier == "forall") == presAndPosts.size) verifierOption = 0
+//    else if (presAndPosts.count(p => p.quantifier == "exists") == presAndPosts.size) verifierOption = 1
+//    else throw UnknownException("Method " + method.mName + " can only use hyperassertions using only either forall or exists")
 
     val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
     val outputStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()

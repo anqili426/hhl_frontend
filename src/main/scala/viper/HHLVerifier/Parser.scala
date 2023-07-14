@@ -1,7 +1,7 @@
 package viper.HHLVerifier
 
 import fastparse._
-import MultiLineWhitespace._
+import JavaWhitespace._
 
 object Parser {
   def program[$: P]: P[HHLProgram] = P(Start ~ method.rep ~ End).map{
@@ -144,7 +144,6 @@ object Parser {
   }
 
   def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | stateExistsExpr |  "(" ~ expr ~ ")")
-
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   def notExpr[$: P]: P[UnaryExpr] = P("!" ~ boolean).map(e => UnaryExpr("!", e))
