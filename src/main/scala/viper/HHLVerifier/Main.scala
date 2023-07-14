@@ -22,7 +22,11 @@ object Main {
     programSource.close()
 
     val outputPath = if (args.length <= 1) "unspecified" else args(1)
-    val inlineOpt = if (args.contains("--inline")) Generator.inline = true
+    if (args.contains("--inline")) Generator.inline = true
+    if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
+    else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
+    // TODO: This still needs to be implemented
+    else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
 
     println("The input program is read from " + programAbsPath)
     println("The translated program is written to " + outputPath)
