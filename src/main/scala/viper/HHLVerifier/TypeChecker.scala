@@ -103,7 +103,9 @@ object TypeChecker {
         if (currMethod.allVars.contains(id.name)) id.typ = currMethod.allVars.get(id.name).get
         else res = false
       case be@BinaryExpr(e1, op, e2) =>
-        isHyperAssertion = typeCheckExpr(e1, hyperAssertionExpected) || typeCheckExpr(e2, hyperAssertionExpected)
+        val isHyperAssertionLeft = typeCheckExpr(e1, hyperAssertionExpected)
+        val isHyperAssertionRight = typeCheckExpr(e2, hyperAssertionExpected)
+        isHyperAssertion = isHyperAssertionLeft || isHyperAssertionRight
         val typeMatched = checkIfTypeMatch(e1.typ, e2.typ)
         res = res && typeMatched
         if (!typeMatched) res = false
@@ -137,7 +139,9 @@ object TypeChecker {
         vName.typ = vType
       // AssertVarDecl expression itself doesn't have a concrete type
       case ie@ImpliesExpr(left, right) =>
-        isHyperAssertion = typeCheckExpr(left, hyperAssertionExpected) || typeCheckExpr(right, hyperAssertionExpected)
+        val isHyperAssertionLeft = typeCheckExpr(left, hyperAssertionExpected)
+        val isHyperAssertionRight = typeCheckExpr(right, hyperAssertionExpected)
+        isHyperAssertion = isHyperAssertionLeft || isHyperAssertionRight
         res = checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
       case ast@Assertion( _, assertVarDecls, body) =>
@@ -160,14 +164,11 @@ object TypeChecker {
         if (currMethod.allVars.contains(name)) {
           pv.typ = currMethod.allVars.get(name).get
         } else res = false
-      case h@Hint(name, args) =>
-        if (!hyperAssertionExpected) throw UnknownException("Hints can only appear in a hyper assertion or a use hint statement")
-        val expectedArgs = SymbolChecker.allHints.get(name).get
-        if (expectedArgs.length != args.length) throw UnknownException("The hint " + name + " is expected to be used with " + expectedArgs.length + " arguments. ")
-        args.foreach(a => typeCheckExpr(a, hyperAssertionExpected))
-        expectedArgs.foreach(
-          a => checkIfTypeMatch(a, args(expectedArgs.indexOf(a)).typ)
-        )
+      case h@Hint(name, arg) =>
+        if (!hyperAssertionExpected) throw UnknownException("Hint" + name + " can only appear in a hyper assertion or a use hint statement")
+        typeCheckExpr(arg, hyperAssertionExpected)
+        // At the moment, we only allow hints to take 1 argument of type Int
+        checkIfTypeMatch(arg.typ, intType)
         h.typ = boolType
     }
     if (!res) throw TypeException("The expression has a type error: " + e)

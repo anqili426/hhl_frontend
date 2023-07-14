@@ -26,7 +26,7 @@ method testHavoc(x: Int) returns (res: Int)
    requires exists _s: State :: <_s> && get(_s, x) == 1
    ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
    {
-      havoc res {hint1(p: Int)}
+      havoc res {hint1}
       // Need to change to use stmt later
       hyperAssume forall _s: State :: <_s> ==> hint1(get(_s, x))
    }

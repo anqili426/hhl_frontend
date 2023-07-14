@@ -87,9 +87,7 @@ object Parser {
 
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ expr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
   def useHintStmt[$: P]: P[UseHintStmt] = P("use" ~~ spaces ~ useHint).map(UseHintStmt)
-  def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr.rep(sep = ",", min = 1) ~ ")").map {
-    items => Hint(items._1, items._2)
-  }
+  def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr ~ ")").map { items => Hint(items._1, items._2) }
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
@@ -103,13 +101,7 @@ object Parser {
 
   def hyperAssertExpr[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
 
-  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "(" ~ (progVar ~ ":" ~ anyTypeName).rep(sep=",", min=1) ~ ")" ~ "}").map {
-    case (id, args) => HintDecl(id, args.map{
-      arg =>
-        arg._1.typ = arg._2
-        arg._1
-    })
-  }
+  def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "}").map {HintDecl}
 
   def generalId[$: P]: P[String] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
 

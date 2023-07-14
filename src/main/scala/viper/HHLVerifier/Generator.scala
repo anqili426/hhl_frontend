@@ -27,6 +27,7 @@ object Generator {
   val stateType = getConcreteStateType(defaultTypeVarMap)   // Type State[T]
   val setStateType = getConcreteSetStateType(defaultTypeVarMap) // Type SetState[T]
 
+  val intVarName = "k"
   val sVarName = "s"
   val s0VarName = "s0"
   val s1VarName = "s1"
@@ -267,15 +268,15 @@ object Generator {
             val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
             val s0 = vpr.LocalVar(s0VarName, state.typ)()
             val s1 = vpr.LocalVar(s1VarName, state.typ)()
-            val v = vpr.LocalVarDecl("v", vpr.Int)()
+            val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
             val triggers = if (hintDecl.isEmpty) Seq.empty
-            else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, Seq(v.localVar)), getInSetApp(Seq(state, currStates), typVarMap)))())
+            else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, k.localVar), getInSetApp(Seq(state, currStates), typVarMap)))())
             val havocStmts = {
               if (verifierOption == 0) Seq(translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap))
               else {
                 val stmt1 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap)
                 val stmt2 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap,
-                  vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), v.localVar)(), v, triggers=triggers)
+                  vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), k.localVar)(), k, triggers=triggers)
                 Seq(stmt1, stmt2)
               }
             }
@@ -439,7 +440,7 @@ object Generator {
             val frameUnmodifiedVarsStmt = translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars, typVarMap)
 
             // Let currStates be a union of Sk's
-            val k = vpr.LocalVarDecl("k", vpr.Int)()
+            val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
             val zero = vpr.IntLit(0)()
             val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
             val getSkFuncApp = vpr.FuncApp(getSkFuncName, Seq(k.localVar))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
@@ -458,7 +459,7 @@ object Generator {
               } else {
                 // Get all declarations of hints
                 val allHintDecls = invWithHints.map(i => i._1).filter(h => !h.isEmpty)
-                val translatedHintDecls = allHintDecls.map(h => translateHintDecl(h.get, Seq(k.localVar)))
+                val translatedHintDecls = allHintDecls.map(h => translateHintDecl(h.get, k.localVar))
                 val triggers = if (translatedHintDecls.isEmpty) Seq.empty else Seq(vpr.Trigger(translatedHintDecls)())
                 Seq(
                   vpr.Inhale(vpr.Forall(Seq(k), triggers,
@@ -620,8 +621,8 @@ object Generator {
         case pv@ProofVar(name) =>
           if (useAliasForProofVar && currProofVarName==name) getAliasForProofVar(pv, typVarMap).localVar
           else vpr.LocalVar(name, translateType(pv.typ, typVarMap))()
-        case Hint(name, args) =>
-          vpr.FuncApp(name, args.map(a => translateExp(a, state, currStates)))(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
+        case Hint(name, arg) =>
+          vpr.FuncApp(name, Seq(translateExp(arg, state, currStates)))(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
         // case HintDecl(name, args) => This is translated in a separate method
         // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
         case _ =>
@@ -629,12 +630,13 @@ object Generator {
       }
     }
 
-  def translateHintDecl(decl: HintDecl, args: Seq[vpr.Exp]): vpr.Exp = {
+  def translateHintDecl(decl: HintDecl, arg: vpr.Exp): vpr.Exp = {
     if (verifierOption == 0) throw UnknownException("Hints can only be declared when using exists-HHL")
     // Generate a Viper function for the hint declaration
-    allFuncs = allFuncs :+ vpr.Function(decl.name, decl.args.map(a => vpr.LocalVarDecl(a.name, translateType(a.typ))()),
+    val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
+    allFuncs = allFuncs :+ vpr.Function(decl.name, Seq(k),
                                         vpr.Bool, Seq.empty, Seq.empty, Option.empty)()
-    vpr.FuncApp(decl.name, args)(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
+    vpr.FuncApp(decl.name, Seq(arg))(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
   }
 
   def translateAssertVarDecl(decl: AssertVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.LocalVarDecl = {
@@ -775,9 +777,9 @@ object Generator {
     )()
 
     val SS = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
-    val x = vpr.LocalVarDecl("x", vpr.Int)()
+    val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
     val havocSetMethod = vpr.Method(havocSetMethodName, Seq.empty, Seq(SS), Seq.empty, Seq.empty, Option.empty)()
-    val havocIntMethod = vpr.Method(havocIntMethodName, Seq.empty, Seq(x), Seq.empty, Seq.empty, Option.empty)()
+    val havocIntMethod = vpr.Method(havocIntMethodName, Seq.empty, Seq(k), Seq.empty, Seq.empty, Option.empty)()
     (Seq(stateDomain, setStateDomain), Seq(havocSetMethod, havocIntMethod))
   }
 

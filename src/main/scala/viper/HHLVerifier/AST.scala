@@ -22,8 +22,8 @@ case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], bod
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
 case class StateExistsExpr(state: SpecialId) extends Expr
 case class LoopIndex() extends Expr
-case class HintDecl(name: String, args: Seq[Id]) extends Expr
-case class Hint(name: String, args: Seq[Expr]) extends Expr
+case class HintDecl(name: String) extends Expr
+case class Hint(name: String, arg: Expr) extends Expr
 
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {

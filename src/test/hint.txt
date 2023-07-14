@@ -2,7 +2,7 @@ method test(x: Int) returns (y: Int)
 requires exists _s: State :: <_s>
 ensures exists _s: State :: <_s> && get(_s, y) == 1
 {
-    havoc y {hint1(p: Int)}
+    havoc y {hint1}
     use hint1(1)
 }
 
@@ -12,7 +12,7 @@ ensures exists _s: State :: <_s> && get(_s, y) == 10
 {
     y := 0
     while(y < 10)
-    {hint2(p: Int)} invariant $n <= 10 ==> exists _s: State :: <_s> && get(_s, y) <= 10 && get(_s, y) == $n
+    {hint2} invariant $n <= 10 ==> exists _s: State :: <_s> && get(_s, y) <= 10 && get(_s, y) == $n
     {
         y := y + 1
     }

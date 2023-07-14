@@ -5,8 +5,7 @@ object SymbolChecker {
   var allVars: Map[String, Type] = Map.empty  // All variables used in one method (including method arguments)
   var allArgNames: Set[String] = Set.empty  // All arguments of one method
   var allMethodNames: Seq[String] = List.empty  // All method names of one program
-  var allHints: Map[String, Seq[Type]] = Map.empty // All hints declared in one program
-  var allHintArgNames: Set[String] = Set.empty // All arguments of hints declared in one program
+  var allHintNames: Set[String] = Set.empty // All hints declared in one program
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
@@ -14,7 +13,6 @@ object SymbolChecker {
     val dupMethodNames = allMethodNames.diff(allMethodNames.distinct)
     if (dupMethodNames.size > 0) throw DuplicateIdentifierException("Duplicate method name " + dupMethodNames)
     p.content.foreach(checkSymbolsMethod)
-
   }
 
   def checkSymbolsMethod(m: Method): Unit = {
@@ -199,25 +197,23 @@ object SymbolChecker {
         case LoopIndex() =>
             if (!isInLoopInv) throw UnknownException("Loop index $n can only be used in a loop invariant")
             Seq.empty
-        case h@Hint(_, args) =>
+        case h@Hint(_, arg) =>
             checkHintDefined(h)
-            var varsInArgs: Seq[(String, Type)] = Seq.empty
-            args.foreach(a => varsInArgs = varsInArgs ++ checkSymbolsExpr(a, isInLoopInv, isFrame))
-            varsInArgs
+            val varsInArg = checkSymbolsExpr(arg, isInLoopInv, isFrame)
+            varsInArg
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
       }
     }
 
-    def checkIdDup(id: Expr, includeHintArgs: Boolean = true): Unit = {
+    def checkIdDup(id: Expr): Unit = {
       val idName = getIdName(id)
-      var allNames = allVars.keySet ++ allMethodNames ++ allHints.keySet
-      if (includeHintArgs) allNames = allNames ++ allHintArgNames
+      val allNames = allVars.keySet ++ allMethodNames ++ allHintNames
       if (allNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
     }
 
     def checkHintDefined(hint: Hint): Unit = {
-      if (!allHints.contains(hint.name)) throw IdentifierNotFoundException("Hint " + hint.name + " not found")
+      if (!allHintNames.contains(hint.name)) throw IdentifierNotFoundException("Hint " + hint.name + " not found")
     }
 
     def checkIdDefined(id: Expr): Unit = {
@@ -231,7 +227,7 @@ object SymbolChecker {
         case AssertVar(name) => name
         case AssertVarDecl (vName, _) => vName.name
         case ProofVar(name) => name
-        case HintDecl(name, _) => name
+        case HintDecl(name) => name
         case Hint(name, _) => name
         case _ =>
           throw UnknownException("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass)
@@ -242,15 +238,6 @@ object SymbolChecker {
       // Check that the hint name is distinct
       checkIdDup(decl)
       // Update the hint map
-      allHints = allHints + (decl.name -> decl.args.map(a => a.typ))
-      // Check that the arg names are different from each other
-      val argNames = decl.args.map(a => a.name)
-      if (argNames.distinct.length < argNames.length) throw UnknownException("In declaration of the hint " + decl.name + ", arguments have non-distinct names")
-      // Check that the name of every arg is not used as a method name or variable name before
-      decl.args.foreach{
-        a =>
-          checkIdDup(a, false)
-          allHintArgNames += a.name
-      }
+      allHintNames = allHintNames + decl.name
     }
 }
