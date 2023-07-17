@@ -94,7 +94,7 @@ object TypeChecker {
 
   // hyperAssertionExpected is true if e is expected to be (part of) a hyper assertion
   // Returns true if e indeed is (or contains) a hyper assertion
-  def typeCheckExpr(e: Expr, hyperAssertionExpected: Boolean, inHintUse: Boolean = false) : Boolean = {
+  def typeCheckExpr(e: Expr, hyperAssertionExpected: Boolean) : Boolean = {
     var res = true
     var isHyperAssertion = false
     e match {
@@ -144,10 +144,11 @@ object TypeChecker {
         isHyperAssertion = isHyperAssertionLeft || isHyperAssertionRight
         res = checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
-      case ast@Assertion( _, assertVarDecls, body) =>
+      case ast@Assertion(_, assertVarDecls, body) =>
         isHyperAssertion = typeCheckAssertionHelper(assertVarDecls, body, hyperAssertionExpected)
         ast.typ = boolType
       case gve@GetValExpr(state, id) =>
+        isHyperAssertion = true
         // When type checking for id in a GetValExpr, fix hyperAssertionExpected to be false
         // Any other occurrence of Id instances should be type checked with the correct inHyperAssertion flag
         typeCheckExpr(state, hyperAssertionExpected)
@@ -155,12 +156,14 @@ object TypeChecker {
         res = checkIfTypeMatch(state.typ, stateType)
         gve.typ = id.typ
       case se@StateExistsExpr(state) =>
+        isHyperAssertion = true
         typeCheckExpr(state, hyperAssertionExpected)
         res = checkIfTypeMatch(state.typ, stateType)
         se.typ = boolType
       case li@LoopIndex() =>
         li.typ = intType
       case pv@ProofVar(name) =>
+        isHyperAssertion = true
         if (currMethod.allVars.contains(name)) {
           pv.typ = currMethod.allVars.get(name).get
         } else res = false
@@ -168,7 +171,7 @@ object TypeChecker {
         if (!hyperAssertionExpected) throw UnknownException("Hint" + name + " can only appear in a hyper assertion or a use hint statement")
         typeCheckExpr(arg, hyperAssertionExpected)
         // At the moment, we only allow hints to take 1 argument of type Int
-        checkIfTypeMatch(arg.typ, intType)
+        res = checkIfTypeMatch(arg.typ, intType)
         h.typ = boolType
     }
     if (!res) throw TypeException("The expression has a type error: " + e)

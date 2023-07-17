@@ -142,6 +142,7 @@ object SymbolChecker {
         (framedVars ++ allBodyVars._1, allBodyVars._2)
 
       case UseHintStmt(hint) =>
+        checkIfHintUseWellformed(hint)
         val varsInHint = checkSymbolsExpr(hint, false, false)
         (varsInHint, Seq.empty)
       case _ =>
@@ -175,7 +176,7 @@ object SymbolChecker {
         case ImpliesExpr(left, right) =>
             // State-exists-expressions can appear on the left-hand side of an implication, so isFrame is fixed as false here
             checkSymbolsExpr(left, isInLoopInv, false) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
-        case Assertion(_, assertVars, body) =>
+        case Assertion(quantifier, assertVars, body) =>
           val originalTable = allVars
           // Assertion variables will be added to the symbol table
           assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv, isFrame))
@@ -239,5 +240,27 @@ object SymbolChecker {
       checkIdDup(decl)
       // Update the hint map
       allHintNames = allHintNames + decl.name
+    }
+
+    def checkIfHintUseWellformed(hint: Expr): Unit = {
+      def checkIfHintOnly(e: Expr): Boolean = {
+        e match {
+          case Hint(_, _) => true
+          case BinaryExpr(e1, _, e2) => checkIfHintOnly(e1) && checkIfHintOnly(e2)
+          case _ => false
+        }
+      }
+
+      var res = false
+      hint match {
+        case Hint(_, _) => res = true
+        case be@BinaryExpr(_, _, _) => res = checkIfHintOnly(be)
+        case Assertion(quantifier, _, body) =>
+          res = (quantifier == "forall" && body.isInstanceOf[ImpliesExpr] &&
+            checkIfHintOnly(body.asInstanceOf[ImpliesExpr].right))
+        case _ =>
+      }
+      if (!res) throw UnknownException("The expression in the use statement is not well-formed:\n " +
+        hint + "\nExpected syntax: use <hints> or use forall: ... ==> <hints>")
     }
 }

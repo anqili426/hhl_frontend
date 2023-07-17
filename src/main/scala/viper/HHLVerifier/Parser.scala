@@ -18,8 +18,8 @@ object Parser {
       Method(items._1, args, res, pre, post, items._6)
   }
 
-  def precondition[$: P]: P[Assertion] = P("requires" ~~ spaces ~ hyperAssertExpr)
-  def postcondition[$: P]: P[Assertion] = P("ensures" ~~ spaces ~ hyperAssertExpr)
+  def precondition[$: P]: P[Assertion] = P("requires" ~~ spaces ~ assertion)
+  def postcondition[$: P]: P[Assertion] = P("ensures" ~~ spaces ~ assertion)
 
   def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ notStateTypeName).map{
     items => items._1.typ = items._2
@@ -82,12 +82,10 @@ object Parser {
       val invs = if (items._2 == Nil) Seq.empty else items._2
       WhileLoopStmt(items._1, items._3, invs)
   }
-
   def loopInv[$: P]: P[(Option[HintDecl], Expr)] = P(hintDecl.? ~ "invariant" ~~ spaces ~ expr)
 
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ expr ~ "{" ~ stmts ~ "}").map(items => FrameStmt(items._1, items._2))
-  def useHintStmt[$: P]: P[UseHintStmt] = P("use" ~~ spaces ~ useHint).map(UseHintStmt)
-  def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr ~ ")").map { items => Hint(items._1, items._2) }
+  def useHintStmt[$: P]: P[UseHintStmt] = P("use" ~~ spaces ~ expr).map(UseHintStmt)
 
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
@@ -97,9 +95,9 @@ object Parser {
   def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
-  def expr[$: P]: P[Expr] = P(hyperAssertExpr | otherExpr)
+  def expr[$: P]: P[Expr] = P(assertion | otherExpr)
 
-  def hyperAssertExpr[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
+  def assertion[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
 
   def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "}").map {HintDecl}
 
@@ -154,7 +152,10 @@ object Parser {
   def progVar[$: P]: P[Id] = generalId.map(name => Id(name))
 
   def assertVar[$: P]: P[AssertVar] = P("_" ~~ CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => AssertVar(name))
+
   def loopIndex[$: P]: P[LoopIndex] = P("$n").map(_ => LoopIndex())
 
   def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(value => Num(value))
+
+  def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr ~ ")").map { items => Hint(items._1, items._2) }
 }

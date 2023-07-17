@@ -49,7 +49,7 @@ case class DeclareStmt(blockName: Id, stmts: CompositeStmt) extends Stmt
 case class ReuseStmt(blockName: Id) extends Stmt {
   var reusedBlock: CompositeStmt = CompositeStmt(Seq.empty)
 }
-case class UseHintStmt(hint: Hint) extends Stmt
+case class UseHintStmt(hint: Expr) extends Stmt
 
 sealed trait TopLevelDecl
 case class Method(mName: String, args: Seq[Id], res: Seq[Id], pre: Seq[Assertion], post: Seq[Assertion], body: CompositeStmt) extends TopLevelDecl {

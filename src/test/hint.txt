@@ -19,3 +19,20 @@ ensures exists _s: State :: <_s> && get(_s, y) == 10
 
     use hint2(10)
 }
+
+method randomNumGen() returns (x: Int)
+   requires exists _s: State :: <_s>
+   ensures forall _n: Int :: _n < 9 && _n > 0 ==> exists _s: State :: <_s> && get(_s, x) == _n
+   {
+      havoc x {hint}
+      assume x < 9 && x > 0
+      use forall _n: Int :: _n < 9 && _n > 0 ==> hint(_n)
+   }
+
+method testHavoc(x: Int) returns (res: Int)
+   requires exists _s: State :: <_s> && get(_s, x) == 1
+   ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
+   {
+      havoc res {hint3}
+      use forall _s: State :: <_s> ==> hint3(get(_s, x))
+   }
