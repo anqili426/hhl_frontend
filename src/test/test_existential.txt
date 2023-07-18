@@ -42,7 +42,8 @@ requires exists _s: State :: <_s> && get(_s, x) == 2
 ensures exists _s: State :: <_s> && get(_s, res) == 1
 {
     res := x
-    havoc res
+    havoc res {hint}
+    use hint(1)
 }
 
 method testWhile() returns (sum: Int)
@@ -54,11 +55,13 @@ ensures exists _s: State :: <_s> && get(_s, sum) == 102
     sum := 1
 
     while (n <= 100)
-        invariant $n <= 101 ==> exists _s: State :: <_s> && get(_s, sum) == get(_s, n) + 1 && get(_s, n) <= 101 && get(_s, n) == $n
+        {hint1} invariant $n <= 101 ==> exists _s: State :: <_s> && get(_s, sum) == get(_s, n) + 1 && get(_s, n) <= 101 && get(_s, n) == $n
     {
         n := n + 1
         sum := sum + 1
     }
+
+    use hint1(101)
 }
 
 method testHyperAssumeAssert()

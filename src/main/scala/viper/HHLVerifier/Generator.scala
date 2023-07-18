@@ -52,7 +52,7 @@ object Generator {
   var allFuncs: Seq[vpr.Function] = Seq.empty
   var allDomains: Seq[vpr.Domain] = Seq.empty
 
-  var verifierOption = 0 // 0: forall 1: exists
+  var verifierOption = 0 // 0: forall 1: exists 2: both
   var inline = false  // true: verification of the loop invariant will be inline
 
   // This variable is used when translating declarations of proof variables
@@ -80,10 +80,6 @@ object Generator {
   }
 
   def translateMethod(method: Method, typVarMap: Map[vpr.TypeVar, vpr.Type]): Unit = {
-//    if (presAndPosts.size == 0 || presAndPosts.count(p => p.quantifier == "forall") == presAndPosts.size) verifierOption = 0
-//    else if (presAndPosts.count(p => p.quantifier == "exists") == presAndPosts.size) verifierOption = 1
-//    else throw UnknownException("Method " + method.mName + " can only use hyperassertions using only either forall or exists")
-
     val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
     val outputStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()
     val tempStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
@@ -163,6 +159,8 @@ object Generator {
       val state = vpr.LocalVar(sVarName, getConcreteStateType(typVarMap))()
       val stateDecl = vpr.LocalVarDecl(state.name, state.typ)()
       // Results
+      var existsNewStmts: Seq[vpr.Stmt] = Seq.empty
+      var forallNewStmts: Seq[vpr.Stmt] = Seq.empty
       var newStmts: Seq[vpr.Stmt] = Seq.empty
       var newMethods: Seq[vpr.Method] = Seq.empty
       // Translation of S_temp := havocSet()
@@ -201,44 +199,51 @@ object Generator {
           (newStmts, Seq.empty)
 
         case AssumeStmt(e) =>
-          newStmts = {
-            if (verifierOption == 0) {
-              // ForAll
-              // Assume forall s: State :: in_set(s, S_tmp) ==> in_set(s, S) && exp
-              val exp = vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
-                                  translateExp(e, state, currStates))()
-              Seq(havocSTmp, translateAssumeWithViperExpr(state, STmp, exp, typVarMap), updateProgStates)
-            } else {
-              // Exists
-              // Assume forall s: State :: in_set(s, S) && expLeft ==> in_set(s, S_tmp)
-              val expRight = getInSetApp(Seq(state, STmp), typVarMap)
-              val expLeft = translateExp(e, state, currStates)
-              Seq(havocSTmp, translateAssumeWithViperExpr(state, currStates, expRight, typVarMap, expLeft), updateProgStates)
-            }
+
+          if (verifierOption != 1) {
+            // ForAll
+            // Assume forall s: State :: in_set(s, S_tmp) ==> in_set(s, S) && exp
+            val exp = vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
+              translateExp(e, state, currStates))()
+            forallNewStmts = Seq(translateAssumeWithViperExpr(state, STmp, exp, typVarMap))
           }
+
+          if (verifierOption != 0) {
+            // Exists
+            // Assume forall s: State :: in_set(s, S) && expLeft ==> in_set(s, S_tmp)
+            val expRight = getInSetApp(Seq(state, STmp), typVarMap)
+            val expLeft = translateExp(e, state, currStates)
+            existsNewStmts = Seq(translateAssumeWithViperExpr(state, currStates, expRight, typVarMap, expLeft))
+          }
+
+          newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
           (newStmts, Seq.empty)
 
         case AssertStmt(e) =>
             val havocSFailTmp = havocSetMethodCall(tempFailedStates.localVar)
             val updateSFail = vpr.LocalVarAssign(failedStates.localVar,
                                 getSetUnionApp(Seq(failedStates.localVar, tempFailedStates.localVar), typVarMap))()
-            if (verifierOption == 0) {
+            if (verifierOption != 1) {
+              // ForAll
               val exp1 = vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
                 translateExp(e, state, currStates))()
               val exp2 = vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
                 translateExp(UnaryExpr("!", e), state, currStates))()
               val stmt1 = translateAssumeWithViperExpr(state, STmp, exp1, typVarMap)
               val stmt2 = translateAssumeWithViperExpr(state, tempFailedStates.localVar, exp2, typVarMap)
-              newStmts = Seq(havocSTmp, havocSFailTmp, stmt1, stmt2, updateSFail, updateProgStates)
-            } else {
+              forallNewStmts = Seq(stmt1, stmt2)
+            }
+            if (verifierOption != 0) {
+              // Exists
               val exp1Right = getInSetApp(Seq(state, STmp), typVarMap)
               val exp1Left = translateExp(e, state, currStates)
               val exp2Right = getInSetApp(Seq(state, tempFailedStates.localVar), typVarMap)
               val exp2Left = translateExp(UnaryExpr("!", e), state, currStates)
               val stmt1 = translateAssumeWithViperExpr(state, currStates, exp1Right, typVarMap, exp1Left)
               val stmt2 = translateAssumeWithViperExpr(state, currStates, exp2Right, typVarMap, exp2Left)
-              newStmts = Seq(havocSTmp, havocSFailTmp, stmt1, stmt2, updateSFail, updateProgStates)
+              existsNewStmts = Seq(stmt1, stmt2)
             }
+            newStmts = Seq(havocSTmp, havocSFailTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateSFail, updateProgStates)
             (newStmts, Seq.empty)
 
         case HyperAssumeStmt(e) =>
@@ -253,15 +258,19 @@ object Generator {
             val leftVar = vpr.LocalVarDecl(left.name, translateType(left.typ, typVarMap))()
             val s0 = vpr.LocalVar(s0VarName, state.typ)()
             val s1 = vpr.LocalVar(s1VarName, state.typ)()
-            if (verifierOption == 0) {
+            if (verifierOption != 1) {
+              // ForAll
               val exp = vpr.EqCmp(translateExp(left, state, currStates), translateExp(right, s0, STmp))()
               val stmt = translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap, exp)
-              newStmts = Seq(havocSTmp, stmt, updateProgStates)
-            } else {
+              forallNewStmts = Seq(stmt)
+            }
+            if (verifierOption != 0) {
+              // Exists
               val exp = vpr.EqCmp(translateExp(left, s1, STmp), translateExp(right, state, currStates))()
               val stmt = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap, exp)
-              newStmts = Seq(havocSTmp, stmt, updateProgStates)
+              existsNewStmts = Seq(stmt)
             }
+            newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
             (newStmts, Seq.empty)
 
         case HavocStmt(id, hintDecl) =>
@@ -271,16 +280,19 @@ object Generator {
             val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
             val triggers = if (hintDecl.isEmpty) Seq.empty
             else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, k.localVar), getInSetApp(Seq(state, currStates), typVarMap)))())
-            val havocStmts = {
-              if (verifierOption == 0) Seq(translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap))
-              else {
-                val stmt1 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap)
-                val stmt2 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap,
-                  vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), k.localVar)(), k, triggers=triggers)
-                Seq(stmt1, stmt2)
-              }
+
+            if (verifierOption != 1) {
+              // ForAll
+              forallNewStmts = Seq(translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap))
             }
-            newStmts = Seq(havocSTmp) ++ havocStmts ++ Seq(updateProgStates)
+            if (verifierOption != 0) {
+              // Exits
+              val stmt1 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap)
+              val stmt2 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap,
+                vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), k.localVar)(), k, triggers = triggers)
+              existsNewStmts = Seq(stmt1, stmt2)
+            }
+            newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
             (newStmts, Seq.empty)
 
         case IfElseStmt(cond, ifStmt, elseStmt) =>
@@ -446,35 +458,39 @@ object Generator {
             val getSkFuncApp = vpr.FuncApp(getSkFuncName, Seq(k.localVar))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
             allFuncs = allFuncs :+ getSkFunc
             currLoopIndex = k.localVar
-            val assumeUnionStates =  {
-              if (verifierOption == 0) {
-                val unionStates = vpr.Exists(Seq(k), Seq.empty,
-                  vpr.And(vpr.GeCmp(k.localVar, zero)(),
-                    vpr.And(getInSetApp(Seq(state, getSkFuncApp), typVarMap),
-                      getAllInvariants(inv, getSkFuncApp)
-                    )()
+
+            if (verifierOption != 1) {
+              // ForAll
+              val unionStates = vpr.Exists(Seq(k), Seq.empty,
+                vpr.And(vpr.GeCmp(k.localVar, zero)(),
+                  vpr.And(getInSetApp(Seq(state, getSkFuncApp), typVarMap),
+                    getAllInvariants(inv, getSkFuncApp)
                   )()
                 )()
-                Seq(translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap))
-              } else {
-                // Get all declarations of hints
-                val allHintDecls = invWithHints.map(i => i._1).filter(h => !h.isEmpty)
-                val translatedHintDecls = allHintDecls.map(h => translateHintDecl(h.get, k.localVar))
-                val triggers = if (translatedHintDecls.isEmpty) Seq.empty else Seq(vpr.Trigger(translatedHintDecls)())
-                Seq(
-                  vpr.Inhale(vpr.Forall(Seq(k), triggers,
-                    vpr.Implies(vpr.GeCmp(k.localVar, zero)(),
-                      getAllInvariants(inv, getSkFuncApp))())())(),
-                  vpr.Inhale(vpr.Forall(Seq(stateDecl, k), Seq.empty,
-                    vpr.Implies(vpr.And(vpr.GeCmp(k.localVar, zero)(),
-                      getInSetApp(Seq(state, getSkFuncApp), typVarMap))(),
-                      getInSetApp(Seq(state, STmp), typVarMap))())())()
-                )
-              }
+              )()
+              forallNewStmts = Seq(translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap))
             }
+
+            if (verifierOption != 0) {
+              // Exists
+              // Get all declarations of hints
+              val allHintDecls = invWithHints.map(i => i._1).filter(h => !h.isEmpty)
+              val translatedHintDecls = allHintDecls.map(h => translateHintDecl(h.get, k.localVar))
+              val triggers = if (translatedHintDecls.isEmpty) Seq.empty else Seq(vpr.Trigger(translatedHintDecls)())
+              existsNewStmts = Seq(
+                                    vpr.Inhale(vpr.Forall(Seq(k), triggers,
+                                      vpr.Implies(vpr.GeCmp(k.localVar, zero)(),
+                                        getAllInvariants(inv, getSkFuncApp))())())(),
+                                    vpr.Inhale(vpr.Forall(Seq(stateDecl, k), Seq.empty,
+                                      vpr.Implies(vpr.And(vpr.GeCmp(k.localVar, zero)(),
+                                        getInSetApp(Seq(state, getSkFuncApp), typVarMap))(),
+                                        getInSetApp(Seq(state, STmp), typVarMap))())())()
+                                  )
+            }
+
             //  Assume !cond
             val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-            newStmts =  Seq(assertI0) ++ invVerificationStmts ++ Seq(havocSTmp, frameUnmodifiedVarsStmt) ++ assumeUnionStates ++ Seq(updateProgStates) ++ notCond._1
+            newStmts =  Seq(assertI0) ++ invVerificationStmts ++ Seq(havocSTmp, frameUnmodifiedVarsStmt) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates) ++ notCond._1
             (newStmts, invVerificationVars)
 
         case FrameStmt(f, body) =>
@@ -631,7 +647,7 @@ object Generator {
     }
 
   def translateHintDecl(decl: HintDecl, arg: vpr.Exp): vpr.Exp = {
-    if (verifierOption == 0) throw UnknownException("Hints can only be declared when using exists-HHL")
+    if (verifierOption == 0) throw UnknownException("Hints cannot be declared when using forall-HHL")
     // Generate a Viper function for the hint declaration
     val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
     allFuncs = allFuncs :+ vpr.Function(decl.name, Seq(k),
