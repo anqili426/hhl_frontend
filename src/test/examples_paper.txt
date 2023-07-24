@@ -1,12 +1,21 @@
 method randomNumGen() returns (x: Int)
    requires exists _s: State :: <_s>
-   ensures forall _n: Int :: _n < 9 && _n > 0 ==> exists _s: State :: <_s> && get(_s, x) == _n
+   ensures forall _n: Int :: _n < 9 && _n > 0 ==> hint(_n) && (exists _s: State :: <_s> && get(_s, x) == _n)
    {
       havoc x {hint}
       assume x < 9 && x > 0
-      use forall _n: Int :: _n < 9 && _n > 0 ==> hint(_n)
+      /* use hint(1)
+      use hint(2)
+      use hint(3)
+      use hint(4)
+      use hint(5)
+      use hint(6)
+      use hint(7)
+      use hint(8) */
+      // use forall _n: Int :: _n < 9 && _n > 0 ==> hint(_n)
    }
 
+/*
 method randomNumGen2() returns (x: Int)
    requires exists _s: State :: <_s>
    ensures forall _n: Int :: _n > 9 ==> exists _s: State :: <_s> && get(_s, x) < _n
@@ -19,14 +28,18 @@ method randomNumGen2() returns (x: Int)
       use hint4(2)
    }
 
+
 method GNI(h: Int, l_in: Int) returns (l_out: Int)
     requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, l_in) == get(_s2, l_in)
-    ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> exists _s: State:: <_s> && get(_s, h) == get(_s1, h) && get(_s, l_out) == get(_s2, l_out)
+    // ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> exists _s: State:: <_s> && get(_s, h) == get(_s1, h) && get(_s, l_out) == get(_s2, l_out)
     {
+        hyperAssert forall _s1: State, _s2: State :: <_s1> && <_s2> ==> exists _s: State :: <_s> && get(_s1, h) == get(_s, h)
         var y: Int
         havoc y
+        hyperAssert forall _s1: State, _s2: State :: <_s1> && <_s2> ==> exists _s: State :: <_s> && get(_s1, h) == get(_s, h) && get(_s, y) == get(_s2, h) + get(_s2, y) - get(_s1, h)
         l_out := h + y
     }
+
 
 method GNI_bad(h: Int, l_in: Int) returns (l_out: Int)
     requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, l_in) == get(_s2, l_in)
@@ -38,3 +51,4 @@ method GNI_bad(h: Int, l_in: Int) returns (l_out: Int)
         assume y >= 0 && y <= 100
         l_out := h + y
 }
+*/

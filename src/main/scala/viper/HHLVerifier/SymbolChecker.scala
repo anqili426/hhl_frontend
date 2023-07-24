@@ -6,6 +6,7 @@ object SymbolChecker {
   var allArgNames: Set[String] = Set.empty  // All arguments of one method
   var allMethodNames: Seq[String] = List.empty  // All method names of one program
   var allHintNames: Set[String] = Set.empty // All hints declared in one program
+  var allHintsInMethod: Set[String] = Set.empty // All hints declared in one method
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
@@ -27,11 +28,12 @@ object SymbolChecker {
       checkIdDup(r)
       allVars = allVars + (r.name -> r.typ)
     }
-    m.post.foreach(p => checkSymbolsExpr(p, false, false))
     checkSymbolsStmt(m.body)
+    m.post.foreach(p => checkSymbolsExpr(p, false, false))
     m.allVars = allVars
     // Reset
     allVars = Map.empty
+    allHintsInMethod = Set.empty
   }
 
   // Returns
@@ -214,7 +216,7 @@ object SymbolChecker {
     }
 
     def checkHintDefined(hint: Hint): Unit = {
-      if (!allHintNames.contains(hint.name)) throw IdentifierNotFoundException("Hint " + hint.name + " not found")
+      if (!allHintsInMethod.contains(hint.name)) throw IdentifierNotFoundException("Hint " + hint.name + " not found")
     }
 
     def checkIdDefined(id: Expr): Unit = {
@@ -238,8 +240,9 @@ object SymbolChecker {
     def checkHintDecl(decl: HintDecl): Unit = {
       // Check that the hint name is distinct
       checkIdDup(decl)
-      // Update the hint map
+      // Update the hint set
       allHintNames = allHintNames + decl.name
+      allHintsInMethod = allHintsInMethod + decl.name
     }
 
     def checkIfHintUseWellformed(hint: Expr): Unit = {

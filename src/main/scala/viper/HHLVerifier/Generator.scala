@@ -1,5 +1,5 @@
 package viper.HHLVerifier
-import viper.silver.ast.{IntLit, Seqn}
+import org.checkerframework.checker.units.qual.Current
 import viper.silver.{ast => vpr}
 
 object Generator {
@@ -48,6 +48,8 @@ object Generator {
   // Flag used when translating alignment
   val isIfBlockVarName = "isIfBlock"
 
+  val hintWrapperSuffix = "_wrapper"
+
   var allMethods: Seq[vpr.Method] = Seq.empty
   var allFuncs: Seq[vpr.Function] = Seq.empty
   var allDomains: Seq[vpr.Domain] = Seq.empty
@@ -60,6 +62,17 @@ object Generator {
   // The alias is different from its declared identifier
   var useAliasForProofVar = false
   var currProofVarName = ""
+
+  // These variables are used when translating a postcondition of a method
+  var containsHints = false // true if the postcondition contains any hints
+  var removeHints = false // true if we need to remove the hints from the postconditions
+
+  // Viper int literals
+  val one = vpr.IntLit(1)()
+  val zero = vpr.IntLit(0)()
+
+  // Vpr bool literals
+  val trueLit = vpr.BoolLit(true)()
 
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
@@ -111,7 +124,12 @@ object Generator {
     val pres = method.pre.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
 
     // Forming the postconditions
-    val posts = method.post.map(p => translateExp(p, null, outputStates.localVar))
+    val posts = method.post.map {
+      p =>
+        val res = translatePostcondition(p, null, outputStates.localVar)
+        if (res.length == 2) vpr.InhaleExhaleExp(res(0), res(1))()
+        else res(0)
+    }
 
     /* Method body contains the following
     *  Local variable declaration (program variables + auxiliary variables of type SetState + isIfBlock)
@@ -144,6 +162,17 @@ object Generator {
     val methodBody = Seq(currStatesAssignment) ++ assignToVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
     val thisMethod = vpr.Method(method.mName, translatedArgs, ret :+ outputStates, pres, posts, Some(vpr.Seqn(methodBody, localVars)()))()
     allMethods = allMethods :+ thisMethod
+  }
+
+  def translatePostcondition(e: Expr, s: vpr.LocalVar, currStates: vpr.LocalVar): Seq[vpr.Exp] = {
+    containsHints = false
+    val post1 = translateExp(e, s, currStates)
+    if (containsHints) {
+      removeHints = true
+      val post2 = translateExp(e, s, currStates)
+      removeHints = false
+      Seq(post2, post1)
+    } else Seq(post1)
   }
 
     /*
@@ -359,7 +388,7 @@ object Generator {
                                                 vpr.Implies(getInSetApp(Seq(state, STmp), typVarMap),
                                                   vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
                                                     vpr.EqCmp(getGetApp(Seq(state, isIfBlockVpr), typVarMap),
-                                                      IntLit(1)()
+                                                      one
                                                     )()
                                                   )()
                                                 )()
@@ -373,7 +402,7 @@ object Generator {
                                                 vpr.Implies(getInSetApp(Seq(state, STmp), typVarMap),
                                                   vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
                                                     vpr.EqCmp(getGetApp(Seq(state, isIfBlockVpr), typVarMap),
-                                                      IntLit(0)()
+                                                      zero
                                                     )()
                                                   )()
                                                 )()
@@ -403,7 +432,7 @@ object Generator {
             loopCounter = loopCounter + 1
             val getSkFuncName = "get_Sk_" + loopCounter
             // Connect all invariants with && to form 1 invariant
-            currLoopIndex = vpr.IntLit(0)()
+            currLoopIndex = zero
             val inv = invWithHints.map(i => i._2)
             val I0 = getAllInvariants(inv, currStates)
             // Assert I(0)
@@ -453,7 +482,6 @@ object Generator {
 
             // Let currStates be a union of Sk's
             val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
-            val zero = vpr.IntLit(0)()
             val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
             val getSkFuncApp = vpr.FuncApp(getSkFuncName, Seq(k.localVar))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
             allFuncs = allFuncs :+ getSkFunc
@@ -507,7 +535,7 @@ object Generator {
     }
 
     def getAllInvariants(invs: Seq[Expr], currStates: vpr.Exp): vpr.Exp = {
-      if (invs.isEmpty) return vpr.BoolLit(true)()
+      if (invs.isEmpty) return trueLit
       val translatedInvs = invs.map(i => translateExp(i, null, currStates))
       getAndOfExps(translatedInvs)
     }
@@ -519,7 +547,7 @@ object Generator {
       val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
       currLoopIndex = currLoopIndexDecl.localVar
       val In = getAllInvariants(inv, inputStates.localVar)
-      currLoopIndex = vpr.Add(currLoopIndex, IntLit(1)())()
+      currLoopIndex = vpr.Add(currLoopIndex, one)()
       val InPlus1 = getAllInvariants(inv, outputStates.localVar)
 
       val tmpStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
@@ -529,7 +557,7 @@ object Generator {
       val loopBody = translateStmt(body, outputStates.localVar)
 
       // Precondition 1: Loop index >= 0
-      val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, IntLit(0)())()
+      val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, zero)()
       // Precondition 2: All program variables + auxiliary variables are different
       // (do so by assigning a distinct integer value to each of them)
       val auxiliaryVars = loopBody._2.filter(v => v.typ.isInstanceOf[vpr.AtomicType])
@@ -550,7 +578,7 @@ object Generator {
           Seq(outputStates),  // return values
           Seq(pre1, In) ++ pre2,  // pre
           Seq(InPlus1),  // post
-          Some(Seqn(methodBody, Seq(tmpStates) ++ loopBody._2.diff(allAtomicProgVarsInBody).map(v => vpr.LocalVarDecl(v.name, v.typ)()))())    // body
+          Some(vpr.Seqn(methodBody, Seq(tmpStates) ++ loopBody._2.diff(allAtomicProgVarsInBody).map(v => vpr.LocalVarDecl(v.name, v.typ)()))())    // body
         )()
       Seq(thisMethod)
     }
@@ -562,11 +590,11 @@ object Generator {
         val nonDetBool = vpr.LocalVar(nonDetBoolName + loopCounter, vpr.Bool)()
 
         val havocIndex = havocIntMethodCall(currLoopIndexDecl.localVar)
-        val indexNonNeg = vpr.Inhale(vpr.GeCmp(currLoopIndex, vpr.IntLit(0)())())()
+        val indexNonNeg = vpr.Inhale(vpr.GeCmp(currLoopIndex, zero)())()
         // Assume I(n)
         val inhaleIn = vpr.Inhale(getAllInvariants(inv, currStates))()
         // Update loop index to be $n + 1
-        currLoopIndex = vpr.Add(currLoopIndex, IntLit(1)())()
+        currLoopIndex = vpr.Add(currLoopIndex, one)()
         val inhaleLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates)._1
         val translatedLoopBody = translateStmt(loopBody, currStates)
         // Assert I(n+1)
@@ -638,7 +666,11 @@ object Generator {
           if (useAliasForProofVar && currProofVarName==name) getAliasForProofVar(pv, typVarMap).localVar
           else vpr.LocalVar(name, translateType(pv.typ, typVarMap))()
         case Hint(name, arg) =>
-          vpr.FuncApp(name, Seq(translateExp(arg, state, currStates)))(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
+          containsHints = true
+          if (removeHints) trueLit
+          else
+          // When a hint is used, always call the function named as name + hintWrapperSuffix
+          vpr.FuncApp(name + hintWrapperSuffix, Seq(translateExp(arg, state, currStates)))(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
         // case HintDecl(name, args) => This is translated in a separate method
         // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
         case _ =>
@@ -648,10 +680,22 @@ object Generator {
 
   def translateHintDecl(decl: HintDecl, arg: vpr.Exp): vpr.Exp = {
     if (verifierOption == 0) throw UnknownException("Hints cannot be declared when using forall-HHL")
-    // Generate a Viper function for the hint declaration
+    // Generate 2 Viper functions for the hint declaration
+    // 1. A function named as decl.name where body is an expression that evaluates to true
+    // 2. A function named as decl.name + hintWrapperSuffix where body is a call to the function above
+    // The second function is needed when the hint is used in the postcondition
     val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
-    allFuncs = allFuncs :+ vpr.Function(decl.name, Seq(k),
-                                        vpr.Bool, Seq.empty, Seq.empty, Option.empty)()
+
+    // Function 1
+    val hintFuncBody = vpr.Or(vpr.LeCmp(k.localVar, zero)(), vpr.GtCmp(k.localVar, zero)())()
+    val hintFunc = vpr.Function(decl.name, Seq(k),
+      vpr.Bool, Seq.empty, Seq.empty, Option(hintFuncBody))()
+
+    // Function 2
+    val hintWrapperBody = vpr.FuncApp(decl.name, Seq(k.localVar))(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
+    val hintWrapperFunc = vpr.Function(decl.name + hintWrapperSuffix, Seq(k), vpr.Bool, Seq.empty, Seq.empty, Option(hintWrapperBody))()
+
+    allFuncs = allFuncs ++ Seq(hintFunc, hintWrapperFunc)
     vpr.FuncApp(decl.name, Seq(arg))(vpr.NoPosition, vpr.NoInfo, vpr.Bool, vpr.NoTrafos)
   }
 
