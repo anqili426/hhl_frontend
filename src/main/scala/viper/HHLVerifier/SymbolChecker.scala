@@ -17,9 +17,11 @@ object SymbolChecker {
   }
 
   def checkSymbolsMethod(m: Method): Unit = {
+    var varsAllowedInPost: Map[String, Type] = Map.empty
     m.args.foreach(a => {
       checkIdDup(a)
       allVars = allVars + (a.name -> a.typ)
+      varsAllowedInPost = varsAllowedInPost + (a.name -> a.typ)
     })
     allArgNames = m.argsMap.keySet
     m.pre.foreach(p => checkSymbolsExpr(p, false, false))
@@ -27,10 +29,17 @@ object SymbolChecker {
     m.res.foreach { r =>
       checkIdDup(r)
       allVars = allVars + (r.name -> r.typ)
+      varsAllowedInPost = varsAllowedInPost + (r.name -> r.typ)
     }
     checkSymbolsStmt(m.body)
-    m.post.foreach(p => checkSymbolsExpr(p, false, false))
     m.allVars = allVars
+
+    // Because postconditions can contain hints declared in the method body
+    // We must perform the symbol checking for postcondition after the symbol checking for method body
+    // Note that now allVars must be updated to contain only the args and return variables
+    allVars = varsAllowedInPost
+    m.post.foreach(p => checkSymbolsExpr(p, false, false))
+
     // Reset
     allVars = Map.empty
     allHintsInMethod = Set.empty
