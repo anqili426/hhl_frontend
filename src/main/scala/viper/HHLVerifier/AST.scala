@@ -52,7 +52,7 @@ case class ReuseStmt(blockName: Id) extends Stmt {
 case class UseHintStmt(hint: Expr) extends Stmt
 
 sealed trait TopLevelDecl
-case class Method(mName: String, args: Seq[Id], res: Seq[Id], pre: Seq[Assertion], post: Seq[Assertion], body: CompositeStmt) extends TopLevelDecl {
+case class Method(mName: String, args: Seq[Id], res: Seq[Id], pre: Seq[Expr], post: Seq[Expr], body: CompositeStmt) extends TopLevelDecl {
   val argsMap: Map[String, Type] = args.map(arg => (arg.name -> arg.typ)).toMap
   val resMap: Map[String, Type] = res.map(res => (res.name -> res.typ)).toMap
   var allVars: Map[String, Type] = Map.empty

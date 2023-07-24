@@ -169,8 +169,10 @@ object Generator {
     val post1 = translateExp(e, s, currStates)
     if (containsHints) {
       removeHints = true
+      // If post1 contains hints, then remove the hints in post1 to form post2
       val post2 = translateExp(e, s, currStates)
       removeHints = false
+      // The order here cannot be changed
       Seq(post2, post1)
     } else Seq(post1)
   }
