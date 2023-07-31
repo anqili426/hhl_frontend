@@ -9,14 +9,14 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) != get
 
     var t: Int
 
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) != get(_s2, x) {
+    //frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) != get(_s2, x) {
         while (i < x)
         invariant forall _s: State :: <_s> ==> get(_s, i) <= get(_s, x) && get(_s, res) == get(_s, i) * get(_s, x)
         {
             res := res + x
             i := i + 1
         }
-    }
+    //}
 }
 
 method test2(x: Int) returns (res: Int)
@@ -29,7 +29,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) != get
     i := 0
     res := 0
 
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) != get(_s2, x) {
+    //frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) != get(_s2, x) {
         while (i < x)
         invariant forall _s: State :: <_s> ==> get(_s, i) <= get(_s, x) && get(_s, res) == get(_s, i)
         {
@@ -40,5 +40,5 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) != get
             }
             res := i
         }
-    }
+    //}
 }

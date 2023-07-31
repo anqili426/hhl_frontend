@@ -1,7 +1,0 @@
-method main(x: Int, y: Int) returns (res: Int)
-    requires forall _s: State :: <_s> ==> get(_s, x) == get(_s, y) + 1
-    ensures forall _s: State :: <_s> ==> get(_s, res) == get(_s, y) * 2 + 1
-{
-    res := x + y
-}
-

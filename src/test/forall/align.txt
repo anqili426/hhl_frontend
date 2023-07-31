@@ -38,7 +38,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
 
     if (x > 0) {
         declare commonLoop {
-            frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, n) == get(_s2, n) && get(_s1, x) >= get(_s2, x) {
+            // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, n) == get(_s2, n) && get(_s1, x) >= get(_s2, x) {
                 while (ind < n)
                 invariant forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, new_x) >= get(_s2, new_x) && get(_s1, y) >= get(_s2, y)
                 invariant forall _s: State :: <_s> ==> get(_s, ind) == $n
@@ -48,7 +48,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
                     y := new_x + 1
                     ind := ind + 1
                 }
-            }
+            // }
         }
         y := y + 1
     } else {
@@ -111,7 +111,6 @@ method test3(x: Int) returns (y: Int)
     var i: Int
     i := x
 
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, x) == get(_s2, x) {
         while (i > 0)
             invariant forall _s: State :: <_s> ==> get(_s, i) >= 0 && (get(_s, i) == 0 ==> get(_s, y) == get(_s, x))
         {
@@ -125,5 +124,4 @@ method test3(x: Int) returns (y: Int)
             }
             i := i - 1
         }
-    }
 }

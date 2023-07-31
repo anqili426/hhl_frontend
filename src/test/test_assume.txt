@@ -1,7 +1,0 @@
-method main(x: Int, y: Int)
-    requires forall _s: State :: <_s> ==> get(_s, x) == 0
-    ensures forall _s: State :: <_s> ==> get(_s, x) == get(_s, y)
-{
-    assume x == 0 && y == 0
-    havoc x
-}

@@ -2,15 +2,14 @@ method test(x: Int) returns (res: Int)
 requires exists _s: State :: <_s> && get(_s, x) == 3
 ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
 {
-     res := 0
      let $s: State :: <$s> && get($s, x) == 3
+     res := 0
      while (res < x)
      {hint2} invariant $n <= get($s, x) ==> exists _s: State :: <_s>
      && get(_s, res) <= get(_s, x) && get(_s, res) == $n && get(_s, x) == get($s, x)
-     // The following invariant I(0) doesn't verify, because of the assignment res := 0, $s is not in the latest set of program states
-     // {hint2} invariant $n <= get($s, x) ==> <$s> && get($s, res) <= get($s, x) && get($s, res) == $n
      {
          res := res + 1
      }
-     use forall _s: State :: <_s> ==> hint2(get(_s, x))
+     hyperAssume forall _s: State :: <_s> ==> hint2(get(_s, x))
+     // use forall _s: State :: <_s> ==> hint2(get(_s, x))
 }

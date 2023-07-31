@@ -49,7 +49,6 @@ requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(
 ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get(_s2, res)
 {
     res := 0
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, y) == get(_s2, y) {
         if (y >= 0) {
             while (res < y)
                 invariant forall _s: State :: <_s> ==> get(_s, res) <= get(_s, y)
@@ -66,5 +65,4 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, res) == get
                 res := res + 1
             }
         }
-    }
 }

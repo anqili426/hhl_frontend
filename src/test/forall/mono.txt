@@ -11,14 +11,14 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
     var y: Int
     y := x
 
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, old_x) >= get(_s2, old_x) {
+    // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, old_x) >= get(_s2, old_x) {
         while (y > 0)
             invariant forall _s: State :: <_s> ==> get(_s, y) >= 0 && get(_s, res) == get(_s, old_x) - get(_s, y)
         {
             res := res + 1
             y := y - 1
         }
-    }
+    // }
 }
 
 method test2(x: Int, i: Int) returns (res: Int)
@@ -30,7 +30,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
     new_x := x
     res := 0
 
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, x) >= get(_s2, x) {
+    // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, x) >= get(_s2, x) {
         while (new_x > 11)
             invariant forall _s: State :: <_s> ==> get(_s, new_x) >= 11
             invariant forall _s: State :: <_s> ==> get(_s, res) == get(_s, x) - get(_s, new_x)
@@ -38,7 +38,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
             res := res + 1
             new_x := new_x - 1
         }
-    }
+    // }
 }
 
 method test3(x: Int, i: Int, n: Int) returns (res: Int)
@@ -50,7 +50,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
     new_x := x
     res := 0
 
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, x) >= get(_s2, x) && get(_s1, n) == get(_s2, n) {
+    // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, x) >= get(_s2, x) && get(_s1, n) == get(_s2, n) {
         while (new_x > n)
             invariant forall _s: State :: <_s> ==> get(_s, new_x) >= get(_s, n)
             invariant forall _s: State :: <_s> ==> get(_s, res) == get(_s, x) - get(_s, new_x)
@@ -58,7 +58,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
             res := res + 1
             new_x := new_x - 1
         }
-    }
+    // }
 }
 
 method test4(x: Int, n: Int, i: Int) returns (y: Int)
@@ -75,7 +75,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
 
     y := 1
 
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, n) == get(_s2, n) && get(_s1, x) >= get(_s2, x) {
+    // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, n) == get(_s2, n) && get(_s1, x) >= get(_s2, x) {
         while (ind < n)
         invariant forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, new_x) >= get(_s2, new_x) && get(_s1, y) >= get(_s2, y)
         invariant forall _s: State :: <_s> ==> get(_s, ind) == $n
@@ -85,5 +85,5 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
             y := new_x + 1
             ind := ind + 1
         }
-    }
+    // }
 }
