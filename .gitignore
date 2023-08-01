@@ -15,3 +15,4 @@ tmp/
 *.bpl.*
 src/main/scala/viper/HHLVerifier/*.txt
 src/main/scala/viper/HHLVerifier/*.vpr
+.DS_Store

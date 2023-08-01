@@ -593,19 +593,21 @@ object Generator {
 
         val havocIndex = havocIntMethodCall(currLoopIndexDecl.localVar)
         val indexNonNeg = vpr.Inhale(vpr.GeCmp(currLoopIndex, zero)())()
+
+        val havocStates = havocSetMethodCall(currStates)
         // Assume I(n)
         val inhaleIn = vpr.Inhale(getAllInvariants(inv, currStates))()
-        // Update loop index to be $n + 1
-        currLoopIndex = vpr.Add(currLoopIndex, one)()
         val inhaleLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates)._1
         val translatedLoopBody = translateStmt(loopBody, currStates)
+        // Update loop index to be $n + 1
+        currLoopIndex = vpr.Add(currLoopIndexDecl.localVar, one)()
         // Assert I(n+1)
         val assertIn1 = vpr.Assert(getAllInvariants(inv, currStates))()
         val assumeFalse = vpr.Inhale(vpr.FalseLit()())()
         val ifBody = Seq(inhaleIn) ++ inhaleLoopGuard ++ translatedLoopBody._1 ++ Seq(assertIn1, assumeFalse)
         val ifStmt = vpr.If(nonDetBool, vpr.Seqn(ifBody, Seq.empty)(), vpr.Seqn(Seq.empty, Seq.empty)())()
         val newVars = Seq(nonDetBool, currLoopIndexDecl.localVar) ++ translatedLoopBody._2
-        val newStmts = Seq(havocIndex, indexNonNeg, ifStmt)
+        val newStmts = Seq(havocIndex, indexNonNeg, havocStates, ifStmt)
         (newStmts, newVars)
     }
 
