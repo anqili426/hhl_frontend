@@ -506,7 +506,7 @@ object Generator {
               // Get all declarations of hints
               val allHintDecls = invWithHints.map(i => i._1).filter(h => !h.isEmpty)
               val translatedHintDecls = allHintDecls.map(h => translateHintDecl(h.get, k.localVar))
-              val triggers = if (translatedHintDecls.isEmpty) Seq.empty else Seq(vpr.Trigger(translatedHintDecls)())
+              val triggers = if (translatedHintDecls.isEmpty) Seq.empty else translatedHintDecls.map(h => vpr.Trigger(Seq(h))())
               existsNewStmts = Seq(
                                     vpr.Inhale(vpr.Forall(Seq(k), triggers,
                                       vpr.Implies(vpr.GeCmp(k.localVar, zero)(),

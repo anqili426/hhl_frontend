@@ -171,11 +171,7 @@ ensures exists _s: State :: <_s> && get(_s, y) == -1
        i := i - 1
     }
 
-    // TODO: shouldn't need both hint10 and hint11 for the same k
     use hint10(get($s, x))
-    use hint11(get($s, x))
-
-    use hint10(0)
     use hint11(0)
 }
 
@@ -218,8 +214,8 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
     use hint12(get($s1, n))
 }
 
-
-// Alignment
+/*
+// Alignment -- not supported for exists-HHL at the moment
 method align(x: Int, n: Int, i: Int) returns (res: Int)
 requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2
                                             && get(_s1, n) == get(_s2, n) && get(_s1, n) == 3
@@ -265,3 +261,4 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
 
     use hint13(get($s1, n))
 }
+*/
