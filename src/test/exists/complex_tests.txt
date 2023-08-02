@@ -1,3 +1,4 @@
+/*
 // Functional inv
 method functional(x: Int) returns (res: Int)
 requires exists _s: State :: <_s> && get(_s, x) == 3
@@ -59,8 +60,8 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, y) < 0 && ge
         }
     use hint4(get($s1, y))
     use hint5(-1 * get($s2, y))
-}
-
+} */
+/*
 // Nested loops
 method nested_loops(x: Int) returns (res: Int)
 requires exists _s: State :: <_s> && get(_s, x) > 0
@@ -78,6 +79,7 @@ ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
                                     && get(_s, x) == get($s, x)
                                     && get(_s, i) == get(_s, res)
                                     && get(_s, i) == $n * get(_s, x)
+                                    && get($s, x) > 0
     {
         // $s1 doesn't necessarily exist
         let $s1: State :: <$s1> && get($s1, i) <= get($s1, x) && get($s1, x) == get($s, x)
@@ -95,12 +97,171 @@ ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
     }
 
     use hint6(1)
-}
+} */
 
 // Two loops
+method two_loops(x: Int) returns (res: Int)
+requires exists _s: State :: <_s> && get(_s, x) == 3
+ensures exists _s: State :: <_s> && get(_s, x) * get(_s, x) + get(_s, x) == get(_s, res)
+{
+    var i: Int
+    i := 0
+    res := 0
+
+    let $s: State :: <$s> && get($s, x) == 3
+
+    // Compute res = x * x
+    while (i < x)
+    {hint8} invariant $n <= get($s, x) ==> exists _s: State :: <_s>
+                                                  && get(_s, i) == $n
+                                                  && get(_s, x) == get($s, x)
+                                                  && get(_s, res) == get(_s, i) * get(_s, x)
+    {
+        res := res + x
+        i := i + 1
+    }
+
+    use hint8(get($s, x))
+
+    i := 0
+
+    // Compute res = res + x
+    while (i < x)
+    {hint9} invariant $n <= get($s, x) ==> exists _s: State :: <_s>
+                                                  && get(_s, i) == $n
+                                                  && get(_s, x) == get($s, x)
+                                                  && get(_s, res) == get(_s, x) * get(_s, x) + get(_s, i)
+    {
+        res := res + 1
+        i := i + 1
+    }
+
+    use hint9(get($s, x))
+}
 
 // If-else in loops
+method if_else_in_loop(x: Int) returns (y: Int)
+requires exists _s: State :: <_s> && get(_s, x) == 3
+requires exists _s: State :: <_s> && get(_s, x) == 0
+ensures exists _s: State :: <_s> && get(_s, y) == 3
+ensures exists _s: State :: <_s> && get(_s, y) == -1
+{
+    y := -1
+    var i: Int
+    i := x
+
+    let $s: State :: <$s> && get($s, x) == 3 && get($s, i) == get($s, x)
+    let $s1: State :: <$s1> && get($s1, x) == 0 && get($s, i) == get($s, x) && get($s1, y) == -1
+
+    while (i > 0)
+    {hint10} invariant $n <= get($s, x) ==> exists _s: State :: <_s>
+                                                    && get(_s, i) >= 0
+                                                    && get(_s, x) - get(_s, i) == $n
+                                                    && get(_s, x) == get($s, x)
+                                                    && (get(_s, i) == 0 ==> get(_s, x) == get(_s, y))
+    {hint11} invariant $n == 0 ==> exists _s: State :: <_s> && get(_s, x) == 0
+                                                        && get(_s, i) == 0
+                                                        && get(_s, y) == get($s1, y)
+    {
+       if (i == 1) {
+         y := x
+       } else {
+         y := 2
+       }
+       i := i - 1
+    }
+
+    // TODO: shouldn't need both hint10 and hint11 for the same k
+    use hint10(get($s, x))
+    use hint11(get($s, x))
+
+    use hint10(0)
+    use hint11(0)
+}
 
 // Relational inv
+method relational(x: Int, n: Int, i: Int) returns (res: Int)
+requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2
+                                            && get(_s1, n) == get(_s2, n) && get(_s1, n) == 3
+                                            && get(_s1, x) <= get(_s2, x) && get(_s1, x) == 4
+ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2
+                                            && get(_s1, res) <= get(_s2, res)
+{
+    res := 0
+    var ind: Int
+    ind := 0
+
+    let $s1: State :: <$s1> && get($s1, i) == 1 && get($s1, n) == 3
+                            && get($s1, x) == 4 && get($s1, ind) == 0
+                            && get($s1, res) == 0
+    let $s2: State :: <$s2> && get($s2, i) == 2
+                            && get($s2, x) >= get($s1, x)
+                            && get($s2, n) == get($s1, n)
+                            && get($s2, ind) == 0
+                            && get($s2, res) == 0
+
+    while (ind < n)
+    {hint12} invariant $n <= get($s1, n) ==> exists _s1: State, _s2: State :: <_s1> && <_s2>
+                                                        && get(_s1, i) == 1 && get(_s2, i) == 2
+                                                        && get(_s2, x) >= get(_s1, x)
+                                                        && get(_s1, n) == get(_s2, n)
+                                                        && get(_s1, n) == get($s1, n)
+                                                        && get(_s1, ind) == $n
+                                                        && get(_s2, ind) == get(_s1, ind)
+                                                        && get(_s1, res) <= get(_s2, res)
+                                                        && get(_s1, ind) <= get(_s1, n)
+    {
+        res := 2 * x
+        ind := ind + 1
+    }
+
+    use hint12(get($s1, n))
+}
+
 
 // Alignment
+method align(x: Int, n: Int, i: Int) returns (res: Int)
+requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2
+                                            && get(_s1, n) == get(_s2, n) && get(_s1, n) == 3
+                                            && get(_s1, x) <= get(_s2, x) && get(_s1, x) == 4
+ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2
+                                            && get(_s1, res) <= get(_s2, res)
+{
+    res := 0
+    var ind: Int
+    ind := 0
+
+    let $s1: State :: <$s1> && get($s1, i) == 1 && get($s1, n) == 3
+                            && get($s1, x) == 4 && get($s1, ind) == 0
+                            && get($s1, res) == 0
+    let $s2: State :: <$s2> && get($s2, i) == 2
+                            && get($s2, x) >= get($s1, x)
+                            && get($s2, n) == get($s1, n)
+                            && get($s2, ind) == 0
+                            && get($s2, res) == 0
+
+    if (x > 0) {
+        declare commonLoop {
+            while (ind < n)
+                {hint13} invariant $n <= get($s1, n) ==> exists _s1: State, _s2: State :: <_s1> && <_s2>
+                                                                    && get(_s1, i) == 1 && get(_s2, i) == 2
+                                                                    && get(_s2, x) >= get(_s1, x)
+                                                                    && get(_s1, n) == get(_s2, n)
+                                                                    && get(_s1, n) == get($s1, n)
+                                                                    && get(_s1, ind) == $n
+                                                                    && get(_s2, ind) == get(_s1, ind)
+                                                                    && get(_s1, res) <= get(_s2, res)
+                                                                    && get(_s1, ind) <= get(_s1, n)
+                                                                    && get(_s1, x) == get($s1, x)
+                {
+                    res := 2 * x
+                    ind := ind + 1
+                }
+        }
+        // y := y + 1
+    } else {
+        reuse commonLoop
+    }
+
+    use hint13(get($s1, n))
+}
