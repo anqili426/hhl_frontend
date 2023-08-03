@@ -219,7 +219,7 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
 method align(x: Int, n: Int, i: Int) returns (res: Int)
 requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2
                                             && get(_s1, n) == get(_s2, n) && get(_s1, n) == 3
-                                            && get(_s1, x) <= get(_s2, x) && get(_s1, x) == 4
+                                            && get(_s1, x) <= get(_s2, x) && get(_s1, x) == -1
 ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2
                                             && get(_s1, res) <= get(_s2, res)
 {
@@ -228,7 +228,7 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
     ind := 0
 
     let $s1: State :: <$s1> && get($s1, i) == 1 && get($s1, n) == 3
-                            && get($s1, x) == 4 && get($s1, ind) == 0
+                            && get($s1, x) == -1 && get($s1, ind) == 0
                             && get($s1, res) == 0
     let $s2: State :: <$s2> && get($s2, i) == 2
                             && get($s2, x) >= get($s1, x)
@@ -254,7 +254,7 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
                     ind := ind + 1
                 }
         }
-        // y := y + 1
+        res := res - 100
     } else {
         reuse commonLoop
     }
