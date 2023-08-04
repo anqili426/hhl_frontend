@@ -254,7 +254,8 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
                     ind := ind + 1
                 }
         }
-        res := res - 100
+        // TODO: adding this line doesn't work any more...
+        // res := res + 1
     } else {
         reuse commonLoop
     }

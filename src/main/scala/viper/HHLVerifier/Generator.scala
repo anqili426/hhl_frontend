@@ -379,11 +379,11 @@ object Generator {
               if (verifierOption != 0) {
                 setFlagForIf = setFlagForIf :+ vpr.Inhale(vpr.Forall(Seq(stateDecl), Seq.empty,
                   vpr.Implies(getInSetApp(Seq(state, ifBlockStates), typVarMap),
-                    vpr.EqCmp(isIfBlockVpr, one)()
+                    vpr.EqCmp(getGetApp(Seq(state, isIfBlockVpr), typVarMap), one)()
                   )())())()
                 setFlagForElse = setFlagForElse :+ vpr.Inhale(vpr.Forall(Seq(stateDecl), Seq.empty,
                   vpr.Implies(getInSetApp(Seq(state, elseBlockStates), typVarMap),
-                    vpr.EqCmp(isIfBlockVpr, zero)()
+                    vpr.EqCmp(getGetApp(Seq(state, isIfBlockVpr), typVarMap), zero)()
                   )())())()
               }
 
