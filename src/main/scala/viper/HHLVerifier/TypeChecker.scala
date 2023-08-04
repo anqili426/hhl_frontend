@@ -81,7 +81,8 @@ object TypeChecker {
         vName.typ = vType
         res = true
       case ProofVarDecl(_, p) =>
-        typeCheckExpr(p, false)
+        // hyperAssertionExpected set to true so that program variables can't occur in p
+        typeCheckExpr(p, true)
         res = checkIfTypeMatch(p.typ, boolType)
       case UseHintStmt(hint) =>
         // Program variables cannot appear as a hint argument
