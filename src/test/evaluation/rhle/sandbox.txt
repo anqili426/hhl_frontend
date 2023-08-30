@@ -1,0 +1,76 @@
+method test() returns (sum: Int) 
+requires exists _s: State :: <_s>
+ensures exists _s: State :: <_s> && get(_s, sum) == 0
+{
+    sum := 0
+    var i: Int
+    var j: Int 
+    var p: Int 
+    var n: Int
+    i := 0
+    j := 0
+    p := 0
+
+    var increment: Int
+    increment := 0
+
+    // let $s: State :: <$s> && get($s, sum) == 0 && get($s, j) == 0 && get($s, p) == 0
+
+    while (i < 10) 
+    {hint1} invariant $n <= 10 ==> exists _s: State :: <_s> && get(_s, i) == $n
+                                                && get(_s, i) >= 0
+                                                && (get(_s, i) % 2 == 1 ==> get(_s, p) == 1)
+                                                && (get(_s, i) < 5 ==> (get(_s, j) == 0 && get(_s, increment) == get(_s, p) && get(_s, sum) <= 2))
+                                                && (get(_s, i) >= 5 ==> (get(_s, j) == 1 && get(_s, increment) == get(_s, p) - 1))
+    {
+       // var increment: Int
+
+        // g(j, p)
+        if (j == 0) {
+            increment := p
+        }
+        if (j == 1) {
+            increment := p - 1
+        }
+        if (j < 0 || j > 1) {
+            increment := 1
+        }
+
+        sum := sum + increment
+
+        if (i == 5) {
+            j := 1
+        }
+
+        // flipCoin()
+        if (p == 0) {
+            p := 1
+        } else {
+            p := 0
+        }
+
+        i := i + 1
+    }
+    use hint1(10)
+}
+
+
+/*
+i = 0: p := 0, j := 0, incr := 0, sum := 0, 
+i = 1: p := 1, j := 0, incr := 1, sum := 1
+i = 2: p := 0, j := 0, incr := 0, sum := 1
+i = 3: p := 1, j := 0, incr := 1, sum := 2
+i = 4: p := 0, j := 0, incr := 0, sum := 2
+i = 5: p := 1, j := 1, incr := 0, sum := 2
+i = 6: p := 0, j := 1, incr := -1, sum := 1
+i = 7: p := 1, j := 1, incr := 0, sum := 1
+i = 8: p := 0, j := 1, incr := -1, sum := 0
+i = 9: p := 1, j := 1, incr := 0, sum := 0
+
+i == $n
+i % 2 == 1 ==> p == 1
+$n <= 10
+
+i < 5 ==> j == 0 and incr == p and sum == 0 + incr
+i >= 5 ==> j == 1 and incr == p - 1  and sum == 2 + incr
+*/
