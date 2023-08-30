@@ -135,14 +135,16 @@ object SymbolChecker {
         (Seq.empty, Seq.empty)
 
       case WhileLoopStmt(cond, body, inv) =>
-        val bodyVars = checkSymbolsStmt(body)
         val allHintDecls = inv.map(i => i._1).filter(h => !h.isEmpty)
         allHintDecls.map(h => checkHintDecl(h.get))
-        val allVars = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, true, false)).flatten ++ bodyVars._1
+        var allVarsOfLoop = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, true, false)).flatten
+        // Body must be checked after loop condition and invariants are checked
+        val bodyVars = checkSymbolsStmt(body)
+        allVarsOfLoop = allVarsOfLoop ++ bodyVars._1
         // The following assignment cannot be removed
         // body.allProgVars must contain all program variables in the loop guard, invariant & loop body
-        body.allProgVars = allVars.distinct.toMap
-        (allVars, bodyVars._2)
+        body.allProgVars = allVarsOfLoop.distinct.toMap
+        (allVarsOfLoop, bodyVars._2)
 
       case FrameStmt(framedAssertion, body) =>
         val framedVars = checkSymbolsExpr(framedAssertion, false, true)

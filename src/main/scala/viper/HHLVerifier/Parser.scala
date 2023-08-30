@@ -136,7 +136,8 @@ object Parser {
   def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | stateExistsExpr |  "(" ~ expr ~ ")")
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
-  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ boolean).map(e => UnaryExpr("!", e))
+  // Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
+  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ expr).map(e => UnaryExpr("!", e))
   def negExpr[$: P]: P[UnaryExpr] = P("-" ~ number).map(e => UnaryExpr("-", e))
 
   def boolean[$: P] : P[BoolLit] = P(boolTrue | boolFalse)
