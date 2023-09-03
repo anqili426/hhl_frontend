@@ -1,0 +1,73 @@
+// P3
+// Verification doesn't terminate
+method compare3(value1: Int, cost1: Int, value2: Int, cost2: Int, i: Int, target: Int) returns (res: Int)
+requires exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 && 
+        get(_s1, target) == get(_s2, target) && get(_s2, target) == get(_s3, target) && 
+        get(_s1, value1) == get(_s3, value1) && get(_s1, cost1) == get(_s3, cost1) && 
+        get(_s2, value2) == get(_s3, value2) && get(_s2, cost2) == get(_s3, cost2) && 
+        get(_s1, value2) == get(_s2, value1) && get(_s1, cost2) == get(_s2, cost1) &&
+        get(_s1, target) == 0 && get(_s1, value1) == 2 && get(_s1, value2) == -2 &&
+        get(_s3, value2) == 2 && get(_s3, cost1) < get(_s3, cost2)
+ensures exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 && 
+        (get(_s1, res) == 0 && !((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) || (get(_s2, res) == 0 && get(_s3, res) == 0)))
+{
+    if (value1 == -1 && value2 == -1) {
+        res := 0
+    } else {
+        if (value1 == -1) {
+            res := 1
+        } else {
+            if (value2 == -1) {
+                res := -1
+            } else {
+                if (value1 == value2) {
+                    var comp: Int
+                    comp := cost1 - cost2
+                    if (comp > 0) {
+                        res := 1
+                    } else {
+                        if (comp < 0) {
+                            res := -1
+                        } else {
+                            res := 0
+                        }
+                    }
+                } else {
+                    var comp1: Int
+                    var abscomp1: Int
+                    comp1 := target - value1
+                    abscomp1 := 0
+
+                    if (comp1 >= 0) {
+                        abscomp1 := comp1
+                    } else {
+                        abscomp1 := -1 * comp1
+                    }
+
+                    var comp2: Int
+                    var abscomp2: Int
+                    comp2 := target - value2
+                    abscomp2 := 0
+
+                    if (comp2 >= 0) {
+                        abscomp2 := comp2
+                    } else {
+                        abscomp2 := -1 * comp2
+                    }
+
+                    var comp3: Int
+                    comp3 := abscomp1 - abscomp2
+                    if (comp3 > 0) {
+                        res := 1
+                    } else {
+                        if (comp3 < 0) {
+                            res := -1
+                        } else {
+                            res := 0
+                        }
+                    }
+                }
+            }
+        }
+   }
+}
