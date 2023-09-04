@@ -1,0 +1,69 @@
+method test() returns (success: Int)
+requires exists _s1: State, _s2: State :: <_s1> && <_s2>
+ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, success) != get(_s2, success)
+{
+    var currTime: Int
+    var lastTime: Int
+    var currTotal: Int
+
+    // getCurrentTimeMs
+    havoc currTime {hint1}
+    assume currTime > 0
+    use hint1(1)
+    use hint1(2)
+
+    lastTime := -1
+    currTotal := 0
+
+    // recordTimeStamp
+    if (lastTime >= 0) {
+        var elapsedTime: Int
+        elapsedTime := currTime - lastTime
+        currTotal := currTotal + elapsedTime
+    }
+    lastTime := currTime
+
+    // sleep
+    var sleepTime: Int
+    havoc sleepTime {hint2}
+    assume sleepTime >= 80 && sleepTime <= 120
+    use hint2(100)
+    use hint2(101)
+    currTime := currTime + sleepTime
+
+    var counter : Int
+    counter := 0
+
+    while (counter < 5)
+    {hint4} invariant $n <= 5 ==> exists _s1: State, _s2: State :: <_s1> && <_s2> && 
+                                get(_s1, counter) == $n && get(_s2, counter) == $n &&
+                                get(_s1, currTime) - get(_s1, lastTime) == 100 &&
+                                get(_s2, currTime) - get(_s2, lastTime) == 101 &&
+                                get(_s1, currTotal) == 100 * get(_s1, counter) &&
+                                get(_s2, currTotal) == 101 * get(_s2, counter) &&
+                                get(_s1, lastTime) >= 0 && get(_s2, lastTime) >= 0
+    {
+        // recordTimeStamp
+        if (lastTime >= 0) {
+            var elapsedTime1: Int
+            elapsedTime1 := currTime - lastTime
+            currTotal := currTotal + elapsedTime1
+        }
+        lastTime := currTime
+
+        // sleep
+        havoc sleepTime {hint3}
+        assume sleepTime >= 80 && sleepTime <= 120
+        use hint3(100)
+        use hint3(101)
+        currTime := currTime + sleepTime
+        counter := counter + 1
+    }
+
+    if (currTotal == 500) {
+        success := 1
+    } else {
+        success := 0
+    }
+    use hint4(5)
+}

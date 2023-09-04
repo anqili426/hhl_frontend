@@ -1,0 +1,38 @@
+method test() returns (success: Int)
+requires exists _s1: State, _s2: State :: <_s1> && <_s2>
+ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, success) != get(_s2, success)
+{
+    var response: Int
+
+    var choiceVar: Int
+    havoc choiceVar {hint1}
+    assume choiceVar >= 0 && choiceVar <= 2
+    
+    use hint1(0)
+    use hint1(1)
+
+    if (choiceVar == 0) {
+        response := 200
+    } else {
+        if (choiceVar == 1) {
+            response := 400
+        } else {
+            response := 500
+        }
+    }
+
+    var res: Int
+    if (response == 200) {
+        res := 1
+    } else {
+        res := 0
+    }
+
+    if (res == 0) {
+        success := 0
+    } else {
+        success := 1
+    }
+
+    
+}

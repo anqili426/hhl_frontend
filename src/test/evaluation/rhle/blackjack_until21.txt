@@ -4,12 +4,17 @@ ensures exists _s: State :: <_s> && get(_s, handValue_out) == 21
 {
     handValue_out := handValue_in
 
-    while (handValue_out < 21) {
+    let $s: State :: <$s> && get($s, handValue_out) >= 2 && get($s, handValue_out) <= 20
+    while (handValue_out < 21) 
+    {hint2} invariant $n <= (21 - get($s, handValue_out)) ==> 
+            exists _s: State :: <_s> && get(_s, handValue_out) <= 21 && $n == get(_s, handValue_out) - get($s, handValue_out)
+    {
         var card: Int
         havoc card {hint1}
         assume card >= 1 && card <= 10
-        // use hint1()
-        handValue_out := handValue_in + card
+        use hint1(1)
+        handValue_out := handValue_out + card
     }
-    
+
+    use hint2(21 - get($s, handValue_out))
 }
