@@ -21,7 +21,8 @@ object Main {
     val program = programSource.mkString
     programSource.close()
 
-    val outputPath = if (args.length <= 1) "unspecified" else args(1)
+    // val outputPath = if (args.length <= 1) "unspecified" else args(1)
+    val outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
     if (args.contains("--inline")) Generator.inline = true
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
@@ -29,9 +30,9 @@ object Main {
     else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
 
     println("The input program is read from " + programAbsPath)
-    println("The translated program is written to " + outputPath)
 
     try {
+      val t0 = System.nanoTime()
       val res = fastparse.parse(program, Parser.program(_))
       if (res.isSuccess) {
         println("Parsing successful. ")
@@ -46,9 +47,11 @@ object Main {
         
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)
+        Generator.reset()
         // Optionally save the Viper program to some provided file
-        if (args.length > 1) {
+        if (outputPath != "unspecified") {
           val fw = new FileWriter(outputPath, false)
+          println("The translated program is written to " + outputPath)
           try fw.write(viperProgram.toString())
           finally fw.close()
         }
@@ -57,21 +60,22 @@ object Main {
         //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
         if (consistencyErrors.nonEmpty) {
           consistencyErrors.foreach(err => println(err.readableMessage))
-          sys.exit(1)
-        }
+        } else {
+          println("Translated program is being verified by Viper. ")
+          val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
+          silicon.start()
+          val verifyRes = silicon.verify(viperProgram)
+          silicon.stop()
+          val t1 = System.nanoTime()
 
-        println("Translated program is being verified by Viper. ")
-        val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
-        silicon.start()
-        val verifyRes = silicon.verify(viperProgram)
-        silicon.stop()
-
-        verifyRes match {
-          case Success =>
-            println("Verification succeeded")
-          case Failure(err) =>
-            println("Verification failed")
-            err.foreach(e => println(e.readableMessage))
+          verifyRes match {
+            case Success =>
+              println("Verification succeeded")
+            case Failure(err) =>
+              println("Verification failed")
+              err.foreach(e => println(e.readableMessage))
+          }
+          println("Runtime: " + (t1 - t0))
         }
       } else {
         val Parsed.Failure(_, _, extra) = res

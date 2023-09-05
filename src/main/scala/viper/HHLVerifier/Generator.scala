@@ -88,6 +88,12 @@ object Generator {
     p
   }
 
+  def reset(): Unit = {
+    allDomains = Seq.empty
+    allMethods = Seq.empty
+    allFuncs = Seq.empty
+  }
+
   def translateProgram(input: HHLProgram, typVarMap: Map[vpr.TypeVar, vpr.Type]): Unit = {
       input.content.map(m => translateMethod(m, typVarMap))
   }
