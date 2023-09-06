@@ -13,6 +13,11 @@ object TypeChecker {
 
   var assertVars: Map[String, Type] = Map.empty
 
+  def reset(): Unit = {
+    currMethod = null
+    assertVars = Map.empty
+  }
+
   def typeCheckProg(p: HHLProgram): Unit = {
     p.content.foreach(m => typeCheckMethod(m))
   }

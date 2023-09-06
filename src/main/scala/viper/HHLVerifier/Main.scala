@@ -9,6 +9,10 @@ import java.io.FileWriter
 
 object Main {
 
+  var verified = false
+  var runtime = 0.0
+  var test = false
+
   def main(args: Array[String]): Unit = {
 
     if (args.length == 0) {
@@ -26,16 +30,15 @@ object Main {
     if (args.contains("--inline")) Generator.inline = true
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
-    // TODO: This still needs to be implemented
     else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
 
-    println("The input program is read from " + programAbsPath)
+    printMsg("The input program is read from " + programAbsPath)
 
     try {
       val t0 = System.nanoTime()
       val res = fastparse.parse(program, Parser.program(_))
       if (res.isSuccess) {
-        println("Parsing successful. ")
+        printMsg("Parsing successful. ")
         val parsedProgram: HHLProgram = res.get.value
 
         // Symbol table
@@ -43,15 +46,17 @@ object Main {
 
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
-        println("Type checking successful. ")
+        printMsg("Type checking successful. ")
         
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)
+        SymbolChecker.reset()
+        TypeChecker.reset()
         Generator.reset()
         // Optionally save the Viper program to some provided file
         if (outputPath != "unspecified") {
           val fw = new FileWriter(outputPath, false)
-          println("The translated program is written to " + outputPath)
+          printMsg("The translated program is written to " + outputPath)
           try fw.write(viperProgram.toString())
           finally fw.close()
         }
@@ -59,31 +64,42 @@ object Main {
         val consistencyErrors = viperProgram.checkTransitively
         //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
         if (consistencyErrors.nonEmpty) {
-          consistencyErrors.foreach(err => println(err.readableMessage))
+          verified = false
+          consistencyErrors.foreach(err => printMsg(err.readableMessage))
         } else {
-          println("Translated program is being verified by Viper. ")
+          printMsg("Translated program is being verified by Viper. ")
           val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
           silicon.start()
           val verifyRes = silicon.verify(viperProgram)
           silicon.stop()
           val t1 = System.nanoTime()
+          runtime = t1 - t0
 
           verifyRes match {
             case Success =>
-              println("Verification succeeded")
+              verified = true
+              printMsg("Verification succeeded")
             case Failure(err) =>
-              println("Verification failed")
-              err.foreach(e => println(e.readableMessage))
+              verified = false
+              printMsg("Verification failed")
+              err.foreach(e => printMsg(e.readableMessage))
+
           }
-          println("Runtime: " + (t1 - t0))
+          printMsg("Runtime: " + runtime)
         }
       } else {
         val Parsed.Failure(_, _, extra) = res
-        println(extra.trace().longAggregateMsg)
+        printMsg(extra.trace().longAggregateMsg)
       }
     } catch {
-      case e: VerifierException => println(e.errMsg)
+      case e: VerifierException =>
+        verified = false
+        printMsg(e.errMsg)
     }
+  }
+
+  def printMsg(msg: String): Unit = {
+    if (!test) println(msg)
   }
 
 }

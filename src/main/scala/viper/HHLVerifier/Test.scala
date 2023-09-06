@@ -3,27 +3,36 @@ import java.io.File
 
 object Test {
 
+  var failedForAll: List[String] = List.empty
+  var failedExists: List[String] = List.empty
+  var totalRuntime = 0.0
+
+  def runTests(tests: List[File], option: String): Unit = {
+    for (f <- tests) {
+      print(f)
+      val argsForMain = Array(f.getPath, "--" + option)
+      Main.test = true
+      Main.main(argsForMain)
+      totalRuntime = totalRuntime + Main.runtime
+      if ((!f.getName.endsWith("false.txt") && !Main.verified) || (f.getName.endsWith("false.txt") && Main.verified)) {
+        println(" Failed")
+        if (option == "forall") failedForAll = failedForAll :+ f.getPath
+        else if (option == "exists") failedExists = failedExists :+ f.getPath
+      } else println(" OK")
+    }
+  }
+
   def main(args: Array[String]): Unit = {
-    val pathOfForAllTests = "src/test/evaluation/forall/test"
+    val pathOfForAllTests = "src/test/evaluation/forall"
     val pathOfExistsTests = "src/test/evaluation/exists"
 
     val forAllTests = getListOfFiles(pathOfForAllTests)
     val existsTests = getListOfFiles(pathOfExistsTests)
     val totalNum = forAllTests.length + existsTests.length
 
-    var failedForAll: List[String] = List.empty
-    var failedExists: List[String] = List.empty
-    var totalRuntime = 0
-
     println("Evaluation starts")
-    for (f <- forAllTests) {
-      println(f)
-      val argsForMain = Array(f.getPath,"--forall")
-      Main.main(argsForMain)
-      // Get result
-      // Get runtime
-      // Check if result is expected
-    }
+    // runTests(forAllTests, "forall")
+    runTests(existsTests, "exists")
 
     val failedNum = failedForAll.length + failedExists.length
     println("---------------------")
@@ -35,7 +44,7 @@ object Test {
       println("Failed exists tests: " + failedExists.length)
       failedExists.foreach(t => println(t))
     }
-    println("Runtime: " + totalRuntime)
+    println("Runtime: " + totalRuntime + " ns")
   }
 
   def getListOfFiles(dir: String): List[File] = {

@@ -8,6 +8,14 @@ object SymbolChecker {
   var allHintNames: Set[String] = Set.empty // All hints declared in one program
   var allHintsInMethod: Set[String] = Set.empty // All hints declared in one method
 
+  def reset(): Unit = {
+    allVars = Map.empty
+    allArgNames = Set.empty
+    allMethodNames = List.empty
+    allHintNames = Set.empty
+    allHintsInMethod = Set.empty
+  }
+
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
     allMethodNames = p.content.map(m => m.mName)
