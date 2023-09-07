@@ -1,0 +1,9 @@
+method m1(x: Int) returns (res: Int) {
+    if (true) {
+        var y: Int
+        if (true) {
+            var z: Int
+        }
+        z := 1
+    }
+}

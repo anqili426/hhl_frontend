@@ -2,7 +2,8 @@ package viper.HHLVerifier
 
 object SymbolChecker {
   // This map is used to keep track of the declared program variables + assertion variables for each method
-  var allVars: Map[String, Type] = Map.empty  // All variables used in one method (including method arguments)
+  var allVars: Map[String, Type] = Map.empty  // All variables used in one method (including method arguments, block names), used to collect all identifiers defined
+  var allVarsInCurrScope: Map[String, Type] = Map.empty // All variables available in the current scope
   var allArgNames: Set[String] = Set.empty  // All arguments of one method
   var allMethodNames: Seq[String] = List.empty  // All method names of one program
   var allHintNames: Set[String] = Set.empty // All hints declared in one program
@@ -10,6 +11,7 @@ object SymbolChecker {
 
   def reset(): Unit = {
     allVars = Map.empty
+    allVarsInCurrScope = Map.empty
     allArgNames = Set.empty
     allMethodNames = List.empty
     allHintNames = Set.empty
@@ -28,6 +30,7 @@ object SymbolChecker {
     var varsAllowedInPost: Map[String, Type] = Map.empty
     m.args.foreach(a => {
       checkIdDup(a)
+      allVarsInCurrScope = allVarsInCurrScope + (a.name -> a.typ)
       allVars = allVars + (a.name -> a.typ)
       varsAllowedInPost = varsAllowedInPost + (a.name -> a.typ)
     })
@@ -36,10 +39,11 @@ object SymbolChecker {
     // The return variables can only be referred to in the method body or postconditions
     m.res.foreach { r =>
       checkIdDup(r)
+      allVarsInCurrScope = allVarsInCurrScope + (r.name -> r.typ)
       allVars = allVars + (r.name -> r.typ)
       varsAllowedInPost = varsAllowedInPost + (r.name -> r.typ)
     }
-    checkSymbolsStmt(m.body)
+    checkSymbolsStmt(m.body, true)
     m.allVars = allVars
 
     // Because postconditions can contain hints declared in the method body
@@ -50,15 +54,17 @@ object SymbolChecker {
 
     // Reset
     allVars = Map.empty
+    allVarsInCurrScope = Map.empty
     allHintsInMethod = Set.empty
   }
 
   // Returns
   // 1. Sequence of all program variables that appear in the statement
   // 2. Sequence of all program variables that are modified in the statement
-  def checkSymbolsStmt(stmt: Stmt): (Seq[(String, Type)], Seq[(String, Type)]) = {
+  def checkSymbolsStmt(stmt: Stmt, checkMethodBody: Boolean = false): (Seq[(String, Type)], Seq[(String, Type)]) = {
     stmt match {
       case cs@CompositeStmt(stmts) =>
+        val varsBeforeNewScope = allVarsInCurrScope
         var res1: Seq[(String, Type)] = Seq.empty
         var res2: Seq[(String, Type)] = Seq.empty
         stmts.foreach(s => {
@@ -66,6 +72,7 @@ object SymbolChecker {
           res1 = res1 ++ res._1
           res2 = res2 ++ res._2
         })
+        allVarsInCurrScope = varsBeforeNewScope
         cs.allProgVars = res1.distinct.toMap
         cs.modifiedProgVars = res2.distinct.toMap
         (res1.distinct, res2.distinct)
@@ -73,11 +80,13 @@ object SymbolChecker {
       case PVarDecl(id, typ) =>
         checkIdDup(id)
         allVars = allVars + (id.name -> typ)
+        allVarsInCurrScope = allVarsInCurrScope + (id.name -> typ)
         (Seq((id.name, typ)), Seq.empty)
 
       case ProofVarDecl(pv, p) =>
         checkIdDup(pv)
         allVars = allVars + (pv.name -> pv.typ)
+        allVarsInCurrScope = allVarsInCurrScope + (pv.name -> pv.typ)
         val allVarsInP = checkSymbolsExpr(p, false, false)
         if (allVarsInP.filter(v => pv.name == v._1).isEmpty)
           throw UnknownException("The proof variable " + pv.name + " must appear on the right-hand side of the statement")
@@ -178,7 +187,7 @@ object SymbolChecker {
       exp match {
         case id@Id(_) => // This is identifier used. Id in variable declarations are not checked here
           checkIdDefined(id)
-          Seq((id.name, allVars.get(id.name).get))
+          Seq((id.name, allVarsInCurrScope.get(id.name).get))
         case av@AssertVar(_) =>
           checkIdDefined(av)
           Seq.empty
@@ -188,6 +197,7 @@ object SymbolChecker {
         case AssertVarDecl(vName, vType) =>
           checkIdDup(vName)
           allVars = allVars + (vName.name -> vType)
+          allVarsInCurrScope = allVarsInCurrScope + (vName.name -> vType)
           Seq.empty
         case Num(_) => Seq.empty
         case BoolLit(_) => Seq.empty
@@ -198,23 +208,25 @@ object SymbolChecker {
             // State-exists-expressions can appear on the left-hand side of an implication, so isFrame is fixed as false here
             checkSymbolsExpr(left, isInLoopInv, false) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
         case Assertion(quantifier, assertVars, body) =>
-          val originalTable = allVars
+          val originalAllVars = allVars
+          val originalAllVarsInScope = allVarsInCurrScope
           // Assertion variables will be added to the symbol table
           assertVars.foreach(v => checkSymbolsExpr(v, isInLoopInv, isFrame))
           val varsInBody = checkSymbolsExpr(body, isInLoopInv, isFrame)
           // Remove the assertion variables from the symbol table
-          allVars = originalTable
+          allVars = originalAllVars
+          allVarsInCurrScope = originalAllVarsInScope
           varsInBody
         case GetValExpr(state, id) =>
             checkIdDefined(state)
             checkIdDefined(id)
-          var varsInExpr = Seq((id.name, allVars.get(id.name).get))
-          if (state.isInstanceOf[ProofVar]) varsInExpr = varsInExpr :+ (state.idName, allVars.get(state.idName).get)
+          var varsInExpr = Seq((id.name, allVarsInCurrScope.get(id.name).get))
+          if (state.isInstanceOf[ProofVar]) varsInExpr = varsInExpr :+ (state.idName, allVarsInCurrScope.get(state.idName).get)
           varsInExpr
         case StateExistsExpr(state) =>
             if (isFrame) throw UnknownException("Framed assertion cannot include state-exists-expression")
             checkIdDefined(state)
-            if (state.isInstanceOf[ProofVar]) Seq((state.idName, allVars.get(state.idName).get))
+            if (state.isInstanceOf[ProofVar]) Seq((state.idName, allVarsInCurrScope.get(state.idName).get))
             else Seq.empty  // No need to return anything if it's an assertion variable
         case LoopIndex() =>
             if (!isInLoopInv) throw UnknownException("Loop index $n can only be used in a loop invariant")
@@ -240,7 +252,7 @@ object SymbolChecker {
 
     def checkIdDefined(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (!allVars.contains(idName)) throw IdentifierNotFoundException("Identifier " + idName + " not found")
+      if (!allVarsInCurrScope.contains(idName)) throw IdentifierNotFoundException("Identifier " + idName + " not found")
     }
 
     def getIdName(id: Expr): String = {
