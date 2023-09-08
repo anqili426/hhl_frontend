@@ -1,0 +1,8 @@
+method test(x: Int, y: Int) returns (res: Int)
+requires exists _s: State:: <_s> && get(_s, x) == 2
+ensures exists _s: State :: <_s> && get(_s, x) == 2
+{
+    while (false) {
+        res := x
+    }
+}

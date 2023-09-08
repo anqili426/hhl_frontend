@@ -506,6 +506,10 @@ object Generator {
             }
             val frameUnmodifiedVarsStmt = translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars, typVarMap)
 
+            // Let currStates == S0 before the loop
+            val S0 = vpr.FuncApp(getSkFuncName, Seq(zero))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
+            val defineS0 = if (verifierOption == 1) Seq(vpr.Inhale(vpr.EqCmp(currStates, S0)())()) else Seq.empty
+
             // Let currStates be a union of Sk's
             val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
             val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
@@ -544,7 +548,7 @@ object Generator {
 
             //  Assume !cond
             val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-            newStmts =  Seq(assertI0) ++ invVerificationStmts ++ Seq(havocSTmp, frameUnmodifiedVarsStmt) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates) ++ notCond._1
+            newStmts =  Seq(assertI0) ++ invVerificationStmts ++ defineS0 ++ Seq(havocSTmp, frameUnmodifiedVarsStmt) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates) ++ notCond._1
             (newStmts, invVerificationVars)
 
         case FrameStmt(f, body) =>
