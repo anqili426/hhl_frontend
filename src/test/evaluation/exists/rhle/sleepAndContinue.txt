@@ -29,7 +29,15 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, success) != 
     assume sleepTime >= 80 && sleepTime <= 120
     use hint2(100)
     use hint2(101)
-    currTime := currTime + sleepTime
+
+    var old_currTime: Int
+    old_currTime := currTime
+    havoc currTime {hint5}
+    use hint5(101)
+    use hint5(103)
+    // If the following hint is used instead, verification doesn't terminate
+    // use forall _s: State :: <_s> ==> hint5(get(_s, old_currTime) + get(_s, sleepTime))
+    assume currTime == old_currTime + sleepTime
 
     var counter : Int
     counter := 0
@@ -56,7 +64,13 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, success) != 
         assume sleepTime >= 80 && sleepTime <= 120
         use hint3(100)
         use hint3(101)
-        currTime := currTime + sleepTime
+
+        old_currTime := currTime
+
+        havoc currTime {hint6}
+        use forall _s: State :: <_s> ==> hint6(get(_s, old_currTime) + get(_s, sleepTime))
+        assume currTime == old_currTime + sleepTime
+
         counter := counter + 1
     }
 

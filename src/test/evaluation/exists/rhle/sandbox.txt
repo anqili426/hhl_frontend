@@ -21,22 +21,13 @@ ensures exists _s: State :: <_s> && get(_s, sum) == 0
        var increment: Int
 
         // g(j, p)
-        /*hyperAssume forall _s: State :: <_s> ==> 
-                    ((get(_s, j) == 0 ==> get(_s, increment) == get(_s, p)) &&
-                    (get(_s, j) == 1 ==> get(_s, increment) == get(_s, p) - 1) &&
-                    ((get(_s, j) < 0 || get(_s, j) > 1) ==> get(_s, increment) == 1))
-        */
-        if (j == 0) {
-            increment := p
-        } 
-
-        if (j == 1) {
-            increment := p - 1
-        }
-
-        if (j < 0 || j > 1) {
-            increment := 1
-        }
+        havoc increment {hint3}
+        use forall _s: State:: <_s> ==> hint3(get(_s, p))
+        use forall _s: State:: <_s> ==> hint3(get(_s, p) - 1)
+        use hint3(1)
+        assume (j == 0 ==> increment == p) &&
+               (j == 1 ==> increment == p - 1) &&
+               (j < 0 || j > 1) ==> increment == 1
 
         sum := sum + increment
 
@@ -49,11 +40,6 @@ ensures exists _s: State :: <_s> && get(_s, sum) == 0
         assume p == 0 || p == 1
 
         i := i + 1
-
-        // Given the following hints, why does the program verify? 
-        // use forall _s: State :: <_s> && get(_s, i) <= 7 ==> hint2(0)
-        // use forall _s: State :: <_s> && get(_s, i) > 7 ==> hint2(1)
-
         use hint2(0)
         use hint2(1)
     }

@@ -10,16 +10,15 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, success) != 
     
     use hint1(0)
     use hint1(1)
+    use hint1(2)
 
-    if (choiceVar == 0) {
-        response := 200
-    } else {
-        if (choiceVar == 1) {
-            response := 400
-        } else {
-            response := 500
-        }
-    }
+    havoc response {hint2}
+    use hint2(200)
+    use hint2(400)
+    use hint2(500)
+    assume (choiceVar == 0 ==> response == 200) &&
+            (choiceVar == 1 ==> response == 400) &&
+            (choiceVar == 2 ==> response == 500)
 
     var res: Int
     if (response == 200) {
