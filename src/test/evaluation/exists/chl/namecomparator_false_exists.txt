@@ -4,7 +4,8 @@ requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && 
         get(_s1, priority1) == get(_s2, priority1) && get(_s1, priority2) == get(_s2, priority2) &&
         get(_s1, priority3) == get(_s2, priority3) &&
         get(_s1, name1) == get(_s1, name2) && get(_s1, name1) == get(_s1, priority1)
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s1, res) != -1 * get(_s2, res)
+ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 &&
+        get(_s1, res) != -1 * get(_s2, res)
 {
         if (name1 == priority1) {
             res := 1

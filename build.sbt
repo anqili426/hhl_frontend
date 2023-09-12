@@ -6,6 +6,7 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "2.13.10"
 
 val fastParse = "com.lihaoyi" %% "fastparse" % "2.2.2"
+val csvWriter = "au.com.bytecode" % "opencsv" % "2.4"
 lazy val silicon = project in file("silicon")
 //lazy val carbon = project in file("carbon")
 
@@ -19,6 +20,7 @@ lazy val impcon_frontend = (project in file("."))
         version := "1.0-SNAPSHOT",
 
         libraryDependencies += fastParse,
+         libraryDependencies += csvWriter,
 
         Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-reports", "-oD"),
 

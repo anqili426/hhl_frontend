@@ -1,6 +1,8 @@
 method test(a: Int, b: Int, i: Int) returns (c: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, a) < get(_s2, a) && get(_s1, b) > get(_s2, b)
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, c) > get(_s2, c) 
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+        get(_s1, a) < get(_s2, a) && get(_s1, b) > get(_s2, b)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+        get(_s1, c) > get(_s2, c)
 {
     assume a > 0 && b > a
     c := 0

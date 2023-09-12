@@ -6,7 +6,9 @@ requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && 
     get(_s1, sectorCode2) == get(_s2, sectorCode1) && get(_s1, industryCode2) == get(_s2, industryCode1) &&
     get(_s1, fiscalQuarter1) == get(_s1, fiscalQuarter2) && get(_s1, sectorCode1) > 0 && get(_s1, sectorCode2) < 0 &&
     get(_s1, industryCode1) == get(_s1, industryCode2) && get(_s1, industryCode1) > 0
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 && !((get(_s1, res) > 0 && get(_s2, res) < 0) || (get(_s1, res) < 0 && get(_s2, res) > 0) || (get(_s1, res) == 0 && get(_s2, res) == 0))
+ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 &&
+    !((get(_s1, res) > 0 && get(_s2, res) < 0) || (get(_s1, res) < 0 && get(_s2, res) > 0) || (get(_s1, res) == 0 &&
+    get(_s2, res) == 0))
 {
     var fiscalRes: Int 
     if (fiscalQuarter1 > fiscalQuarter2) {
@@ -67,7 +69,8 @@ requires exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> &&
     get(_s1, fiscalQuarter1) == get(_s1, fiscalQuarter2) && get(_s2, fiscalQuarter1) == get(_s2, fiscalQuarter2) &&
     get(_s1, sectorCode1) > 0 && get(_s1, sectorCode2) < 0 && get(_s2, sectorCode2) == get(_s1, sectorCode1) &&
     get(_s2, industryCode1) > 0 && get(_s2, industryCode2) < 0
-ensures exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 && (get(_s1, res) > 0 && get(_s2, res) > 0 && get(_s3, res) <= 0)
+ensures exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3
+    && (get(_s1, res) > 0 && get(_s2, res) > 0 && get(_s3, res) <= 0)
 {
     var fiscalRes: Int 
     if (fiscalQuarter1 > fiscalQuarter2) {
@@ -130,7 +133,8 @@ requires exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> &&
     get(_s1, sectorCode1) == 0 && get(_s1, sectorCode2) > 0 && get(_s2, sectorCode2) == get(_s2, sectorCode1) &&
     get(_s1, industryCode1) == get(_s1, industryCode2) && get(_s1, industryCode1) > 0 && get(_s2, industryCode2) > get(_s2, industryCode1)
 ensures exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 &&
-    (get(_s1, res) == 0 && !((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) || (get(_s2, res) == 0 && get(_s3, res) == 0)))
+    (get(_s1, res) == 0 && !((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) ||
+        (get(_s2, res) == 0 && get(_s3, res) == 0)))
 {
     var fiscalRes: Int 
     if (fiscalQuarter1 > fiscalQuarter2) {

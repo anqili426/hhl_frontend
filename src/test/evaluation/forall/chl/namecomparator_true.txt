@@ -1,7 +1,10 @@
 method compare1(name1: Int, name2: Int, priority1: Int, priority2: Int, priority3: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, name1) == get(_s2, name2) && get(_s1, name2) == get(_s2, name1)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, priority1) == get(_s2, priority1) && get(_s1, priority2) == get(_s2, priority2) && get(_s1, priority3) == get(_s2, priority3)
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, res) == -1 * get(_s2, res)
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+    get(_s1, name1) == get(_s2, name2) && get(_s1, name2) == get(_s2, name1)
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, priority1) == get(_s2, priority1) &&
+    get(_s1, priority2) == get(_s2, priority2) && get(_s1, priority3) == get(_s2, priority3)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+    get(_s1, res) == -1 * get(_s2, res)
 {
     if (name1 == name2) {
         res := 0
@@ -44,8 +47,10 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
 
 method compare2(name1: Int, name2: Int, priority1: Int, priority2: Int, priority3: Int, i: Int) returns (res: Int)
 requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
-                                                        (get(_s1, name1) == get(_s3, name1)) && (get(_s1, name2) == get(_s2, name1)) && (get(_s2, name2) == get(_s3, name2))
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, priority1) == get(_s2, priority1) && get(_s1, priority2) == get(_s2, priority2) && get(_s1, priority3) == get(_s2, priority3)
+            (get(_s1, name1) == get(_s3, name1)) && (get(_s1, name2) == get(_s2, name1)) &&
+            (get(_s2, name2) == get(_s3, name2))
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, priority1) == get(_s2, priority1) &&
+    get(_s1, priority2) == get(_s2, priority2) && get(_s1, priority3) == get(_s2, priority3)
 ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
         ((get(_s1, res) > 0 && get(_s2, res) > 0) ==> get(_s3, res) > 0)
 {
@@ -90,10 +95,13 @@ ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 
 method compare3(name1: Int, name2: Int, priority1: Int, priority2: Int, priority3: Int, i: Int) returns (res: Int)
 requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
-                                                        (get(_s1, name1) == get(_s3, name1)) && (get(_s1, name2) == get(_s2, name1)) && (get(_s2, name2) == get(_s3, name2))
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, priority1) == get(_s2, priority1) && get(_s1, priority2) == get(_s2, priority2) && get(_s1, priority3) == get(_s2, priority3)
+           (get(_s1, name1) == get(_s3, name1)) && (get(_s1, name2) == get(_s2, name1)) &&
+           (get(_s2, name2) == get(_s3, name2))
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, priority1) == get(_s2, priority1) &&
+            get(_s1, priority2) == get(_s2, priority2) && get(_s1, priority3) == get(_s2, priority3)
 ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
-        (get(_s1, res) == 0 ==> ((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) || (get(_s2, res) == 0 && get(_s3, res) == 0)))
+        (get(_s1, res) == 0 ==> ((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) ||
+            (get(_s2, res) == 0 && get(_s3, res) == 0)))
 {
     if (name1 == name2) {
         res := 0

@@ -843,7 +843,7 @@ object Generator {
       // Forall
       if (verifierOption == 0) vpr.Implies(inUnion, inS1OrS2)()
       // Exists
-      else if (verifierOption == 1) vpr.Implies(inS1OrS2, inUnion)()
+      else if (verifierOption == 1) vpr.Implies(inS1OrS2, inUnion)() // vpr.EqCmp(inS1OrS2, inUnion)()
       else vpr.EqCmp(inS1OrS2, inUnion)()
     }
 

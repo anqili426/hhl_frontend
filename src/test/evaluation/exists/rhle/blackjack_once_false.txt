@@ -14,7 +14,6 @@ ensures exists _s: State :: <_s> && get(_s, handValue_out) == 21
     use hint1(7)
     use hint1(8)
     use hint1(9)
-    use hint1(10) 
-    // use forall _i: Int :: _i >= 1 && _i <= 10 ==> hint1(_i)
+    use hint1(10)
     handValue_out := handValue_in + card
 }

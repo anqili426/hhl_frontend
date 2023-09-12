@@ -1,8 +1,13 @@
 // P1
 method compare1(containsKey1: Int, order1: Int, containsKey2: Int, order2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, containsKey1) == get(_s2, containsKey2) && get(_s1, order1) == get(_s2, order2) && get(_s1, containsKey2) == get(_s2, containsKey1) && get(_s1, order2) == get(_s2, order1)
-requires forall _s: State :: <_s> ==> (get(_s, containsKey1) == 1 || get(_s, containsKey1) == 0) && (get(_s, containsKey2) == 1 || get(_s, containsKey2) == 0)
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> ((get(_s1, res) > 0 && get(_s2, res) < 0) || (get(_s1, res) < 0 && get(_s2, res) > 0) || (get(_s1, res) == 0 && get(_s2, res) == 0))
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+    get(_s1, containsKey1) == get(_s2, containsKey2) && get(_s1, order1) == get(_s2, order2) &&
+    get(_s1, containsKey2) == get(_s2, containsKey1) && get(_s1, order2) == get(_s2, order1)
+requires forall _s: State :: <_s> ==> (get(_s, containsKey1) == 1 || get(_s, containsKey1) == 0) &&
+    (get(_s, containsKey2) == 1 || get(_s, containsKey2) == 0)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+    ((get(_s1, res) > 0 && get(_s2, res) < 0) || (get(_s1, res) < 0 && get(_s2, res) > 0) ||
+        (get(_s1, res) == 0 && get(_s2, res) == 0))
 {
     if (containsKey1 == 1 && containsKey2 == 1) {
         if (order1 < order2) {
@@ -21,9 +26,14 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
 
 // P2
 method compare2(containsKey1: Int, order1: Int, containsKey2: Int, order2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, containsKey1) == get(_s3, containsKey1) && get(_s1, order1) == get(_s3, order1) && get(_s2, containsKey2) == get(_s3, containsKey2) && get(_s2, order2) == get(_s3, order2) && get(_s1, containsKey2) == get(_s2, containsKey1) && get(_s1, order2) == get(_s2, order1)
-requires forall _s: State :: <_s> ==> (get(_s, containsKey1) == 1 || get(_s, containsKey1) == 0) && (get(_s, containsKey2) == 1 || get(_s, containsKey2) == 0)
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> (get(_s1, res) > 0 && get(_s2, res) > 0 ==> get(_s3, res) > 0)
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    get(_s1, containsKey1) == get(_s3, containsKey1) && get(_s1, order1) == get(_s3, order1) &&
+    get(_s2, containsKey2) == get(_s3, containsKey2) && get(_s2, order2) == get(_s3, order2) &&
+    get(_s1, containsKey2) == get(_s2, containsKey1) && get(_s1, order2) == get(_s2, order1)
+requires forall _s: State :: <_s> ==> (get(_s, containsKey1) == 1 || get(_s, containsKey1) == 0) &&
+    (get(_s, containsKey2) == 1 || get(_s, containsKey2) == 0)
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    (get(_s1, res) > 0 && get(_s2, res) > 0 ==> get(_s3, res) > 0)
 {
     if (containsKey1 == 1 && containsKey2 == 1) {
         if (order1 < order2) {
@@ -42,9 +52,15 @@ ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 
 // P3
 method compare3(containsKey1: Int, order1: Int, containsKey2: Int, order2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, containsKey1) == get(_s3, containsKey1) && get(_s1, order1) == get(_s3, order1) && get(_s2, containsKey2) == get(_s3, containsKey2) && get(_s2, order2) == get(_s3, order2) && get(_s1, containsKey2) == get(_s2, containsKey1) && get(_s1, order2) == get(_s2, order1)
-requires forall _s: State :: <_s> ==> (get(_s, containsKey1) == 1 || get(_s, containsKey1) == 0) && (get(_s, containsKey2) == 1 || get(_s, containsKey2) == 0)
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> (get(_s1, res) == 0 ==> ((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) || (get(_s2, res) == 0 && get(_s3, res) == 0)))
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    get(_s1, containsKey1) == get(_s3, containsKey1) && get(_s1, order1) == get(_s3, order1) &&
+    get(_s2, containsKey2) == get(_s3, containsKey2) && get(_s2, order2) == get(_s3, order2) &&
+    get(_s1, containsKey2) == get(_s2, containsKey1) && get(_s1, order2) == get(_s2, order1)
+requires forall _s: State :: <_s> ==> (get(_s, containsKey1) == 1 || get(_s, containsKey1) == 0) &&
+    (get(_s, containsKey2) == 1 || get(_s, containsKey2) == 0)
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    (get(_s1, res) == 0 ==> ((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) ||
+        (get(_s2, res) == 0 && get(_s3, res) == 0)))
 {
     if (containsKey1 == 1 && containsKey2 == 1) {
         if (order1 < order2) {

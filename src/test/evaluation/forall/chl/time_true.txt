@@ -1,7 +1,10 @@
 // P1
 method compare1(ora1: Int, voltot1: Int, ora2: Int, voltot2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, ora1) == get(_s2, ora2) && get(_s1, voltot1) == get(_s2, voltot2) && get(_s1, ora2) == get(_s2, ora1) && get(_s1, voltot2) == get(_s2, voltot1)
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, res) == -1 * get(_s2, res)
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+    get(_s1, ora1) == get(_s2, ora2) && get(_s1, voltot1) == get(_s2, voltot2) &&
+    get(_s1, ora2) == get(_s2, ora1) && get(_s1, voltot2) == get(_s2, voltot1)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+    get(_s1, res) == -1 * get(_s2, res)
 {
         if (ora1 == ora2) {
             res := 0
@@ -28,8 +31,12 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
 
 // P2
 method compare2(ora1: Int, voltot1: Int, ora2: Int, voltot2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, ora1) == get(_s3, ora1) && get(_s1, voltot1) == get(_s3, voltot1) && get(_s2, ora2) == get(_s3, ora2) && get(_s2, voltot2) == get(_s3, voltot2) && get(_s1, ora2) == get(_s2, ora1) && get(_s1, voltot2) == get(_s2, voltot1)
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> (get(_s1, res) > 0 && get(_s2, res) > 0 ==> get(_s3, res) > 0)
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    get(_s1, ora1) == get(_s3, ora1) && get(_s1, voltot1) == get(_s3, voltot1) &&
+    get(_s2, ora2) == get(_s3, ora2) && get(_s2, voltot2) == get(_s3, voltot2) &&
+    get(_s1, ora2) == get(_s2, ora1) && get(_s1, voltot2) == get(_s2, voltot1)
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    (get(_s1, res) > 0 && get(_s2, res) > 0 ==> get(_s3, res) > 0)
 {
        if (ora1 == ora2) {
             res := 0
@@ -56,8 +63,13 @@ ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 
 // P3
 method compare3(ora1: Int, voltot1: Int, ora2: Int, voltot2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, ora1) == get(_s3, ora1) && get(_s1, voltot1) == get(_s3, voltot1) && get(_s2, ora2) == get(_s3, ora2) && get(_s2, voltot2) == get(_s3, voltot2) && get(_s1, ora2) == get(_s2, ora1) && get(_s1, voltot2) == get(_s2, voltot1)
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> (get(_s1, res) == 0 ==> ((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) || (get(_s2, res) == 0 && get(_s3, res) == 0)))
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    get(_s1, ora1) == get(_s3, ora1) && get(_s1, voltot1) == get(_s3, voltot1) &&
+    get(_s2, ora2) == get(_s3, ora2) && get(_s2, voltot2) == get(_s3, voltot2) &&
+    get(_s1, ora2) == get(_s2, ora1) && get(_s1, voltot2) == get(_s2, voltot1)
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    (get(_s1, res) == 0 ==> ((get(_s2, res) > 0 && get(_s3, res) > 0) ||
+        (get(_s2, res) < 0 && get(_s3, res) < 0) || (get(_s2, res) == 0 && get(_s3, res) == 0)))
 {
         if (ora1 == ora2) {
             res := 0

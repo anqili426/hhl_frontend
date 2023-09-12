@@ -6,7 +6,9 @@ requires exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> &&
                  get(_s1, containsKey2) == get(_s2, containsKey1) && get(_s1, order2) == get(_s2, order1) &&
                  get(_s1, containsKey1) == 1 && get(_s1, containsKey2) == 0 && get(_s2, containsKey2) == 1 &&
                  get(_s3, order1) > get(_s3, order2)
-ensures exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 && (get(_s1, res) == 0 && !((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) || (get(_s2, res) == 0 && get(_s3, res) == 0)))
+ensures exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 &&
+                (get(_s1, res) == 0 && !((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) ||
+                (get(_s2, res) == 0 && get(_s3, res) == 0)))
 {
     if (containsKey1 == 1 && containsKey2 == 1) {
         if (order1 < order2) {

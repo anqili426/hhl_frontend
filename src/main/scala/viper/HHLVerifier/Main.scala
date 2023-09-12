@@ -25,7 +25,6 @@ object Main {
     val program = programSource.mkString
     programSource.close()
 
-    // val outputPath = if (args.length <= 1) "unspecified" else args(1)
     val outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
     if (args.contains("--inline")) Generator.inline = true
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
@@ -73,7 +72,7 @@ object Main {
           val verifyRes = silicon.verify(viperProgram)
           silicon.stop()
           val t1 = System.nanoTime()
-          runtime = t1 - t0
+          runtime = (t1 - t0) / 10E9
 
           verifyRes match {
             case Success =>
