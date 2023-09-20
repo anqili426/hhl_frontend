@@ -9,12 +9,13 @@ import java.io.FileWriter
 
 object Main {
 
-  var verified = false
+  var verified = 0  // 0: unknown, 1: failure, 2: success
   var runtime = 0.0
   var test = false
 
   def main(args: Array[String]): Unit = {
 
+    verified = 0
     if (args.length == 0) {
       println("Please provide the program to verify. ")
       sys.exit(1)
@@ -63,7 +64,7 @@ object Main {
         val consistencyErrors = viperProgram.checkTransitively
         //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
         if (consistencyErrors.nonEmpty) {
-          verified = false
+          verified = 1
           consistencyErrors.foreach(err => printMsg(err.readableMessage))
         } else {
           printMsg("Translated program is being verified by Viper. ")
@@ -76,10 +77,10 @@ object Main {
 
           verifyRes match {
             case Success =>
-              verified = true
+              verified = 2
               printMsg("Verification succeeded")
             case Failure(err) =>
-              verified = false
+              verified = 1
               printMsg("Verification failed")
               err.foreach(e => printMsg(e.readableMessage))
 
@@ -92,7 +93,7 @@ object Main {
       }
     } catch {
       case e: VerifierException =>
-        verified = false
+        verified = 1
         printMsg(e.errMsg)
     }
   }

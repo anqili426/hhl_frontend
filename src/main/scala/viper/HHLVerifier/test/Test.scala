@@ -74,7 +74,7 @@ object Test {
       }
     }
 
-    val actualLOC = allNonemptyLines.length - commentLOC
+    val actualLOC = allNonemptyLines.length - commentLOC - specLOC - proofLOC
     Array(actualLOC, specLOC, proofLOC)
   }
 
@@ -92,7 +92,7 @@ object Test {
       totalRuntime = totalRuntime + Main.runtime
 
       var res = "Failed"
-      if ((!f.getName.endsWith("false.txt") && !Main.verified) || (f.getName.endsWith("false.txt") && Main.verified)) {
+      if ((!f.getName.endsWith("false.txt") && Main.verified != 2) || (f.getName.endsWith("false.txt") && Main.verified != 1)) {
         println(" Failed")
         if (option == "forall") failedForAll = failedForAll :+ f.getPath
         else if (option == "exists") failedExists = failedExists :+ f.getPath
@@ -117,9 +117,8 @@ object Test {
     println("Evaluation starts")
 
     var allTestData: List[Array[String]] = List.empty
-    // allTestData = allTestData ++ runTests(forAllTests, "forall")
-    allTestData = allTestData ++ runTests(existsTests, "exists")
-
+    allTestData = allTestData ++ runTests(forAllTests, "forall")
+    // allTestData = allTestData ++ runTests(existsTests, "exists")
     val failedNum = failedForAll.length + failedExists.length
     println("---------------------")
     println("Total: " + totalNum)
@@ -135,7 +134,7 @@ object Test {
     val outputFilePath  = "src/test/evaluation/output.csv"
     val outputFile = new BufferedWriter(new FileWriter(outputFilePath))
     val csvWriter = new CSVWriter(outputFile)
-    val schema = Array("Test case name", "Option", "Runtime (s)", "Test result", "Total LOC", "Spec LOC", "Proof LOC")
+    val schema = Array("Test case name", "Option", "Runtime (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC")
     val dataToWrite = List(schema) ++ allTestData
     csvWriter.writeAll(dataToWrite.map(_.toArray).asJava)
     outputFile.close()

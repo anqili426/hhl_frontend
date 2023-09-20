@@ -1,8 +1,11 @@
 // P1
 method compare1(value1: Int, cost1: Int, value2: Int, cost2: Int, i: Int, target: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, value1) == get(_s2, value2) && get(_s1, cost1) == get(_s2, cost2) && get(_s1, value2) == get(_s2, value1) && get(_s1, cost2) == get(_s2, cost1)
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+    get(_s1, value1) == get(_s2, value2) && get(_s1, cost1) == get(_s2, cost2) &&
+    get(_s1, value2) == get(_s2, value1) && get(_s1, cost2) == get(_s2, cost1)
 requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, target) == get(_s2, target)
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==> get(_s1, res) == -1 * get(_s2, res)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 ==>
+    get(_s1, res) == -1 * get(_s2, res)
 {
     var comp1: Int 
     var abscomp1: Int
@@ -68,9 +71,13 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
 // P2
 // Verification doesn't terminate
 method compare2(value1: Int, cost1: Int, value2: Int, cost2: Int, i: Int, target: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, value1) == get(_s3, value1) && get(_s1, cost1) == get(_s3, cost1) && get(_s2, value2) == get(_s3, value2) && get(_s2, cost2) == get(_s3, cost2) && get(_s1, value2) == get(_s2, value1) && get(_s1, cost2) == get(_s2, cost1)
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    get(_s1, value1) == get(_s3, value1) && get(_s1, cost1) == get(_s3, cost1) &&
+    get(_s2, value2) == get(_s3, value2) && get(_s2, cost2) == get(_s3, cost2) &&
+    get(_s1, value2) == get(_s2, value1) && get(_s1, cost2) == get(_s2, cost1)
 requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, target) == get(_s2, target)
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> (get(_s1, res) > 0 && get(_s2, res) > 0 ==> get(_s3, res) > 0)
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    (get(_s1, res) > 0 && get(_s2, res) > 0 ==> get(_s3, res) > 0)
 {
     var comp1: Int 
     var abscomp1: Int
@@ -136,9 +143,14 @@ ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 // P3
 // Verification doesn't terminate
 method compare3(value1: Int, cost1: Int, value2: Int, cost2: Int, i: Int, target: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> get(_s1, value1) == get(_s3, value1) && get(_s1, cost1) == get(_s3, cost1) && get(_s2, value2) == get(_s3, value2) && get(_s2, cost2) == get(_s3, cost2) && get(_s1, value2) == get(_s2, value1) && get(_s1, cost2) == get(_s2, cost1)
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    get(_s1, value1) == get(_s3, value1) && get(_s1, cost1) == get(_s3, cost1) &&
+    get(_s2, value2) == get(_s3, value2) && get(_s2, cost2) == get(_s3, cost2) &&
+    get(_s1, value2) == get(_s2, value1) && get(_s1, cost2) == get(_s2, cost1)
 requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> get(_s1, target) == get(_s2, target)
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==> (get(_s1, res) == 0 ==> ((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) || (get(_s2, res) == 0 && get(_s3, res) == 0)))
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s3, i) == 3 ==>
+    (get(_s1, res) == 0 ==> ((get(_s2, res) > 0 && get(_s3, res) > 0) || (get(_s2, res) < 0 && get(_s3, res) < 0) ||
+        (get(_s2, res) == 0 && get(_s3, res) == 0)))
 {
     var comp1: Int 
     var abscomp1: Int
