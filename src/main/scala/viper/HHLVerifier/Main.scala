@@ -72,7 +72,7 @@ object Main {
           val verifyRes = silicon.verify(viperProgram)
           silicon.stop()
           val t1 = System.nanoTime()
-          runtime = (t1 - t0) / 10E9
+          runtime = (t1 - t0) / 1E9
 
           verifyRes match {
             case Success =>

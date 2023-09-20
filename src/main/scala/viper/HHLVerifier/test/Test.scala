@@ -16,12 +16,13 @@ object Test {
 
   val specKeyword = List("requires", "ensures")
   val proofKeyword = List("use", "hyperAssert", "hyperAssume", "declare", "reuse", "let", "invariant", "frame")
-  val otherKeyword = List("assume", "assert", "while", "if", "else", "}", "{", "havoc", "//", "/*")
+  val otherKeyword = List("assume", "assert", "while", "if", "else", "}", "{", "havoc")
+  val commentKeyword = List("//", "/*") // The current implementation doesn't support the counting of block comments
 
   def partOfCurrStmt(lineInd: Int, allNonemptyLines: Array[String]): Boolean = {
 
     val line = allNonemptyLines(lineInd).trim
-    val allKeywords = specKeyword ++ proofKeyword ++ otherKeyword
+    val allKeywords = specKeyword ++ proofKeyword ++ otherKeyword ++ commentKeyword
 
     if (allKeywords.exists(k => line.startsWith(k))) {
       return false
@@ -42,7 +43,7 @@ object Test {
     val allLines = program.split("\n")
     val allNonemptyLines = allLines.filter(l => l.trim.nonEmpty)
 
-    val totalLOC = allLines.length
+    var commentLOC = 0
     var specLOC = 0
     var proofLOC = 0
     var i = 0
@@ -66,10 +67,15 @@ object Test {
         }
         i = nextLineInd
       } else {
+        if (commentKeyword.exists(k => line.startsWith(k))) {
+          commentLOC = commentLOC + 1
+        }
         i = i + 1
       }
     }
-    Array(totalLOC, specLOC, proofLOC)
+
+    val actualLOC = allNonemptyLines.length - commentLOC
+    Array(actualLOC, specLOC, proofLOC)
   }
 
   def runTests(tests: List[File], option: String): List[Array[String]] = {
@@ -111,8 +117,8 @@ object Test {
     println("Evaluation starts")
 
     var allTestData: List[Array[String]] = List.empty
-    allTestData = allTestData ++ runTests(forAllTests, "forall")
-    // allTestData = allTestData ++ runTests(existsTests, "exists")
+    // allTestData = allTestData ++ runTests(forAllTests, "forall")
+    allTestData = allTestData ++ runTests(existsTests, "exists")
 
     val failedNum = failedForAll.length + failedExists.length
     println("---------------------")
@@ -126,7 +132,7 @@ object Test {
     }
     println("Runtime: " + totalRuntime + " s")
 
-    val outputFilePath  = "src/test/evaluation/output1.csv"
+    val outputFilePath  = "src/test/evaluation/output.csv"
     val outputFile = new BufferedWriter(new FileWriter(outputFilePath))
     val csvWriter = new CSVWriter(outputFile)
     val schema = Array("Test case name", "Option", "Runtime (s)", "Test result", "Total LOC", "Spec LOC", "Proof LOC")

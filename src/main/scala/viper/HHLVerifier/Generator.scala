@@ -840,11 +840,13 @@ object Generator {
         getInSetApp(Seq(sVar.localVar, S2Var.localVar))
       )()
       val inUnion = getInSetApp(Seq(sVar.localVar, getSetUnionApp(Seq(S1Var.localVar, S2Var.localVar))))
-      // Forall
-      if (verifierOption == 0) vpr.Implies(inUnion, inS1OrS2)()
-      // Exists
-      else if (verifierOption == 1) vpr.Implies(inS1OrS2, inUnion)() // vpr.EqCmp(inS1OrS2, inUnion)()
-      else vpr.EqCmp(inS1OrS2, inUnion)()
+      // By running experiments, we have found out that using "==" in the axiom here speeds up verification
+//      // Forall
+//      if (verifierOption == 0)  vpr.Implies(inUnion, inS1OrS2)()
+//      // Exists
+//      else if (verifierOption == 1)  vpr.Implies(inS1OrS2, inUnion)()
+//      else vpr.EqCmp(inS1OrS2, inUnion)()
+      vpr.EqCmp(inS1OrS2, inUnion)()
     }
 
     val setStateDomain = vpr.Domain(
