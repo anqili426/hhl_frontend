@@ -56,6 +56,7 @@ object Generator {
 
   var verifierOption = 0 // 0: forall 1: exists 2: both
   var inline = false  // true: verification of the loop invariant will be inline
+  var frame = true // true: automatic framing is enabled
 
   // This variable is used when translating declarations of proof variables
   // When set to true, use an alias for the proof variable referred to by currProofVar
@@ -504,10 +505,11 @@ object Generator {
                 )()
               }
             }
-            val frameUnmodifiedVarsStmt = translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars, typVarMap)
+            val frameUnmodifiedVarsStmt = if (!frame) Seq.empty else Seq(translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars, typVarMap))
 
             // Let currStates == S0 before the loop
             val S0 = vpr.FuncApp(getSkFuncName, Seq(zero))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
+            // TODO: move it to a different place, causes bug when inlined
             val defineS0 = if (verifierOption == 1) Seq(vpr.Inhale(vpr.EqCmp(currStates, S0)())()) else Seq.empty
 
             // Let currStates be a union of Sk's
@@ -548,7 +550,7 @@ object Generator {
 
             //  Assume !cond
             val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates)
-            newStmts =  Seq(assertI0) ++ invVerificationStmts ++ defineS0 ++ Seq(havocSTmp, frameUnmodifiedVarsStmt) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates) ++ notCond._1
+            newStmts =  Seq(assertI0) ++ invVerificationStmts ++ defineS0 ++ Seq(havocSTmp) ++ frameUnmodifiedVarsStmt ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates) ++ notCond._1
             (newStmts, invVerificationVars)
 
         case FrameStmt(f, body) =>

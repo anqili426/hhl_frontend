@@ -27,6 +27,7 @@ object Main {
     programSource.close()
 
     val outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
+    if (args.contains("--noframe")) Generator.frame = false
     if (args.contains("--inline")) Generator.inline = true
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
