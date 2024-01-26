@@ -11,12 +11,17 @@ object Generator {
   // SetState domain
   val setStateDomainName = "SetState"
   val inSetFuncName = "in_set"
+  val inSetForAllFuncName = "in_set_forall"
+  val inSetExistsFuncName = "in_set_exists"
   val setUnionFuncName = "set_union"
 
   val funcToDomainNameMap = Map(equalFuncName -> stateDomainName,
                                 getFuncName -> stateDomainName,
                                 inSetFuncName -> setStateDomainName,
-                                setUnionFuncName -> setStateDomainName)
+                                inSetForAllFuncName -> setStateDomainName,
+                                inSetExistsFuncName -> setStateDomainName,
+                                setUnionFuncName -> setStateDomainName
+                                )
 
   val havocSetMethodName = "havocSet"
   val havocIntMethodName = "havocInt"
@@ -116,6 +121,15 @@ object Generator {
       )()
     )()
     )()
+    // The following statement assumes in_set_forall == in_set_exists for all states in S
+    val inSetEq = vpr.Inhale(vpr.Forall(
+      Seq(state),
+      Seq.empty,
+      vpr.EqCmp(getInSetApp(Seq(state.localVar, inputStates.localVar), typVarMap),
+        getInSetApp(Seq(state.localVar, inputStates.localVar), typVarMap, false)
+      )()
+      )()
+    )()
 
     // Arguments of the input method
     val args = method.args.map(a => vpr.LocalVarDecl(a.name, translateType(a.typ, typVarMap))())
@@ -166,7 +180,7 @@ object Generator {
     val nonIntAuxVars = Seq(tempStates, tempFailedStates, failedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
     val localVars = progVarDecls ++ auxiliaryVarDecls ++ nonIntAuxVars
 
-    val methodBody = Seq(currStatesAssignment) ++ assignToVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
+    val methodBody = Seq(inSetEq, currStatesAssignment) ++ assignToVars ++ Seq(assumeSFailEmpty) ++ translatedContent._1
     val thisMethod = vpr.Method(method.mName, translatedArgs, ret :+ outputStates, pres, posts, Some(vpr.Seqn(methodBody, localVars)()))()
     allMethods = allMethods :+ thisMethod
   }
@@ -249,9 +263,9 @@ object Generator {
           if (verifierOption != 0) {
             // Exists
             // Assume forall s: State :: in_set(s, S) && expLeft ==> in_set(s, S_tmp)
-            val expRight = getInSetApp(Seq(state, STmp), typVarMap)
+            val expRight = getInSetApp(Seq(state, STmp), typVarMap, useForAll=false)
             val expLeft = translateExp(e, state, currStates)
-            existsNewStmts = Seq(translateAssumeWithViperExpr(state, currStates, expRight, typVarMap, expLeft))
+            existsNewStmts = Seq(translateAssumeWithViperExpr(state, currStates, expRight, typVarMap, expLeft, useForAll=false))
           }
 
           newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
@@ -273,12 +287,12 @@ object Generator {
             }
             if (verifierOption != 0) {
               // Exists
-              val exp1Right = getInSetApp(Seq(state, STmp), typVarMap)
+              val exp1Right = getInSetApp(Seq(state, STmp), typVarMap, false)
               val exp1Left = translateExp(e, state, currStates)
-              val exp2Right = getInSetApp(Seq(state, tempFailedStates.localVar), typVarMap)
+              val exp2Right = getInSetApp(Seq(state, tempFailedStates.localVar), typVarMap, false)
               val exp2Left = translateExp(UnaryExpr("!", e), state, currStates)
-              val stmt1 = translateAssumeWithViperExpr(state, currStates, exp1Right, typVarMap, exp1Left)
-              val stmt2 = translateAssumeWithViperExpr(state, currStates, exp2Right, typVarMap, exp2Left)
+              val stmt1 = translateAssumeWithViperExpr(state, currStates, exp1Right, typVarMap, exp1Left, useForAll=false)
+              val stmt2 = translateAssumeWithViperExpr(state, currStates, exp2Right, typVarMap, exp2Left, useForAll=false)
               existsNewStmts = Seq(stmt1, stmt2)
             }
             newStmts = Seq(havocSTmp, havocSFailTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateSFail, updateProgStates)
@@ -305,7 +319,7 @@ object Generator {
             if (verifierOption != 0) {
               // Exists
               val exp = vpr.EqCmp(translateExp(left, s1, STmp), translateExp(right, state, currStates))()
-              val stmt = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap, exp)
+              val stmt = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap, exp, useForAll=false)
               existsNewStmts = Seq(stmt)
             }
             newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
@@ -317,7 +331,7 @@ object Generator {
             val s1 = vpr.LocalVar(s1VarName, state.typ)()
             val k = vpr.LocalVarDecl(intVarName, vpr.Int)()
             val triggers = if (hintDecl.isEmpty) Seq.empty
-            else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, k.localVar), getInSetApp(Seq(state, currStates), typVarMap)))())
+            else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, k.localVar), getInSetApp(Seq(state, currStates), typVarMap, false)))())
 
             if (verifierOption != 1) {
               // ForAll
@@ -325,9 +339,9 @@ object Generator {
             }
             if (verifierOption != 0) {
               // Exits
-              val stmt1 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap)
+              val stmt1 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap, useForAll=false)
               val stmt2 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap,
-                vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), k.localVar)(), k, triggers = triggers)
+                vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), k.localVar)(), k, triggers = triggers, false)
               existsNewStmts = Seq(stmt1, stmt2)
             }
             newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
@@ -385,11 +399,11 @@ object Generator {
               }
               if (verifierOption != 0) {
                 setFlagForIf = setFlagForIf :+ vpr.Inhale(vpr.Forall(Seq(stateDecl), Seq.empty,
-                  vpr.Implies(getInSetApp(Seq(state, ifBlockStates), typVarMap),
+                  vpr.Implies(getInSetApp(Seq(state, ifBlockStates), typVarMap, false),
                     vpr.EqCmp(getGetApp(Seq(state, isIfBlockVpr), typVarMap), one)()
                   )())())()
                 setFlagForElse = setFlagForElse :+ vpr.Inhale(vpr.Forall(Seq(stateDecl), Seq.empty,
-                  vpr.Implies(getInSetApp(Seq(state, elseBlockStates), typVarMap),
+                  vpr.Implies(getInSetApp(Seq(state, elseBlockStates), typVarMap, false),
                     vpr.EqCmp(getGetApp(Seq(state, isIfBlockVpr), typVarMap), zero)()
                   )())())()
               }
@@ -423,8 +437,8 @@ object Generator {
                 resumeElseBlockStates = resumeElseBlockStates :+
                   vpr.Inhale(
                     vpr.Forall(Seq(stateDecl), Seq.empty,
-                      vpr.Implies(getInSetApp(Seq(state, STmp), typVarMap),
-                        vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
+                      vpr.Implies(getInSetApp(Seq(state, STmp), typVarMap, false),
+                        vpr.And(getInSetApp(Seq(state, currStates), typVarMap, false),
                           vpr.EqCmp(getGetApp(Seq(state, isIfBlockVpr), typVarMap),
                             zero)())())())()
                   )()
@@ -476,36 +490,16 @@ object Generator {
               invVerificationVars = invVerification._2
             }
 
-            // Frame all program variables that are not modified in the loop body
-            val s_prime = vpr.LocalVarDecl(if (verifierOption == 0) s0VarName else s1VarName, state.typ)()
-            val vVar = vpr.LocalVarDecl("progVar", vpr.Int)()
-            val frameUnmodifiedVars = {
-              if (body.modifiedProgVars.isEmpty) {
-                vpr.Exists(Seq(s_prime), Seq.empty,
-                  vpr.And(getInSetApp(Seq(s_prime.localVar, currStates), typVarMap),
-                    vpr.Forall(Seq(vVar), Seq.empty,
-                        vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
-                          getGetApp(Seq(state, vVar.localVar), typVarMap))()
-                    )()
-                  )()
-                )()
-              } else {
-                // varsModifiedByLoop is guanranteed to be non-empty
-                val varsModifiedByLoop = body.modifiedProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
-                vpr.Exists(Seq(s_prime), Seq.empty,
-                  vpr.And(getInSetApp(Seq(s_prime.localVar, currStates), typVarMap),
-                    vpr.Forall(Seq(vVar), Seq.empty,
-                      vpr.Implies(
-                        getAndOfExps(varsModifiedByLoop.map(t => vpr.NeCmp(vVar.localVar, t)()).toList),
-                        vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
-                          getGetApp(Seq(state, vVar.localVar), typVarMap))()
-                      )()
-                    )()
-                  )()
-                )()
-              }
+            val frameUnmodifiedVarsStmt = if (!frame) Seq.empty else {
+              var res : Seq[vpr.Stmt] = Seq.empty
+              if (verifierOption != 1)
+                // ForAll
+                res = res :+ translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars(body, state, currStates, typVarMap, true), typVarMap)
+              if (verifierOption != 0)
+                // Exists
+                res = res :+ translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars(body, state, currStates, typVarMap, false), typVarMap, useForAll = false)
+              res
             }
-            val frameUnmodifiedVarsStmt = if (!frame) Seq.empty else Seq(translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars, typVarMap))
 
             // Let currStates == S0 before the loop
             val S0 = vpr.FuncApp(getSkFuncName, Seq(zero))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
@@ -543,8 +537,8 @@ object Generator {
                                         getAllInvariants(inv, getSkFuncApp))())())(),
                                     vpr.Inhale(vpr.Forall(Seq(stateDecl, k), Seq.empty,
                                       vpr.Implies(vpr.And(vpr.GeCmp(k.localVar, zero)(),
-                                        getInSetApp(Seq(state, getSkFuncApp), typVarMap))(),
-                                        getInSetApp(Seq(state, STmp), typVarMap))())())()
+                                        getInSetApp(Seq(state, getSkFuncApp), typVarMap, false))(),
+                                        getInSetApp(Seq(state, STmp), typVarMap, false))())())()
                                   )
             }
 
@@ -563,6 +557,35 @@ object Generator {
         case UseHintStmt(hint) =>
           newStmts = Seq(vpr.Inhale(translateExp(hint, state, currStates))())
           (newStmts, Seq.empty)
+      }
+    }
+
+    def frameUnmodifiedVars(body: CompositeStmt, state: vpr.LocalVar, currStates: vpr.Exp, typVarMap: Map[vpr.TypeVar, vpr.Type], useForAll: Boolean): vpr.Exp = {
+      val s_prime = vpr.LocalVarDecl(if (verifierOption == 0) s0VarName else s1VarName, state.typ)()
+      val vVar = vpr.LocalVarDecl("progVar", vpr.Int)()
+      if (body.modifiedProgVars.isEmpty) {
+        vpr.Exists(Seq(s_prime), Seq.empty,
+          vpr.And(getInSetApp(Seq(s_prime.localVar, currStates), typVarMap, useForAll),
+            vpr.Forall(Seq(vVar), Seq.empty,
+              vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
+                getGetApp(Seq(state, vVar.localVar), typVarMap))()
+            )()
+          )()
+        )()
+      } else {
+        // varsModifiedByLoop is guaranteed to be non-empty
+        val varsModifiedByLoop = body.modifiedProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
+        vpr.Exists(Seq(s_prime), Seq.empty,
+          vpr.And(getInSetApp(Seq(s_prime.localVar, currStates), typVarMap, useForAll),
+            vpr.Forall(Seq(vVar), Seq.empty,
+              vpr.Implies(
+                getAndOfExps(varsModifiedByLoop.map(t => vpr.NeCmp(vVar.localVar, t)()).toList),
+                vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
+                  getGetApp(Seq(state, vVar.localVar), typVarMap))()
+              )()
+            )()
+          )()
+        )()
       }
     }
 
@@ -692,9 +715,9 @@ object Generator {
         case GetValExpr(s, id) =>
           val stateVar = translateExp(s, state, currStates)
           translateExp(id, stateVar.asInstanceOf[vpr.LocalVar], currStates)
-        case StateExistsExpr(s) =>
+        case se@StateExistsExpr(s) =>
           val translatedState = translateExp(s, state, currStates)
-          getInSetApp(Seq(translatedState, currStates), typVarMap)
+          getInSetApp(Seq(translatedState, currStates), typVarMap, !se.useForAll)
         case LoopIndex() => currLoopIndex
         case pv@ProofVar(name) =>
           if (useAliasForProofVar && currProofVarName==name) getAliasForProofVar(pv, typVarMap).localVar
@@ -740,20 +763,20 @@ object Generator {
   // This returns a Viper assume statement that expresses the following:
   // assume forall stateVar :: in_set(state1, S1) ==> (exists state2 :: in_set(state2, S2) && equal_on_everything_except(state1, state2, varToHavoc) && extraExp)
   def translateHavocVarHelper(S1: vpr.LocalVar, S2: vpr.LocalVar, state1: vpr.LocalVar, state2: vpr.LocalVar,
-                              varToHavoc: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type], extraExp: vpr.Exp = null, extraVar: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty) : vpr.Inhale = {
-    var itemsInExistsExpr: Seq[vpr.Exp] = Seq(getInSetApp(Seq(state2, S2), typVarMap),
+                              varToHavoc: vpr.LocalVarDecl, typVarMap: Map[vpr.TypeVar, vpr.Type], extraExp: vpr.Exp = null, extraVar: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty, useForAll: Boolean = true) : vpr.Inhale = {
+    var itemsInExistsExpr: Seq[vpr.Exp] = Seq(getInSetApp(Seq(state2, S2), typVarMap, useForAll),
                                               getEqualExceptApp(Seq(state1, state2, varToHavoc.localVar), typVarMap))
     if (extraExp != null) itemsInExistsExpr = itemsInExistsExpr :+ extraExp
     val existsExpr = vpr.Exists(Seq(vpr.LocalVarDecl(state2.name, state2.typ)()), Seq.empty, getAndOfExps(itemsInExistsExpr))()
-    translateAssumeWithViperExpr(state1, S1, existsExpr, typVarMap, extraVarDecl=extraVar, triggers=triggers)
+    translateAssumeWithViperExpr(state1, S1, existsExpr, typVarMap, extraVarDecl=extraVar, triggers=triggers, useForAll=useForAll)
   }
 
   // This returns a Viper assume statement of the form "assume forall state (, extraVar) :: in_set(state, S) (&& leftExp) => (rightExp)"
   // T is determined by the typVarMap(T -> someType)
   def translateAssumeWithViperExpr(state: vpr.LocalVar, S: vpr.LocalVar, rightExp: vpr.Exp,
-                                   typVarMap: Map[vpr.TypeVar, vpr.Type], leftExp: vpr.Exp = null, extraVarDecl: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty) : vpr.Inhale = {
+                                   typVarMap: Map[vpr.TypeVar, vpr.Type], leftExp: vpr.Exp = null, extraVarDecl: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty, useForAll: Boolean = true) : vpr.Inhale = {
     val lhs = {
-      val inSetExp = getInSetApp(Seq(state, S), typVarMap)
+      val inSetExp = getInSetApp(Seq(state, S), typVarMap, useForAll)
       if (leftExp != null) vpr.And(inSetExp, leftExp)()
       else inSetExp
     }
@@ -837,10 +860,10 @@ object Generator {
       Option.empty
     )()
 
-    val setUnionAxiomBody = {
+    val setUnionForallAxiomBody = {
       val inS1OrS2 = vpr.Or(getInSetApp(Seq(sVar.localVar, S1Var.localVar)),
-        getInSetApp(Seq(sVar.localVar, S2Var.localVar))
-      )()
+          getInSetApp(Seq(sVar.localVar, S2Var.localVar))
+        )()
       val inUnion = getInSetApp(Seq(sVar.localVar, getSetUnionApp(Seq(S1Var.localVar, S2Var.localVar))))
       // By running experiments, we have found out that using "==" in the axiom here speeds up verification
 //      // Forall
@@ -848,6 +871,14 @@ object Generator {
 //      // Exists
 //      else if (verifierOption == 1)  vpr.Implies(inS1OrS2, inUnion)()
 //      else vpr.EqCmp(inS1OrS2, inUnion)()
+       vpr.EqCmp(inS1OrS2, inUnion)()
+    }
+
+    val setUnionExistsAxiomBody = {
+      val inS1OrS2 = vpr.Or(getInSetApp(Seq(sVar.localVar, S1Var.localVar), useForAll=false),
+        getInSetApp(Seq(sVar.localVar, S2Var.localVar), useForAll=false)
+      )()
+      val inUnion = getInSetApp(Seq(sVar.localVar, getSetUnionApp(Seq(S1Var.localVar, S2Var.localVar))), useForAll=false)
       vpr.EqCmp(inS1OrS2, inUnion)()
     }
 
@@ -855,20 +886,34 @@ object Generator {
       setStateDomainName,
       // Domain functions
       Seq(
-        vpr.DomainFunc(inSetFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
+        // vpr.DomainFunc(inSetFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
+        vpr.DomainFunc(inSetForAllFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
+        vpr.DomainFunc(inSetExistsFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
         vpr.DomainFunc(setUnionFuncName, Seq(S1Var, S2Var), setStateType)(domainName = setStateDomainName)
       ),
       // Domain axioms
       Seq(
         vpr.NamedDomainAxiom(
-          setUnionFuncName + "_def",
+          setUnionFuncName + "_forall_def",
           vpr.Forall(
             Seq(S1Var, S2Var),
             Seq(vpr.Trigger(Seq(getSetUnionApp(Seq(S1Var.localVar, S2Var.localVar))))()),
             vpr.Forall(
               Seq(sVar),
               Seq.empty,
-              setUnionAxiomBody
+              setUnionForallAxiomBody
+            )()
+          )()
+        )(domainName = setStateDomainName),
+        vpr.NamedDomainAxiom(
+          setUnionFuncName + "_exists_def",
+          vpr.Forall(
+            Seq(S1Var, S2Var),
+            Seq(vpr.Trigger(Seq(getSetUnionApp(Seq(S1Var.localVar, S2Var.localVar))))()),
+            vpr.Forall(
+              Seq(sVar),
+              Seq.empty,
+              setUnionExistsAxiomBody
             )()
           )()
         )(domainName = setStateDomainName)
@@ -908,8 +953,9 @@ object Generator {
     vpr.MethodCall(havocIntMethodName, Seq.empty, Seq(i))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
   }
 
-  def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {
-    getDomainFuncApp(inSetFuncName, args, vpr.Bool, typVarMap)
+  def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap, useForAll: Boolean = true): vpr.DomainFuncApp = {
+    if (useForAll) getDomainFuncApp(inSetForAllFuncName, args, vpr.Bool, typVarMap)
+    else getDomainFuncApp(inSetExistsFuncName, args, vpr.Bool, typVarMap)
   }
 
   def getSetUnionApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {

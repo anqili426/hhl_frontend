@@ -20,7 +20,11 @@ case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
 case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
-case class StateExistsExpr(state: SpecialId) extends Expr
+case class StateExistsExpr(state: SpecialId) extends Expr {
+  // When this is true, <_s> is translated to in_set_exists(_s, S) later
+  // Otherwise, it is translated to in_set_forall(_s, S)
+  var useForAll: Boolean = false
+}
 case class LoopIndex() extends Expr
 case class HintDecl(name: String) extends Expr
 case class Hint(name: String, arg: Expr) extends Expr

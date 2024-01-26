@@ -100,7 +100,7 @@ object TypeChecker {
 
   // hyperAssertionExpected is true if e is expected to be (part of) a hyper assertion
   // Returns true if e indeed is (or contains) a hyper assertion
-  def typeCheckExpr(e: Expr, hyperAssertionExpected: Boolean) : Boolean = {
+  def typeCheckExpr(e: Expr, hyperAssertionExpected: Boolean, polarity: Int = 1) : Boolean = {
     var res = true
     var isHyperAssertion = false
     e match {
@@ -109,8 +109,8 @@ object TypeChecker {
         if (currMethod.allVars.contains(id.name)) id.typ = currMethod.allVars.get(id.name).get
         else res = false
       case be@BinaryExpr(e1, op, e2) =>
-        val isHyperAssertionLeft = typeCheckExpr(e1, hyperAssertionExpected)
-        val isHyperAssertionRight = typeCheckExpr(e2, hyperAssertionExpected)
+        val isHyperAssertionLeft = typeCheckExpr(e1, hyperAssertionExpected, polarity)
+        val isHyperAssertionRight = typeCheckExpr(e2, hyperAssertionExpected, polarity)
         isHyperAssertion = isHyperAssertionLeft || isHyperAssertionRight
         val typeMatched = checkIfTypeMatch(e1.typ, e2.typ)
         res = res && typeMatched
@@ -125,11 +125,11 @@ object TypeChecker {
         } else res = false  // e1 & e2 have the same type, but their type is undefined for the binary operator
       case ue@UnaryExpr(op, e) =>
         if (op == "!") {
-          isHyperAssertion = typeCheckExpr(e, hyperAssertionExpected)
+          isHyperAssertion = typeCheckExpr(e, hyperAssertionExpected, polarity)
           res = checkIfTypeMatch(e.typ, boolType)
           ue.typ = boolType
         } else if (op == "-") {
-          typeCheckExpr(e, hyperAssertionExpected)
+          typeCheckExpr(e, hyperAssertionExpected, polarity)
           res = checkIfTypeMatch(e.typ, intType)
           ue.typ = intType
         }
@@ -145,8 +145,8 @@ object TypeChecker {
         vName.typ = vType
       // AssertVarDecl expression itself doesn't have a concrete type
       case ie@ImpliesExpr(left, right) =>
-        val isHyperAssertionLeft = typeCheckExpr(left, hyperAssertionExpected)
-        val isHyperAssertionRight = typeCheckExpr(right, hyperAssertionExpected)
+        val isHyperAssertionLeft = typeCheckExpr(left, hyperAssertionExpected, polarity * (-1))
+        val isHyperAssertionRight = typeCheckExpr(right, hyperAssertionExpected, polarity * 1)
         isHyperAssertion = isHyperAssertionLeft || isHyperAssertionRight
         res = checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
@@ -163,6 +163,7 @@ object TypeChecker {
         gve.typ = id.typ
       case se@StateExistsExpr(state) =>
         isHyperAssertion = true
+        se.useForAll = (polarity > 0)
         typeCheckExpr(state, hyperAssertionExpected)
         res = checkIfTypeMatch(state.typ, stateType)
         se.typ = boolType
