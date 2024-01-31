@@ -3,13 +3,13 @@ method GNI(h: Int, i: Int) returns (l_out: Int)
 {
         var y: Int
         havoc y {hint1}
-        use hint1(100)
+        use forall _s1: State, _s2: State :: <_s1> && <_s2> ==> hint1(get(_s2, h) + get(_s2, y) - get(_s1, h))
         l_out := h + y
 }
 
 method GNI_bad(h: Int, i: Int) returns (l_out: Int)
    requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 && get(_s1, h) < get(_s2, h)
-   ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 && (forall _s: State :: <_s> && (get(_s, h) == get(_s1, h)
+   ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2 && (forall _s: State :: (<_s> && (get(_s, h) == get(_s1, h))
     ==> get(_s, l_out) < get(_s2, l_out)))
 {
         var y: Int

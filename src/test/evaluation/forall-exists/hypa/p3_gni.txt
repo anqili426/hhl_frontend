@@ -1,0 +1,17 @@
+method p3_gni() returns (h: Int, o: Int)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> (exists _s3: State :: <_s3> && get(_s3, h) == get(_s2, h) && get(_s3, o) == get(_s1, o))
+{
+    havoc h {hint1}
+    var i: Int
+    havoc i {hint2}
+    assume 0 <= i && i <= 1
+    use hint2(1)
+    use hint2(0)
+    if (i > 0) {
+        o := 1
+    } else {
+        o := 2
+    }
+
+    use forall _s: State :: <_s> ==> hint1(get(_s, h))
+}
