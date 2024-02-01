@@ -606,6 +606,16 @@ object Generator {
       val InPlus1 = getAllInvariants(inv, outputStates.localVar)
 
       val tmpStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
+      val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+      // The following statement assumes in_set_forall == in_set_exists for all states in S
+      val inSetEq = vpr.Inhale(vpr.Forall(
+        Seq(state),
+        Seq.empty,
+        vpr.EqCmp(getInSetApp(Seq(state.localVar, inputStates.localVar), typVarMap),
+          getInSetApp(Seq(state.localVar, inputStates.localVar), typVarMap, false)
+        )()
+      )()
+      )()
       val assignToOutputStates = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
 
       // Translation of the loop body
@@ -626,7 +636,7 @@ object Generator {
       // Assume loop guard
       val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), outputStates.localVar)
 
-      val methodBody = Seq(assignToOutputStates) ++ assumeLoopGuard._1 ++ loopBody._1
+      val methodBody = Seq(inSetEq, assignToOutputStates) ++ assumeLoopGuard._1 ++ loopBody._1
 
       val thisMethod = vpr.Method(methodName,
           Seq(currLoopIndexDecl, inputStates) ++ allProgVarsInBodyDecl ++ nonAtomicProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)()),  // args

@@ -1,0 +1,12 @@
+// Not sure about the spec translation
+method smith(secret: Int, test: Int) returns (res: Int)
+ensures forall _s1: State :: <_s1>  ==>
+    (exists _s2: State :: <_s2> && (get(_s1, res) == get(_s2, res)) && get(_s2, secret) != get(_s1, secret))
+{
+   // why should this be invalid...?
+    if (secret % 2 == 0) {
+        res := 0
+    } else {
+        res := 1
+    }
+}

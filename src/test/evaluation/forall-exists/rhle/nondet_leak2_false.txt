@@ -1,0 +1,26 @@
+method leak(high: Int, low: Int) returns (res: Int)
+requires forall _s1: State :: <_s1> ==>
+    (exists _s2: State :: <_s2> && get(_s1, low) == get(_s2, low) && get(_s1, high) != get(_s2, high))
+ensures forall _s1: State :: <_s1> ==>
+    (exists _s2: State :: <_s2> && get(_s1, low) == get(_s2, low) && get(_s1, res) == get(_s2, res) && get(_s1, high) != get(_s2, high))
+{
+    var r: Int
+    havoc r {hint1}
+    assume r >= 0 && r < 10
+    use hint1(0)
+    use hint1(1)
+    use hint1(2)
+    use hint1(3)
+    use hint1(4)
+    use hint1(5)
+    use hint1(6)
+    use hint1(7)
+    use hint1(8)
+    use hint1(9)
+
+    if (r == 5) {
+        res := high + low
+    } else {
+        res := low
+    }
+}
