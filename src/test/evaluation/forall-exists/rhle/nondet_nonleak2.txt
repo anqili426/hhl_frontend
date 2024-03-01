@@ -11,7 +11,7 @@ ensures forall _s1: State :: <_s1> ==>
     assume coin == 0 || coin == 1
 
     if (coin == 0) {
-        res := high + low
+        res := 1 - low
     } else {
         res := low
     }

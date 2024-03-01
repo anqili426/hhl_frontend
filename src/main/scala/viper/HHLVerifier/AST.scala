@@ -18,12 +18,19 @@ case class BoolLit(value: Boolean) extends Expr
 case class BinaryExpr (e1: Expr, op: String, e2: Expr) extends Expr
 case class UnaryExpr (op: String, e: Expr) extends Expr
 case class ImpliesExpr(left: Expr, right: Expr) extends Expr
-case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr
+case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr {
+  var proForAll: Boolean = false
+  var topExists: Boolean = false
+  var triggers: Seq[Seq[StateExistsExpr]] = Seq.empty
+  var det: Boolean = false
+}
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
 case class StateExistsExpr(state: SpecialId) extends Expr {
-  // When this is true, <_s> is translated to in_set_exists(_s, S) later
-  // Otherwise, it is translated to in_set_forall(_s, S)
+  // When useForAll is true, <_s> is translated to in_set_forall(_s, S) later
+  // Otherwise, it is translated to in_set_exists(_s, S)
   var useForAll: Boolean = false
+  // When useLimited is true, <_s> is translated to in_set_exists_limited(_s, S) or in_set_forall_limited(_s, S)
+  var useLimited: Boolean = false
 }
 case class LoopIndex() extends Expr
 case class HintDecl(name: String) extends Expr

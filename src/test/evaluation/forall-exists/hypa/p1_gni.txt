@@ -1,3 +1,4 @@
+/*
 method p1_gni() returns (h: Int, o: Int)
 ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> (exists _s3: State :: <_s3> && get(_s3, h) == get(_s2, h) && get(_s3, o) == get(_s1, o))
 {
@@ -16,4 +17,35 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> (exists _s3: State :
     }
 
     use forall _s1: State, _s2: State :: <_s1> && <_s2> ==> hint1(get(_s2, h))
+}
+
+method p1_gni1() returns (h: Int, o: Int)
+{
+    o := 1
+    while (true) 
+    invariant forall _s1: State, _s2: State :: <_s1> && <_s2> ==> 
+            (exists _s3: State :: <_s3> && get(_s3, h) == get(_s2, h) && get(_s3, o) == get(_s1, o))
+    {
+        havoc h {hint1}
+
+        if (h > 0) {
+            o := -1 * o
+        } else {
+            o := -1 * o + (h - h)
+        }
+        o := -1
+        use forall _s1: State, _s2: State :: <_s1> && <_s2> ==> hint1(get(_s2, h))
+    }
+} */
+
+
+method test(h: Int, o: Int) returns (res: Int)
+requires forall _s1: State :: ((exists _s0: State :: <_s0> && 3 + 1 == 5) ==> (forall _s2: State :: <_s2> ==> true))
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==>
+                     (exists _s3: State :: <_s3> && get(_s3, h) == get(_s2, h) && get(_s3, o) == get(_s1, o))
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==>
+                    (exists _s3: State :: <_s3> && get(_s3, h) == get(_s2, h) && get(_s3, res) == get(_s1, res))
+ensures (exists _s0: State :: <_s0> && 3 + 1 == 5) ==> (forall _s2: State :: <_s2> ==> true)
+{
+    res := o
 }

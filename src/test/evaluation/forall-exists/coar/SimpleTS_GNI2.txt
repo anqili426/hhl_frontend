@@ -1,0 +1,17 @@
+method simpleTS_GNI2(low: Int, high: Int) returns (res: Int)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==>
+    (exists _s: State :: <_s> && get(_s, high) == get(_s1, high)
+                                && get(_s, res) == get(_s2, res)
+                                && get(_s, low) == get(_s2, low)
+    )
+{
+    var x: Int
+    x := high
+    var i: Int
+    havoc i
+    while (i > 0) {
+        x := x + 1
+        havoc i
+    }
+    res := x
+}

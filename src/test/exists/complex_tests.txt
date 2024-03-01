@@ -82,16 +82,15 @@ ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
                                     && get($s, x) > 0
     {
         // $s1 doesn't necessarily exist
-        let $s1: State :: <$s1> && get($s1, i) <= get($s1, x) && get($s1, x) == get($s, x)
-
+        let $b: Bool :: $b == (exists _s: State :: <_s> && get(_s, i) <= get(_s, x) && get(_s, x) == get($s, x))
+        let $s1: State :: $b ==> <$s1> && get($s1, i) <= get($s1, x) && get($s1, x) == get($s, x)
         while (i < x)
-        {hint7} invariant $n <= get($s1, x) - get($s1, i) ==> exists _s: State :: <_s> && get(_s, i) == $n + get($s1, i)
+        {hint7} invariant $b ==> ($n <= get($s1, x) - get($s1, i) ==> exists _s: State :: <_s> && get(_s, i) == $n + get($s1, i)
                                                                         && get(_s, i) <= get(_s, x)
-                                                                        && get(_s, x) == get($s1, x)
+                                                                        && get(_s, x) == get($s1, x))
         {
             i := i + 1
         }
-
         use hint7(get($s1, x) - get($s1, i))
         res := i
     }
@@ -99,6 +98,35 @@ ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
     use hint6(1)
 } */
 
+method nested_loops2(x: Int) returns (res: Int)
+requires exists _s: State :: <_s> && get(_s, x) > 0
+ensures exists _s: State :: <_s> && get(_s, res) == get(_s, x)
+{
+
+    let $s: State :: <$s> && get($s, x) > 0
+    res := 0
+    while (res < x)
+    {hint6} invariant $n <= 1 ==> exists _s: State:: <_s>
+                                    && get(_s, res) <= get(_s, x)
+                                    && get(_s, x) == get($s, x)
+                                    && get(_s, res) == $n * get(_s, x)
+                                    && get($s, x) > 0
+    {
+        let $b: Bool :: $b == (exists _s: State :: <_s> && get(_s, res) <= get(_s, x) && get(_s, x) == get($s, x))
+        let $s1: State :: $b ==> <$s1> && get($s1, res) <= get($s1, x) && get($s1, x) == get($s, x)
+        while (res < x)
+        {hint7} invariant $b ==> ($n <= get($s1, x) - get($s1, res) ==> exists _s: State :: <_s> && get(_s, res) == $n + get($s1, res)
+                                                                        && get(_s, res) <= get(_s, x)
+                                                                        && get(_s, x) == get($s1, x))
+        {
+            res := res + 1
+        }
+        use hint7(get($s1, x) - get($s1, res))
+    }
+    use hint6(1)
+}
+
+/*
 // Two loops
 method two_loops(x: Int) returns (res: Int)
 requires exists _s: State :: <_s> && get(_s, x) == 3
@@ -195,7 +223,6 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
                             && get($s2, n) == get($s1, n)
                             && get($s2, ind) == 0
                             && get($s2, res) == 0
-
     while (ind < n)
     {hint12} invariant $n <= get($s1, n) ==> exists _s1: State, _s2: State :: <_s1> && <_s2>
                                                         && get(_s1, i) == 1 && get(_s2, i) == 2
@@ -210,11 +237,10 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && g
         res := 2 * x
         ind := ind + 1
     }
-
     use hint12(get($s1, n))
 }
 
-/*
+
 // Alignment -- not supported for exists-HHL at the moment
 method align(x: Int, n: Int, i: Int) returns (res: Int)
 requires exists _s1: State, _s2: State :: <_s1> && <_s2> && get(_s1, i) == 1 && get(_s2, i) == 2

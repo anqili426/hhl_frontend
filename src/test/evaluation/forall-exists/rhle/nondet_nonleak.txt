@@ -18,7 +18,7 @@ ensures forall _s1: State :: <_s1> ==>
     use hint1(8)
     use hint1(9)
 
-    if (r == 5) {
+    if (r == 5000) {
         res := high + low
     } else {
         res := low

@@ -12,14 +12,18 @@ object Generator {
   val setStateDomainName = "SetState"
   val inSetFuncName = "in_set"
   val inSetForAllFuncName = "in_set_forall"
+  val inSetForAllLimitedFuncName = "in_set_forall_limited"
   val inSetExistsFuncName = "in_set_exists"
+  val inSetExistsLimitedFuncName = "in_set_exists_limited"
   val setUnionFuncName = "set_union"
 
   val funcToDomainNameMap = Map(equalFuncName -> stateDomainName,
                                 getFuncName -> stateDomainName,
                                 inSetFuncName -> setStateDomainName,
                                 inSetForAllFuncName -> setStateDomainName,
+                                inSetForAllLimitedFuncName -> setStateDomainName,
                                 inSetExistsFuncName -> setStateDomainName,
+                                inSetExistsLimitedFuncName -> setStateDomainName,
                                 setUnionFuncName -> setStateDomainName
                                 )
 
@@ -142,8 +146,11 @@ object Generator {
     // Forming the preconditions
     val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(args.indexOf(v))())())
     val preAboutArgs = if (argsWithValues.isEmpty) Seq.empty else Seq(argsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
+//    val normalizedPres = method.pre.map(p => Normalizer.normalize(p, false))
+//    normalizedPres.foreach(p => Normalizer.detQuantifier(p, false))
+//    normalizedPres.foreach(p => p.asInstanceOf[Assertion].det)
+    // val pres = normalizedPres.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
     val pres = method.pre.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
-
     // Forming the postconditions
     val posts = method.post.map {
       p =>
@@ -714,11 +721,15 @@ object Generator {
           }
         case av@AssertVar(name) =>
           vpr.LocalVar(name, translateType(av.typ, typVarMap))()
-        case Assertion(quantifier, vars, body) =>
+        case a@Assertion(quantifier, vars, body) =>
           // if (!hintDecl.isEmpty) translateHintDecl(hintDecl)
           val variables = vars.map(v => translateAssertVarDecl(v, typVarMap))
-          if (quantifier == "forall") vpr.Forall(variables, Seq.empty, translateExp(body, state, currStates))()
-          else if (quantifier == "exists") vpr.Exists(variables, Seq.empty, translateExp(body, state, currStates))()
+          if (quantifier == "forall") {
+            val triggers = a.triggers.map(seq => {
+              vpr.Trigger(seq.map(s => translateExp(s, state, currStates)))()
+            })
+            vpr.Forall(variables, triggers, translateExp(body, state, currStates))()
+          } else if (quantifier == "exists") vpr.Exists(variables, Seq.empty, translateExp(body, state, currStates))()
           else throw UnknownException("Unexpected quantifier " + quantifier)
         case ImpliesExpr(left, right) =>
           vpr.Implies(translateExp(left, state, currStates), translateExp(right, state, currStates))()
@@ -727,7 +738,7 @@ object Generator {
           translateExp(id, stateVar.asInstanceOf[vpr.LocalVar], currStates)
         case se@StateExistsExpr(s) =>
           val translatedState = translateExp(s, state, currStates)
-          getInSetApp(Seq(translatedState, currStates), typVarMap, !se.useForAll)
+          getInSetApp(Seq(translatedState, currStates), typVarMap, se.useForAll, se.useLimited)
         case LoopIndex() => currLoopIndex
         case pv@ProofVar(name) =>
           if (useAliasForProofVar && currProofVarName==name) getAliasForProofVar(pv, typVarMap).localVar
@@ -899,6 +910,8 @@ object Generator {
         // vpr.DomainFunc(inSetFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
         vpr.DomainFunc(inSetForAllFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
         vpr.DomainFunc(inSetExistsFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
+        vpr.DomainFunc(inSetForAllLimitedFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
+        vpr.DomainFunc(inSetExistsLimitedFuncName, Seq(sVar, SVar), vpr.Bool)(domainName = setStateDomainName),
         vpr.DomainFunc(setUnionFuncName, Seq(S1Var, S2Var), setStateType)(domainName = setStateDomainName)
       ),
       // Domain axioms
@@ -924,6 +937,28 @@ object Generator {
               Seq(sVar),
               Seq.empty,
               setUnionExistsAxiomBody
+            )()
+          )()
+        )(domainName = setStateDomainName),
+        vpr.NamedDomainAxiom(
+          inSetForAllLimitedFuncName + "_def",
+          vpr.Forall(
+            Seq(sVar, SVar),
+            Seq(vpr.Trigger(Seq(getInSetApp(Seq(sVar.localVar, SVar.localVar))))()),
+            vpr.EqCmp(
+                getInSetApp(Seq(sVar.localVar, SVar.localVar), useLimited=true),
+                getInSetApp(Seq(sVar.localVar, SVar.localVar))
+            )()
+          )()
+        )(domainName = setStateDomainName),
+        vpr.NamedDomainAxiom(
+          inSetExistsLimitedFuncName + "_def",
+          vpr.Forall(
+            Seq(sVar, SVar),
+            Seq(vpr.Trigger(Seq(getInSetApp(Seq(sVar.localVar, SVar.localVar), useForAll=false)))()),
+            vpr.EqCmp(
+                getInSetApp(Seq(sVar.localVar, SVar.localVar), useForAll=false, useLimited=true),
+                getInSetApp(Seq(sVar.localVar, SVar.localVar), useForAll=false)
             )()
           )()
         )(domainName = setStateDomainName)
@@ -963,9 +998,11 @@ object Generator {
     vpr.MethodCall(havocIntMethodName, Seq.empty, Seq(i))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
   }
 
-  def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap, useForAll: Boolean = true): vpr.DomainFuncApp = {
-    if (useForAll) getDomainFuncApp(inSetForAllFuncName, args, vpr.Bool, typVarMap)
-    else getDomainFuncApp(inSetExistsFuncName, args, vpr.Bool, typVarMap)
+  def getInSetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap, useForAll: Boolean = true, useLimited: Boolean = false): vpr.DomainFuncApp = {
+    if (useForAll && !useLimited) getDomainFuncApp(inSetForAllFuncName, args, vpr.Bool, typVarMap)
+    else if (!useForAll && !useLimited) getDomainFuncApp(inSetExistsFuncName, args, vpr.Bool, typVarMap)
+    else if (useForAll && useLimited) getDomainFuncApp(inSetForAllLimitedFuncName, args, vpr.Bool, typVarMap)
+    else getDomainFuncApp(inSetExistsLimitedFuncName, args, vpr.Bool, typVarMap)
   }
 
   def getSetUnionApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {

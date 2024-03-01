@@ -1,7 +1,7 @@
 package viper.HHLVerifier
 
 object TypeChecker {
-  val boolOp = List("==", "!=", "&&", "||", "forall", "exists", "implies")
+  val boolOp = List("==", "!=", "&&", "||", "forall", "exists", "==>")
   val boolOpForNums = List(">=", "<=", ">", "<", "==", "!=")
   val numOp = List("+", "-", "*", "/", "%")
   val boolType = TypeInstance.boolType
@@ -163,7 +163,7 @@ object TypeChecker {
         gve.typ = id.typ
       case se@StateExistsExpr(state) =>
         isHyperAssertion = true
-        se.useForAll = (polarity > 0)
+        se.useForAll = (polarity < 0)
         typeCheckExpr(state, hyperAssertionExpected)
         res = checkIfTypeMatch(state.typ, stateType)
         se.typ = boolType

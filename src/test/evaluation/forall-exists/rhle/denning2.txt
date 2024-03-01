@@ -1,4 +1,5 @@
-method denning1(f1_in: Int, f2_in: Int, f3_in: Int) returns (f1_out: Int, f2_out: Int)
+//Question: why should this verify?
+method denning2(f1_in: Int, f2_in: Int, f3_in: Int) returns (f1_out: Int, f2_out: Int)
 requires forall _s1: State :: <_s1> ==>
     (exists _s2: State :: <_s2> && get(_s1, f1_in) == get(_s2, f1_in) && get(_s1, f2_in) == get(_s2, f2_in) && get(_s1, f3_in) != get(_s2, f3_in))
 ensures forall _s1: State :: <_s1> ==>
@@ -22,6 +23,7 @@ ensures forall _s1: State :: <_s1> ==>
                                     && get(_s1, f2_out) == get(_s2, f2_out)
                                     && get(_s1, f3_in) != get(_s2, f3_in)
                                     && get(_s1, i) == get(_s2, i)
+                                    && get(_s1, n) == get(_s2, n)
          )
     {
         var flag: Int
@@ -36,4 +38,7 @@ ensures forall _s1: State :: <_s1> ==>
         i := i + 1
     }
     use hint1(101)
+    // TODO: if we add sum/n to the RHS below, we don't have the info that n >= 0, check why!
+    f2_out := n + sum
+    f1_out := f2_out
 }
