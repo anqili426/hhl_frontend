@@ -151,7 +151,7 @@ object TypeChecker {
         res = checkIfTypeMatch(left.typ, boolType) && checkIfTypeMatch(right.typ, boolType)
         ie.typ = boolType
       case ast@Assertion(_, assertVarDecls, body) =>
-        isHyperAssertion = typeCheckAssertionHelper(assertVarDecls, body, hyperAssertionExpected)
+        isHyperAssertion = typeCheckAssertionHelper(assertVarDecls, body, hyperAssertionExpected, polarity)
         ast.typ = boolType
       case gve@GetValExpr(state, id) =>
         isHyperAssertion = true
@@ -185,14 +185,14 @@ object TypeChecker {
     isHyperAssertion
   }
 
-  def typeCheckAssertionHelper(assertVarDecls: Seq[AssertVarDecl], body: Expr, hyperAssertionExpected: Boolean): Boolean = {
+  def typeCheckAssertionHelper(assertVarDecls: Seq[AssertVarDecl], body: Expr, hyperAssertionExpected: Boolean, polarity: Int): Boolean = {
     // Check whether at least one assertion variable has type State
     var isHyperAssertion = assertVarDecls.exists(decl => decl.vType.isInstanceOf[StateType])
     assertVarDecls.foreach(decl => typeCheckExpr(decl, hyperAssertionExpected))
     val originalAssertVars = assertVars
     // AssertVar will appear in the body. Update the assertVars map before type checking the body
     assertVars = assertVars ++ assertVarDecls.map(decl => decl.vName.name -> decl.vType).toMap
-    val bodyIsHyperAssertion = typeCheckExpr(body, hyperAssertionExpected)
+    val bodyIsHyperAssertion = typeCheckExpr(body, hyperAssertionExpected, polarity)
     isHyperAssertion = isHyperAssertion || bodyIsHyperAssertion
     if (!checkIfTypeMatch(body.typ, boolType)) throw TypeException("The expression " + body + " should have type Bool")
     assertVars = originalAssertVars

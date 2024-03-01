@@ -146,11 +146,11 @@ object Generator {
     // Forming the preconditions
     val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(args.indexOf(v))())())
     val preAboutArgs = if (argsWithValues.isEmpty) Seq.empty else Seq(argsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
-//    val normalizedPres = method.pre.map(p => Normalizer.normalize(p, false))
-//    normalizedPres.foreach(p => Normalizer.detQuantifier(p, false))
-//    normalizedPres.foreach(p => p.asInstanceOf[Assertion].det)
-    // val pres = normalizedPres.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
-    val pres = method.pre.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
+    val normalizedPres = method.pre.map(p => Normalizer.normalize(p, false))
+    normalizedPres.foreach(p => Normalizer.detQuantifier(p, false))
+    normalizedPres.foreach(p => p.asInstanceOf[Assertion].det)
+    val pres = normalizedPres.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
+    // val pres = method.pre.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
     // Forming the postconditions
     val posts = method.post.map {
       p =>

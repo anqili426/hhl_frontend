@@ -81,8 +81,7 @@ object Normalizer {
               var existsTriggers: Seq[StateExistsExpr] = Seq.empty
               val ownedStateExistsExprs = res._2.filter(se => assertVarIds.contains(se.state.idName))
               ownedStateExistsExprs.foreach(se => {
-                println(se.useForAll)
-                // assert(se.useForAll == true)
+                assert(se.useForAll == true)
                 se.useLimited = !a.proForAll
                 val trigger1 = se.copy()
                 val trigger2 = se.copy()
