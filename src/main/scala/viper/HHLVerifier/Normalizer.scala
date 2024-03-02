@@ -61,12 +61,13 @@ object Normalizer {
   // This method determines:
   // 1. Whether a forall quantifier is productive or not
   // 2. Whether an exists quantifier is top-level or not
-  // 3. Ownership of a stateExistsExpr and its useForAll and useLimited values
-  // 4. Triggers of a hyper-assertion
-  // e is expected to be a normalized expression that passes the symbol checker and the type checker
-  // underForAll is true means that e is part of an assertion that universally quantifiers over states
-  // The first returned value represents whether e contains an assertion that existentially quantifiers over states
-  // The second returned value is a sequence of all the stateExistsExpr (whose ownership is unknown) in e
+  // 3. Ownership of a stateExistsExpr
+  // 4. The useLimited value of each stateExistsExpr based on the shape of e
+  // 5. Triggers of any assertion that universally quantifies over states
+  // Input e is expected to be a normalized expression that passes the symbol checker and the type checker
+  // Input underForAll is true means that e is part of an assertion that universally quantifiers over states
+  // Output 1 represents whether e contains an assertion that existentially quantifiers over states
+  // Output 2 is a sequence of all the stateExistsExpr (whose ownership is unknown) in e
   def detQuantifier(e: Expr, underForAll: Boolean) : (Boolean, Seq[StateExistsExpr]) = {
       e match {
         case a@Assertion(quantifier, vars, body) =>
@@ -80,8 +81,8 @@ object Normalizer {
               var forAllTriggers: Seq[StateExistsExpr] = Seq.empty
               var existsTriggers: Seq[StateExistsExpr] = Seq.empty
               val ownedStateExistsExprs = res._2.filter(se => assertVarIds.contains(se.state.idName))
+              if (ownedStateExistsExprs.size == 0) throw UnknownException("At least 1 assertion variable in the precondition is declared but never used")
               ownedStateExistsExprs.foreach(se => {
-                assert(se.useForAll == true)
                 se.useLimited = !a.proForAll
                 val trigger1 = se.copy()
                 val trigger2 = se.copy()
@@ -107,7 +108,6 @@ object Normalizer {
               a.topExists = !underForAll
               val ownedStateExistsExprs = res._2.filter(se => assertVarIds.contains(se.state.idName))
               ownedStateExistsExprs.foreach(se => {
-                assert(se.useForAll == false)
                 se.useLimited = underForAll
               })
               (true, res._2.diff(ownedStateExistsExprs))
@@ -118,8 +118,9 @@ object Normalizer {
             }
           }
         case UnaryExpr(op, exp) =>
-          if (op == "!") detQuantifier(exp, underForAll)
-          else (false, Seq.empty)
+          if (op == "!") {
+            detQuantifier(exp, underForAll)
+          } else (false, Seq.empty)
         case BinaryExpr(e1, op, e2) =>
           if (TypeChecker.boolOp.contains(op)) {
             val res1 = detQuantifier(e1, underForAll)
@@ -131,5 +132,4 @@ object Normalizer {
         case _ => (false, Seq.empty)
       }
   }
-
 }
