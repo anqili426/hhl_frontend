@@ -94,7 +94,6 @@ object Normalizer {
                 existsTriggers = existsTriggers :+ trigger2
               })
               a.triggers = Seq(forAllTriggers, existsTriggers)
-              a.det = true
               (res._1, res._2.diff(ownedStateExistsExprs))
           } else {
               a.proForAll = false

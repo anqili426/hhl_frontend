@@ -84,6 +84,11 @@ object Generator {
   // Vpr bool literals
   val trueLit = vpr.BoolLit(true)()
 
+  // This is true when limited functions can be used
+  // Should be set to true before translating a method precondition and invariant I(n)
+  // And should be set back to false immediately after
+  var allowLimitedFunctions = false
+
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
     var predicates: Seq[vpr.Predicate] = Seq.empty
@@ -125,15 +130,9 @@ object Generator {
       )()
     )()
     )()
+
     // The following statement assumes in_set_forall == in_set_exists for all states in S
-    val inSetEq = vpr.Inhale(vpr.Forall(
-      Seq(state),
-      Seq.empty,
-      vpr.EqCmp(getInSetApp(Seq(state.localVar, inputStates.localVar), typVarMap),
-        getInSetApp(Seq(state.localVar, inputStates.localVar), typVarMap, false)
-      )()
-      )()
-    )()
+    val inSetEq = inhaleInSetEqStmt(state, inputStates.localVar, typVarMap)
 
     // Arguments of the input method
     val args = method.args.map(a => vpr.LocalVarDecl(a.name, translateType(a.typ, typVarMap))())
@@ -148,9 +147,9 @@ object Generator {
     val preAboutArgs = if (argsWithValues.isEmpty) Seq.empty else Seq(argsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
     val normalizedPres = method.pre.map(p => Normalizer.normalize(p, false))
     normalizedPres.foreach(p => Normalizer.detQuantifier(p, false))
-    normalizedPres.foreach(p => p.asInstanceOf[Assertion].det)
+    allowLimitedFunctions = true
     val pres = normalizedPres.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
-    // val pres = method.pre.map(p => translateExp(p, null, inputStates.localVar)) ++ preAboutArgs
+    allowLimitedFunctions = false
     // Forming the postconditions
     val posts = method.post.map {
       p =>
@@ -492,7 +491,7 @@ object Generator {
               newMethods = translateInvariantVerification(inv, cond, body, typVarMap)
               allMethods = allMethods ++ newMethods
             } else {
-              val invVerification = translateInvariantVerificationInline(inv, cond, body, currStates)
+              val invVerification = translateInvariantVerificationInline(inv, cond, body, currStates, typVarMap)
               invVerificationStmts = invVerification._1
               invVerificationVars = invVerification._2
             }
@@ -596,10 +595,17 @@ object Generator {
       }
     }
 
-    def getAllInvariants(invs: Seq[Expr], currStates: vpr.Exp): vpr.Exp = {
+    def getAllInvariants(invs: Seq[Expr], currStates: vpr.Exp, normalize: Boolean = false): vpr.Exp = {
       if (invs.isEmpty) return trueLit
-      val translatedInvs = invs.map(i => translateExp(i, null, currStates))
-      getAndOfExps(translatedInvs)
+      if (normalize) {
+        val normalizedInvs = invs.map(i => Normalizer.normalize(i, false))
+        normalizedInvs.foreach(i => Normalizer.detQuantifier(i, false))
+        val translatedInvs = normalizedInvs.map(i => translateExp(i, null, currStates))
+        getAndOfExps(translatedInvs)
+      } else {
+        val translatedInvs = invs.map(i => translateExp(i, null, currStates))
+        getAndOfExps(translatedInvs)
+      }
     }
 
     def translateInvariantVerification(inv: Seq[Expr], loopGuard: Expr, body: CompositeStmt, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
@@ -608,21 +614,16 @@ object Generator {
       val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
       val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
       currLoopIndex = currLoopIndexDecl.localVar
-      val In = getAllInvariants(inv, inputStates.localVar)
+      allowLimitedFunctions = true
+      val In = getAllInvariants(inv, inputStates.localVar, true)
+      allowLimitedFunctions = false
       currLoopIndex = vpr.Add(currLoopIndex, one)()
       val InPlus1 = getAllInvariants(inv, outputStates.localVar)
 
       val tmpStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
       val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
       // The following statement assumes in_set_forall == in_set_exists for all states in S
-      val inSetEq = vpr.Inhale(vpr.Forall(
-        Seq(state),
-        Seq.empty,
-        vpr.EqCmp(getInSetApp(Seq(state.localVar, inputStates.localVar), typVarMap),
-          getInSetApp(Seq(state.localVar, inputStates.localVar), typVarMap, false)
-        )()
-      )()
-      )()
+      val inSetEq = inhaleInSetEqStmt(state, inputStates.localVar, typVarMap)
       val assignToOutputStates = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
 
       // Translation of the loop body
@@ -655,7 +656,7 @@ object Generator {
       Seq(thisMethod)
     }
 
-    def translateInvariantVerificationInline(inv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, currStates: vpr.LocalVar): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
+    def translateInvariantVerificationInline(inv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, currStates: vpr.LocalVar, typVarMap: Map[vpr.TypeVar, vpr.Type]): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
         // Assume loop index $n >= 0
         val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
         currLoopIndex = currLoopIndexDecl.localVar
@@ -665,8 +666,12 @@ object Generator {
         val indexNonNeg = vpr.Inhale(vpr.GeCmp(currLoopIndex, zero)())()
 
         val havocStates = havocSetMethodCall(currStates)
+        val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+        val inSetEq = inhaleInSetEqStmt(state, currStates, typVarMap)
         // Assume I(n)
-        val inhaleIn = vpr.Inhale(getAllInvariants(inv, currStates))()
+        allowLimitedFunctions = true
+        val inhaleIn = vpr.Inhale(getAllInvariants(inv, currStates, true))()
+        allowLimitedFunctions = false
         val inhaleLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates)._1
         val translatedLoopBody = translateStmt(loopBody, currStates)
         // Update loop index to be $n + 1
@@ -674,7 +679,7 @@ object Generator {
         // Assert I(n+1)
         val assertIn1 = vpr.Assert(getAllInvariants(inv, currStates))()
         val assumeFalse = vpr.Inhale(vpr.FalseLit()())()
-        val ifBody = Seq(inhaleIn) ++ inhaleLoopGuard ++ translatedLoopBody._1 ++ Seq(assertIn1, assumeFalse)
+        val ifBody = Seq(inSetEq, inhaleIn) ++ inhaleLoopGuard ++ translatedLoopBody._1 ++ Seq(assertIn1, assumeFalse)
         val ifStmt = vpr.If(nonDetBool, vpr.Seqn(ifBody, Seq.empty)(), vpr.Seqn(Seq.empty, Seq.empty)())()
         val newVars = Seq(nonDetBool, currLoopIndexDecl.localVar) ++ translatedLoopBody._2
         val newStmts = Seq(havocIndex, indexNonNeg, havocStates, ifStmt)
@@ -685,6 +690,17 @@ object Generator {
     def getAliasForProofVar(v: ProofVar, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.LocalVarDecl = {
       if (!useAliasForProofVar) throw UnknownException("Method getAliasForProofVar cannot be called when assertProofVar == false")
       vpr.LocalVarDecl("$" + v.name, translateType(v.typ, typVarMap))()
+    }
+
+    def inhaleInSetEqStmt(state: vpr.LocalVarDecl, currStates: vpr.LocalVar, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Inhale = {
+      vpr.Inhale(vpr.Forall(
+        Seq(state),
+        Seq.empty,
+        vpr.EqCmp(getInSetApp(Seq(state.localVar, currStates), typVarMap),
+          getInSetApp(Seq(state.localVar, currStates), typVarMap, false)
+        )()
+      )()
+      )()
     }
 
     // Note that second argument, state, is only used to translate id
@@ -738,7 +754,7 @@ object Generator {
           translateExp(id, stateVar.asInstanceOf[vpr.LocalVar], currStates)
         case se@StateExistsExpr(s) =>
           val translatedState = translateExp(s, state, currStates)
-          getInSetApp(Seq(translatedState, currStates), typVarMap, se.useForAll, se.useLimited)
+          getInSetApp(Seq(translatedState, currStates), typVarMap, se.useForAll, se.useLimited && allowLimitedFunctions)
         case LoopIndex() => currLoopIndex
         case pv@ProofVar(name) =>
           if (useAliasForProofVar && currProofVarName==name) getAliasForProofVar(pv, typVarMap).localVar

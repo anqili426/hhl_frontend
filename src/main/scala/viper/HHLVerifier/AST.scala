@@ -22,7 +22,6 @@ case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], bod
   var proForAll: Boolean = false
   var topExists: Boolean = false
   var triggers: Seq[Seq[StateExistsExpr]] = Seq.empty
-  var det: Boolean = false
 }
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
 case class StateExistsExpr(state: SpecialId) extends Expr {
