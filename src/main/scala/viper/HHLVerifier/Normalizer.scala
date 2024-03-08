@@ -9,7 +9,7 @@ object Normalizer {
   def normalize(e: Expr, negate: Boolean): Expr = {
     e match {
       case BoolLit(value) => if (negate) BoolLit(!value) else e
-      case StateExistsExpr(_) => if (negate) UnaryExpr("!", e) else e
+      case StateExistsExpr(_, _) => if (negate) UnaryExpr("!", e) else e
       case Hint(_, _) => if (negate) UnaryExpr("!", e) else e
       case UnaryExpr(op, body) =>
         if (op == "-") throw UnknownException("Normalizer: expression " + e + " is not expected")
@@ -127,7 +127,7 @@ object Normalizer {
             (res1._1 || res2._1, res1._2 ++ res2._2)
           } else (false, Seq.empty)
         case ImpliesExpr(_, _) => throw UnknownException("Normalizer: unexpected implication")
-        case se@StateExistsExpr(_) => (false, Seq(se))
+        case se@StateExistsExpr(_, _) => (false, Seq(se))
         case _ => (false, Seq.empty)
       }
   }

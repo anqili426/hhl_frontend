@@ -151,10 +151,11 @@ object SymbolChecker {
         // blockName should have been checked before reaching here
         (Seq.empty, Seq.empty)
 
-      case WhileLoopStmt(cond, body, inv) =>
+      case loop@WhileLoopStmt(cond, body, inv) =>
         val allHintDecls = inv.map(i => i._1).filter(h => !h.isEmpty)
         allHintDecls.map(h => checkHintDecl(h.get))
-        var allVarsOfLoop = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, true, false)).flatten
+        // When using the sync rule, loop invariants cannot use the loop index
+        var allVarsOfLoop = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, loop.rule!="syncRule", false)).flatten
         // Body must be checked after loop condition and invariants are checked
         val bodyVars = checkSymbolsStmt(body)
         allVarsOfLoop = allVarsOfLoop ++ bodyVars._1
@@ -223,13 +224,13 @@ object SymbolChecker {
           var varsInExpr = Seq((id.name, allVarsInCurrScope.get(id.name).get))
           if (state.isInstanceOf[ProofVar]) varsInExpr = varsInExpr :+ (state.idName, allVarsInCurrScope.get(state.idName).get)
           varsInExpr
-        case StateExistsExpr(state) =>
+        case StateExistsExpr(state, _) =>
             if (isFrame) throw UnknownException("Framed assertion cannot include state-exists-expression")
             checkIdDefined(state)
             if (state.isInstanceOf[ProofVar]) Seq((state.idName, allVarsInCurrScope.get(state.idName).get))
             else Seq.empty  // No need to return anything if it's an assertion variable
         case LoopIndex() =>
-            if (!isInLoopInv) throw UnknownException("Loop index $n can only be used in a loop invariant")
+            if (!isInLoopInv) throw UnknownException("Loop index $n can only appear in the invariant of a loop that does not use the sync rule")
             Seq.empty
         case h@Hint(_, arg) =>
             checkHintDefined(h)

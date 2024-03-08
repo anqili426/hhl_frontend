@@ -12,6 +12,7 @@ object TypeChecker {
   var currMethod: Method = null
 
   var assertVars: Map[String, Type] = Map.empty
+  var isPre: Boolean = false
 
   def reset(): Unit = {
     currMethod = null
@@ -25,7 +26,9 @@ object TypeChecker {
   def typeCheckMethod(m: Method): Unit = {
     currMethod = m
     var isHyperAssertion = true
+    isPre = true
     m.pre.foreach(p => isHyperAssertion = isHyperAssertion && typeCheckExpr(p, true))
+    isPre = false
     if (!isHyperAssertion) throw TypeException("At least one precondition of method " + m.mName + " is not a hyper assertion")
     m.post.foreach(p => isHyperAssertion = isHyperAssertion && typeCheckExpr(p, true))
     if (!isHyperAssertion) throw TypeException("At least one postcondition of method " + m.mName + " is not a hyper assertion")
@@ -161,12 +164,13 @@ object TypeChecker {
         typeCheckExpr(id, false)
         res = checkIfTypeMatch(state.typ, stateType)
         gve.typ = id.typ
-      case se@StateExistsExpr(state) =>
+      case se@StateExistsExpr(state, _) =>
         isHyperAssertion = true
         se.useForAll = (polarity < 0)
         typeCheckExpr(state, hyperAssertionExpected)
         res = checkIfTypeMatch(state.typ, stateType)
         se.typ = boolType
+        if (se.err && isPre) throw UnknownException("Preconditions cannot refer to failure states")
       case li@LoopIndex() =>
         li.typ = intType
       case pv@ProofVar(name) =>

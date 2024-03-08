@@ -21,10 +21,11 @@ case class ImpliesExpr(left: Expr, right: Expr) extends Expr
 case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr {
   var proForAll: Boolean = false
   var topExists: Boolean = false
+  var isPre: Boolean = false
   var triggers: Seq[Seq[StateExistsExpr]] = Seq.empty
 }
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
-case class StateExistsExpr(state: SpecialId) extends Expr {
+case class StateExistsExpr(state: SpecialId, err: Boolean) extends Expr {
   // When useForAll is true, <_s> is translated to in_set_forall(_s, S) later
   // Otherwise, it is translated to in_set_exists(_s, S)
   var useForAll: Boolean = false
@@ -51,7 +52,9 @@ case class AssertStmt(e: Expr) extends Stmt
 case class HyperAssumeStmt(e: Expr) extends Stmt
 case class HyperAssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: CompositeStmt, elseStmt: CompositeStmt) extends Stmt
-case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)]) extends Stmt
+case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)]) extends Stmt {
+  var rule: String = "default"
+}
 case class PVarDecl(vName: Id, vType: Type) extends Stmt
 case class ProofVarDecl(proofVar: ProofVar, p: Expr) extends Stmt
 case class FrameStmt(framedAssertion: Expr, body: CompositeStmt) extends Stmt

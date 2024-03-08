@@ -77,10 +77,12 @@ object Parser {
   def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ otherExpr ~ ")" ~ "{" ~ stmtsInIf ~ "}" ~ ("else" ~ "{" ~ stmtsInElse ~ "}").?).map{
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
 
-  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~ "(" ~ otherExpr ~ ")"  ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
+  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~~ spaces ~ ("syncRule" | "forAllExistsRule" | "existsRule").?.! ~ "(" ~ otherExpr ~ ")"  ~ loopInv.rep ~ "{" ~ stmts ~ "}").map {
     items =>
-      val invs = if (items._2 == Nil) Seq.empty else items._2
-      WhileLoopStmt(items._1, items._3, invs)
+      val invs = if (items._3 == Nil) Seq.empty else items._3
+      val stmt = WhileLoopStmt(items._2, items._4, invs)
+      stmt.rule = if (items._1 == "") "default" else items._1
+      stmt
   }
   def loopInv[$: P]: P[(Option[HintDecl], Expr)] = P(hintDecl.? ~ "invariant" ~~ spaces ~ expr)
 
@@ -133,7 +135,7 @@ object Parser {
     case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
 
-  def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | stateExistsExpr |  "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | stateExistsErrExpr | stateExistsExpr |  "(" ~ expr ~ ")")
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   // Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
@@ -146,7 +148,8 @@ object Parser {
 
   def getProgVarExpr[$: P]: P[GetValExpr] = P("get(" ~ (assertVar | proofVar) ~ "," ~ progVar ~ ")").map(items => GetValExpr(items._1, items._2))
 
-  def stateExistsExpr[$: P]: P[StateExistsExpr] = P("<" ~ (assertVar | proofVar) ~ ">").map(StateExistsExpr)
+  def stateExistsExpr[$: P]: P[StateExistsExpr] = P("<"  ~ (assertVar | proofVar) ~ ">").map(item => StateExistsExpr(item, false))
+  def stateExistsErrExpr[$: P]: P[StateExistsExpr] = P("<<"  ~ (assertVar | proofVar) ~ ">>").map(item => StateExistsExpr(item, true))
 
   def identifier[$: P]: P[Expr] = P(progVar | assertVar | proofVar)
 
