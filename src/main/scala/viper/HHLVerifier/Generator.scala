@@ -65,6 +65,7 @@ object Generator {
   var verifierOption = 0 // 0: forall 1: exists 2: both
   var inline = false  // true: verification of the loop invariant will be inline
   var frame = true // true: automatic framing is enabled
+  var autoSelectRules = false // true: selection of loop rules is automatic
 
   // This variable is used when translating declarations of proof variables
   // When set to true, use an alias for the proof variable referred to by currProofVar
@@ -88,6 +89,10 @@ object Generator {
   // Should be set to true before translating a method precondition and invariant I(n)
   // And should be set back to false immediately after
   var allowLimitedFunctions = false
+
+  // This is true when we want to translate a method precondition with the parameters replaced with arguments
+  var useParamsToArgsMap = false
+  var currParamsToArgsMap: Map[Id, Id] = Map.empty
 
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
@@ -137,7 +142,7 @@ object Generator {
     val inSetFailEq = inhaleInSetEqStmt(state, outputFailureStates.localVar, typVarMap)
 
     // Arguments of the input method
-    val args = method.args.map(a => vpr.LocalVarDecl(a.name, translateType(a.typ, typVarMap))())
+    val args = method.params.map(a => vpr.LocalVarDecl(a.name, translateType(a.typ, typVarMap))())
     val translatedArgs = args ++ Seq(inputStates)
 
     // Return variables of the input method
@@ -178,7 +183,7 @@ object Generator {
 
     // Assume that all program variables + return variables are different by assigning a distinct value to each of them
     // Program variables that are not method arguments or return values
-    val progVars = method.body.allProgVars.filter(v => !method.argsMap.keySet.contains(v._1) && !method.resMap.keySet.contains(v._1))
+    val progVars = method.body.allProgVars.filter(v => !method.paramsMap.keySet.contains(v._1) && !method.resMap.keySet.contains(v._1))
     // Currently, we only support program variables of type Integer, so pick them out
     val translatedProgVars = progVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).filter(v => v.typ == vpr.Int).toList
     val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars
@@ -601,6 +606,30 @@ object Generator {
         case UseHintStmt(hint) =>
           newStmts = Seq(vpr.Inhale(translateExp(hint, state, currStates, currFailureStates))())
           (newStmts, Seq.empty)
+
+        case call@MethodCallStmt(_, _) =>
+          // TODO: in_set_forall & exists?? Need triggers?
+          // Assert the callee's precondition
+          // TODO: replace vars in pres during translation
+          useParamsToArgsMap = true
+          currParamsToArgsMap = call.paramsToArgs
+          val pres = call.method.pre.map(p => translateExp(p, state, currStates, currFailureStates))
+          useParamsToArgsMap = false
+          val assertPres = vpr.Assert(getAndOfExps(pres))()
+          // Havoc S_tmp and S_fail_tmp
+          val tempFailedStates = vpr.LocalVar(tempFailedStatesVarName, currFailureStates.typ)()
+          val havocSFailTmp = havocSetMethodCall(tempFailedStates)
+          newStmts = Seq(assertPres, havocSTmp, havocSFailTmp)
+          // TODO: Cannot inhale any postcondition that talks about the callee's return value,
+          //  because the callee's return value is not assigned to any vars here
+          val posts = call.method.post.map(p => translateExp(p, state, STmp, tempFailedStates))
+          val assumePosts = vpr.Inhale(getAndOfExps(posts))()
+          // TODO: auto-framing
+          // Update S and S_fail
+          val updateSFail = vpr.LocalVarAssign(currFailureStates,
+            getSetUnionApp(Seq(currFailureStates, tempFailedStates), typVarMap))()
+          newStmts = newStmts ++ Seq(assumePosts, updateSFail, updateProgStates)
+          (newStmts, Seq.empty)
       }
     }
 
@@ -827,7 +856,8 @@ object Generator {
       e match {
         case id@Id(name) =>
           // Any reference to a var is translated to get(state, var)
-          val viperId = vpr.LocalVar(name, translateType(id.typ, typVarMap))()
+          val viperId = if (useParamsToArgsMap) vpr.LocalVar(currParamsToArgsMap.get(id).get.name, translateType(id.typ, typVarMap))()
+                        else vpr.LocalVar(name, translateType(id.typ, typVarMap))()
           getGetApp(Seq(state, viperId), state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap)
         case Num(value) => vpr.IntLit(value)()
         case BoolLit(value) => vpr.BoolLit(value)()

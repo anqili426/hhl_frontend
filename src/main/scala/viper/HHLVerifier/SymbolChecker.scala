@@ -6,6 +6,7 @@ object SymbolChecker {
   var allVarsInCurrScope: Map[String, Type] = Map.empty // All variables available in the current scope
   var allArgNames: Set[String] = Set.empty  // All arguments of one method
   var allMethodNames: Seq[String] = List.empty  // All method names of one program
+  var allMethods: Seq[Method] = Seq.empty // All methods of one program
   var allHintNames: Set[String] = Set.empty // All hints declared in one program
   var allHintsInMethod: Set[String] = Set.empty // All hints declared in one method
 
@@ -13,6 +14,7 @@ object SymbolChecker {
     allVars = Map.empty
     allVarsInCurrScope = Map.empty
     allArgNames = Set.empty
+    allMethods = Seq.empty
     allMethodNames = List.empty
     allHintNames = Set.empty
     allHintsInMethod = Set.empty
@@ -20,6 +22,7 @@ object SymbolChecker {
 
   def checkSymbolsProg(p: HHLProgram): Unit = {
     // Check that each method has a unique identifier
+    allMethods = p.content
     allMethodNames = p.content.map(m => m.mName)
     val dupMethodNames = allMethodNames.diff(allMethodNames.distinct)
     if (dupMethodNames.size > 0) throw DuplicateIdentifierException("Duplicate method name " + dupMethodNames)
@@ -28,13 +31,13 @@ object SymbolChecker {
 
   def checkSymbolsMethod(m: Method): Unit = {
     var varsAllowedInPost: Map[String, Type] = Map.empty
-    m.args.foreach(a => {
+    m.params.foreach(a => {
       checkIdDup(a)
       allVarsInCurrScope = allVarsInCurrScope + (a.name -> a.typ)
       allVars = allVars + (a.name -> a.typ)
       varsAllowedInPost = varsAllowedInPost + (a.name -> a.typ)
     })
-    allArgNames = m.argsMap.keySet
+    allArgNames = m.paramsMap.keySet
     m.pre.foreach(p => checkSymbolsExpr(p, false, false))
     // The return variables can only be referred to in the method body or postconditions
     m.res.foreach { r =>
@@ -176,6 +179,15 @@ object SymbolChecker {
         checkIfHintUseWellformed(hint)
         val varsInHint = checkSymbolsExpr(hint, false, false)
         (varsInHint, Seq.empty)
+
+      case call@MethodCallStmt(name, args) =>
+        if (!allMethodNames.contains(name)) throw UnknownException("Method " + name + " is undefined, so it cannot be called")
+        call.method = allMethods.find(m => m.mName == name).get
+        if (call.method.params.length != args.length) throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
+        val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
+        call.paramsToArgs = call.method.params.zip(args).toMap
+        (varsInArgs, Seq.empty)
+
       case _ =>
         throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)
     }

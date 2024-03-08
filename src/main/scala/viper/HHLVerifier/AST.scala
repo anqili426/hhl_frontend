@@ -35,6 +35,7 @@ case class StateExistsExpr(state: SpecialId, err: Boolean) extends Expr {
 case class LoopIndex() extends Expr
 case class HintDecl(name: String) extends Expr
 case class Hint(name: String, arg: Expr) extends Expr
+case class MethodCallExpr(methodName: String, args: Seq[Expr]) extends Stmt
 
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
@@ -46,6 +47,7 @@ case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
   var modifiedProgVars: Map[String, Type] = Map.empty
 }
 case class AssignStmt(left: Id, right: Expr) extends Stmt
+case class MultiAssignStmt(left: Seq[Id], right: MethodCallExpr) extends Stmt
 case class HavocStmt(id: Id, hintDecl: Option[HintDecl]) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
 case class AssertStmt(e: Expr) extends Stmt
@@ -63,10 +65,14 @@ case class ReuseStmt(blockName: Id) extends Stmt {
   var reusedBlock: CompositeStmt = CompositeStmt(Seq.empty)
 }
 case class UseHintStmt(hint: Expr) extends Stmt
+case class MethodCallStmt(methodName: String, args: Seq[Id]) extends Stmt {
+  var method: Method = null
+  var paramsToArgs: Map[Id, Id] = Map.empty
+}
 
 sealed trait TopLevelDecl
-case class Method(mName: String, args: Seq[Id], res: Seq[Id], pre: Seq[Expr], post: Seq[Expr], body: CompositeStmt) extends TopLevelDecl {
-  val argsMap: Map[String, Type] = args.map(arg => (arg.name -> arg.typ)).toMap
+case class Method(mName: String, params: Seq[Id], res: Seq[Id], pre: Seq[Expr], post: Seq[Expr], body: CompositeStmt) extends TopLevelDecl {
+  val paramsMap: Map[String, Type] = params.map(arg => (arg.name -> arg.typ)).toMap
   val resMap: Map[String, Type] = res.map(res => (res.name -> res.typ)).toMap
   var allVars: Map[String, Type] = Map.empty
 }

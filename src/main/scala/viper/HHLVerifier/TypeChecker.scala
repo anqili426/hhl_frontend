@@ -97,6 +97,11 @@ object TypeChecker {
         // So we set hyperAssertionExpected to true, without verifying if we indeed have a hyper assertion
         typeCheckExpr(hint, true)
         res = checkIfTypeMatch(hint.typ, boolType)
+      case call@MethodCallStmt(_, args) =>
+        args.foreach(a => {
+          typeCheckExpr(a, false)
+          res = res && checkIfTypeMatch(a.typ, call.method.params(0).typ)
+        })
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
   }
