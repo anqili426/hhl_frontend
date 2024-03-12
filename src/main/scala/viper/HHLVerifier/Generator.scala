@@ -339,6 +339,11 @@ object Generator {
             }
             newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
             (newStmts, Seq.empty)
+        case MultiAssignStmt(left, right) =>
+            // TODO: implement this
+            println("Exiting")
+            System.exit(0)
+            (Seq.empty, Seq.empty)
 
         case HavocStmt(id, hintDecl) =>
             val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
@@ -518,6 +523,10 @@ object Generator {
                 val invVerification = translateInvariantVerificationSync(inv, cond, body, currStates, loopFailureStates, typVarMap)
                 newStmts = newStmts ++ invVerification._1
                 newVars = newVars ++ invVerification._2
+            } else if (loop.rule == "forAllExistsRule") {
+                val invVerification = translateInvariantVerificationForAllExists(inv, cond, body, currStates, loopFailureStates, typVarMap)
+                newStmts = newStmts ++ invVerification._1
+                newVars = newVars ++ invVerification._2
             } else {
               // Verify invariant in a separate method
               if (!inline) {
@@ -551,6 +560,9 @@ object Generator {
               val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
               val empS = vpr.Forall(Seq(stateDecl), Seq.empty, vpr.Not(getInSetApp(Seq(state, STmp), typVarMap))())()
               newStmts = newStmts :+ vpr.Inhale(vpr.Or(translatedInv, empS)())()
+            } else if (loop.rule == "forAllExistsRule") {
+              val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
+              newStmts = newStmts :+ vpr.Inhale(translatedInv)()
             } else {
               // Let currStates be a union of Sk's
               // TODO: this needs to be updated to handle S_fail
@@ -608,6 +620,7 @@ object Generator {
           (newStmts, Seq.empty)
 
         case call@MethodCallStmt(_, _) =>
+          System.exit(0)
           // TODO: in_set_forall & exists?? Need triggers?
           // Assert the callee's precondition
           // TODO: replace vars in pres during translation
@@ -820,6 +833,36 @@ object Generator {
     }
 
     val translatedLoopBody = translateStmt(loopBody, currStates, currFailureStates)
+    // Assert I
+    val assertI = vpr.Assert(getAllInvariants(inv, currStates, currFailureStates))()
+    // Assume false
+    val assumeFalse = vpr.Inhale(falseLit)()
+    ifStmtBody = ifStmtBody ++ translatedLoopBody._1 ++ Seq(assertI, assumeFalse)
+
+    val ifStmt = vpr.If(nonDetBool, vpr.Seqn(ifStmtBody, Seq.empty)(), vpr.Seqn(Seq.empty, Seq.empty)())()
+    val newVars = Seq(nonDetBool) ++ translatedLoopBody._2
+    val newStmts = Seq(ifStmt)
+    (newStmts, newVars)
+  }
+
+  def translateInvariantVerificationForAllExists(inv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, currStates: vpr.LocalVar, currFailureStates: vpr.LocalVar, typVarMap: Map[vpr.TypeVar, vpr.Type]): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
+    var ifStmtBody: Seq[vpr.Stmt] = Seq.empty
+    val nonDetBool = vpr.LocalVar(nonDetBoolName + loopCounter, vpr.Bool)()
+    val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+
+    // Havoc S & S_fail
+    val havocStates = havocSetMethodCall(currStates)
+    val havocFailureStates = havocSetMethodCall(currFailureStates)
+    val inSetEq = inhaleInSetEqStmt(state, currStates, typVarMap)
+    val inSetEqFail = inhaleInSetEqStmt(state, currFailureStates, typVarMap)
+    // Assume I
+    allowLimitedFunctions = true
+    val inhaleI = vpr.Inhale(getAllInvariants(inv, currStates, currFailureStates, true))()
+    allowLimitedFunctions = false
+    ifStmtBody = Seq(havocStates, havocFailureStates, inSetEq, inSetEqFail, inhaleI)
+
+    val newLoopBody = IfElseStmt(loopGuard, loopBody, CompositeStmt(Seq.empty))
+    val translatedLoopBody = translateStmt(newLoopBody, currStates, currFailureStates)
     // Assert I
     val assertI = vpr.Assert(getAllInvariants(inv, currStates, currFailureStates))()
     // Assume false

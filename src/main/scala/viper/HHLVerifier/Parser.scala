@@ -50,11 +50,13 @@ object Parser {
       ProofVarDecl(items._1, items._3)
   }
   def proofVar[$: P]: P[ProofVar] = P("$" ~~ CharIn("a-mo-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(ProofVar)
-  def methodCall[$: P] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")")
+  def methodCall[$: P]: P[(String, Seq[Id])] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")")
 
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
-  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt | methodCallStmt)
-  // TODO: def multiAssign[$: P]: P[MultiAssignStmt]
+  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | multiAssign | assign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt | methodCallStmt)
+  def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map{
+    items => MultiAssignStmt(items._1, MethodCallExpr(items._2._1, items._2._2))
+  }
   def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ otherExpr).map(e => AssignStmt(e._1, e._2))
   def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar ~ hintDecl.?).map{
     case(v, None) => HavocStmt(v, Option.empty)

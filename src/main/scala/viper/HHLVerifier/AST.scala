@@ -35,7 +35,10 @@ case class StateExistsExpr(state: SpecialId, err: Boolean) extends Expr {
 case class LoopIndex() extends Expr
 case class HintDecl(name: String) extends Expr
 case class Hint(name: String, arg: Expr) extends Expr
-case class MethodCallExpr(methodName: String, args: Seq[Expr]) extends Stmt
+case class MethodCallExpr(methodName: String, args: Seq[Id]) extends Expr {
+  var method: Method = null
+  var paramsToArgs: Map[Id, Id] = Map.empty
+}
 
 sealed trait Stmt
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {

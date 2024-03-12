@@ -43,7 +43,14 @@ object TypeChecker {
       case AssignStmt(left, right) =>
         typeCheckExpr(left, false)
         typeCheckExpr(right, false)
-        res =checkIfTypeMatch(left.typ, right.typ)
+        res = checkIfTypeMatch(left.typ, right.typ)
+      case MultiAssignStmt(left, right) =>
+        left.foreach(v => typeCheckExpr(v, false))
+        typeCheckExpr(right, false)
+        // Check the variable types on the LHS match with the method return types on the RHS
+        left.foreach(
+          v => res = res && checkIfTypeMatch(v.typ, right.method.res(left.indexOf(v)).typ)
+        )
       case HavocStmt(id, _) =>
         typeCheckExpr(id, false)
       case AssumeStmt(e) =>
@@ -97,11 +104,12 @@ object TypeChecker {
         // So we set hyperAssertionExpected to true, without verifying if we indeed have a hyper assertion
         typeCheckExpr(hint, true)
         res = checkIfTypeMatch(hint.typ, boolType)
-      case call@MethodCallStmt(_, args) =>
+      case call@MethodCallStmt(name, args) =>
         args.foreach(a => {
           typeCheckExpr(a, false)
-          res = res && checkIfTypeMatch(a.typ, call.method.params(0).typ)
+          res = res && checkIfTypeMatch(a.typ, call.method.params(args.indexOf(a)).typ)
         })
+        if (!res) throw TypeException("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters")
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
   }
@@ -189,6 +197,12 @@ object TypeChecker {
         // At the moment, we only allow hints to take 1 argument of type Int
         res = checkIfTypeMatch(arg.typ, intType)
         h.typ = boolType
+      case call@MethodCallExpr(name, args) =>
+        args.foreach(a => {
+          typeCheckExpr(a, false)
+          res = res && checkIfTypeMatch(a.typ, call.method.params(args.indexOf(a)).typ)
+        })
+        if (!res) throw TypeException("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters")
     }
     if (!res) throw TypeException("The expression has a type error: " + e)
     isHyperAssertion

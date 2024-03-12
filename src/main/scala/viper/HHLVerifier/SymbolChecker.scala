@@ -102,6 +102,18 @@ object SymbolChecker {
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo ++ rightVars, idAssignedTo)
 
+      case MultiAssignStmt(left, right) =>
+        val idAssignedTo = left.map(id => checkSymbolsExpr(id, false, false)).flatten
+        val idAssignedToNames = left.map(id => id.name)
+        val args = checkSymbolsExpr(right, false, false)
+        val argNames = right.args.map(a => a.name)
+        idAssignedToNames.foreach(
+          id => if (argNames.contains(id)) throw UnknownException("Cannot assign to variables that are used as arguments in a method call in the same statement")
+        )
+        val numRet = right.method.res.length
+        if (left.length != numRet) throw UnknownException("The call to method " + right.methodName + " should be assigned to exactly " + numRet + " variables. ")
+        (idAssignedTo, args)
+
       case HavocStmt(id, hintDecl) =>
         if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         if (!hintDecl.isEmpty) checkHintDecl(hintDecl.get)
@@ -157,8 +169,8 @@ object SymbolChecker {
       case loop@WhileLoopStmt(cond, body, inv) =>
         val allHintDecls = inv.map(i => i._1).filter(h => !h.isEmpty)
         allHintDecls.map(h => checkHintDecl(h.get))
-        // When using the sync rule, loop invariants cannot use the loop index
-        var allVarsOfLoop = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, loop.rule!="syncRule", false)).flatten
+        // When using the sync rule/forall-exists rule, loop invariants cannot use the loop index
+        var allVarsOfLoop = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, loop.rule=="default", false)).flatten
         // Body must be checked after loop condition and invariants are checked
         val bodyVars = checkSymbolsStmt(body)
         allVarsOfLoop = allVarsOfLoop ++ bodyVars._1
@@ -248,6 +260,13 @@ object SymbolChecker {
             checkHintDefined(h)
             val varsInArg = checkSymbolsExpr(arg, isInLoopInv, isFrame)
             varsInArg
+        case callExpr@MethodCallExpr(name, args) =>
+            if (!allMethodNames.contains(name)) throw UnknownException("Method " + name + " is undefined, so it cannot be called")
+            callExpr.method = allMethods.find(m => m.mName == name).get
+            if (callExpr.method.params.length != args.length) throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
+            val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
+            callExpr.paramsToArgs = callExpr.method.params.zip(args).toMap
+            varsInArgs
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
       }
