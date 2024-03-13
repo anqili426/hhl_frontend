@@ -77,7 +77,7 @@ object TypeChecker {
         typeCheckStmt(stmts)
       case ReuseStmt(blockId) =>
         res = checkIfTypeMatch(blockId.typ, blockType)
-      case WhileLoopStmt(cond, body, inv) =>
+      case WhileLoopStmt(cond, body, inv, decr, _) =>
         var isHyperAssertion = true
         typeCheckExpr(cond, false)
         res = checkIfTypeMatch(cond.typ, boolType)
@@ -86,6 +86,10 @@ object TypeChecker {
           res = res && checkIfTypeMatch(i.typ, boolType)
         })
         if (!isHyperAssertion) throw TypeException("At least one loop invariant is not a hyper assertion")
+        if (!decr.isEmpty) {
+          typeCheckExpr(decr.get, false)
+          res = res && checkIfTypeMatch(decr.get.typ, intType)
+        }
         typeCheckStmt(body)
       case FrameStmt(framedAssertion, body) =>
         val isHyperAssertion = typeCheckExpr(framedAssertion, true)

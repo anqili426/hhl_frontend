@@ -105,10 +105,14 @@ object SymbolChecker {
       case MultiAssignStmt(left, right) =>
         val idAssignedTo = left.map(id => checkSymbolsExpr(id, false, false)).flatten
         val idAssignedToNames = left.map(id => id.name)
+        if (idAssignedToNames.toSet.size != idAssignedToNames.length) throw UnknownException("A variable cannot appear on the RHS of an assignment more than once")
         val args = checkSymbolsExpr(right, false, false)
         val argNames = right.args.map(a => a.name)
         idAssignedToNames.foreach(
-          id => if (argNames.contains(id)) throw UnknownException("Cannot assign to variables that are used as arguments in a method call in the same statement")
+          id => {
+            if (allArgNames.contains(id)) throw IllegalAssignmentException("Cannot reassign to method argument " + id)
+            if (argNames.contains(id)) throw IllegalAssignmentException("Cannot assign to variables that are used as arguments in a method call in the same statement")
+          }
         )
         val numRet = right.method.res.length
         if (left.length != numRet) throw UnknownException("The call to method " + right.methodName + " should be assigned to exactly " + numRet + " variables. ")
@@ -166,11 +170,12 @@ object SymbolChecker {
         // blockName should have been checked before reaching here
         (Seq.empty, Seq.empty)
 
-      case loop@WhileLoopStmt(cond, body, inv) =>
+      case loop@WhileLoopStmt(cond, body, inv, decr, _) =>
         val allHintDecls = inv.map(i => i._1).filter(h => !h.isEmpty)
         allHintDecls.map(h => checkHintDecl(h.get))
         // When using the sync rule/forall-exists rule, loop invariants cannot use the loop index
         var allVarsOfLoop = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, loop.rule=="default", false)).flatten
+        if (!decr.isEmpty) allVarsOfLoop = allVarsOfLoop ++ checkSymbolsExpr(decr.get, false, false)
         // Body must be checked after loop condition and invariants are checked
         val bodyVars = checkSymbolsStmt(body)
         allVarsOfLoop = allVarsOfLoop ++ bodyVars._1
@@ -197,6 +202,7 @@ object SymbolChecker {
         call.method = allMethods.find(m => m.mName == name).get
         if (call.method.params.length != args.length) throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
         val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
+        if (call.method.res.length > 0) throw UnknownException("The call to method " + name + " should be assigned to exactly " + call.method.res.length + " variables. ")
         call.paramsToArgs = call.method.params.zip(args).toMap
         (varsInArgs, Seq.empty)
 

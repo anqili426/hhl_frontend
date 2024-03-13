@@ -339,10 +339,16 @@ object Generator {
             }
             newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
             (newStmts, Seq.empty)
+
         case MultiAssignStmt(left, right) =>
             // TODO: implement this
-            println("Exiting")
-            System.exit(0)
+            // Assert the callee's precondition
+            // havoc S_tmp
+            // havoc S_fail_tmp
+            // Inhale the callee's postcondition
+            // TODO: auto-framing
+            // Update S
+            // Update S_fail
             (Seq.empty, Seq.empty)
 
         case HavocStmt(id, hintDecl) =>
@@ -489,7 +495,7 @@ object Generator {
             (res._1, res._2)
         case ReuseStmt(_) =>
             throw UnknownException("Reuse statement shouldn't be translated on its own")
-        case loop@WhileLoopStmt(cond, body, invWithHints) =>
+        case loop@WhileLoopStmt(cond, body, invWithHints, decr, rule) =>
             loopCounter = loopCounter + 1
             val getSkFuncName = "get_Sk_" + loopCounter
             // Connect all invariants with && to form 1 invariant
@@ -519,11 +525,11 @@ object Generator {
             newVars = Seq(loopFailureStates)
             newStmts = Seq(assumeEmptyFailureStates, assertI0)
 
-            if (loop.rule == "syncRule") {
+            if (rule == "syncRule") {
                 val invVerification = translateInvariantVerificationSync(inv, cond, body, currStates, loopFailureStates, typVarMap)
                 newStmts = newStmts ++ invVerification._1
                 newVars = newVars ++ invVerification._2
-            } else if (loop.rule == "forAllExistsRule") {
+            } else if (rule == "forAllExistsRule") {
                 val invVerification = translateInvariantVerificationForAllExists(inv, cond, body, currStates, loopFailureStates, typVarMap)
                 newStmts = newStmts ++ invVerification._1
                 newVars = newVars ++ invVerification._2
@@ -556,11 +562,11 @@ object Generator {
             newStmts = newStmts ++ frameUnmodifiedVarsStmt
 
             // Update S after the loop
-            if (loop.rule == "syncRule") {
+            if (rule == "syncRule") {
               val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
               val empS = vpr.Forall(Seq(stateDecl), Seq.empty, vpr.Not(getInSetApp(Seq(state, STmp), typVarMap))())()
               newStmts = newStmts :+ vpr.Inhale(vpr.Or(translatedInv, empS)())()
-            } else if (loop.rule == "forAllExistsRule") {
+            } else if (rule == "forAllExistsRule") {
               val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
               newStmts = newStmts :+ vpr.Inhale(translatedInv)()
             } else {
@@ -633,8 +639,6 @@ object Generator {
           val tempFailedStates = vpr.LocalVar(tempFailedStatesVarName, currFailureStates.typ)()
           val havocSFailTmp = havocSetMethodCall(tempFailedStates)
           newStmts = Seq(assertPres, havocSTmp, havocSFailTmp)
-          // TODO: Cannot inhale any postcondition that talks about the callee's return value,
-          //  because the callee's return value is not assigned to any vars here
           val posts = call.method.post.map(p => translateExp(p, state, STmp, tempFailedStates))
           val assumePosts = vpr.Inhale(getAndOfExps(posts))()
           // TODO: auto-framing
