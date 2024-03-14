@@ -116,6 +116,8 @@ object SymbolChecker {
         )
         val numRet = right.method.res.length
         if (left.length != numRet) throw UnknownException("The call to method " + right.methodName + " should be assigned to exactly " + numRet + " variables. ")
+        val resNames = right.method.res.map(r => r.name)
+        right.paramsToArgs = right.paramsToArgs ++ resNames.zip(idAssignedToNames).toMap
         (idAssignedTo, args)
 
       case HavocStmt(id, hintDecl) =>
@@ -203,7 +205,9 @@ object SymbolChecker {
         if (call.method.params.length != args.length) throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
         val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
         if (call.method.res.length > 0) throw UnknownException("The call to method " + name + " should be assigned to exactly " + call.method.res.length + " variables. ")
-        call.paramsToArgs = call.method.params.zip(args).toMap
+        val argNames = args.map(a => a.name)
+        val paramNames = call.method.params.map(p => p.name)
+        call.paramsToArgs = paramNames.zip(argNames).toMap
         (varsInArgs, Seq.empty)
 
       case _ =>
@@ -271,7 +275,9 @@ object SymbolChecker {
             callExpr.method = allMethods.find(m => m.mName == name).get
             if (callExpr.method.params.length != args.length) throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
             val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
-            callExpr.paramsToArgs = callExpr.method.params.zip(args).toMap
+            val argNames = args.map(a => a.name)
+            val paramNames = callExpr.method.params.map(p => p.name)
+            callExpr.paramsToArgs = paramNames.zip(argNames).toMap
             varsInArgs
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)

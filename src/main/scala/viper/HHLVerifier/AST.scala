@@ -37,7 +37,7 @@ case class HintDecl(name: String) extends Expr
 case class Hint(name: String, arg: Expr) extends Expr
 case class MethodCallExpr(methodName: String, args: Seq[Id]) extends Expr {
   var method: Method = null
-  var paramsToArgs: Map[Id, Id] = Map.empty
+  var paramsToArgs: Map[String, String] = Map.empty
 }
 
 sealed trait Stmt
@@ -57,10 +57,7 @@ case class AssertStmt(e: Expr) extends Stmt
 case class HyperAssumeStmt(e: Expr) extends Stmt
 case class HyperAssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: CompositeStmt, elseStmt: CompositeStmt) extends Stmt
-case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)], decr: Option[Expr], rule: String = "default") extends Stmt {
-  // var rule: String = "default"
-  // var decr: Option[Expr] = Option.empty
-}
+case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)], decr: Option[Expr], rule: String = "default") extends Stmt
 case class PVarDecl(vName: Id, vType: Type) extends Stmt
 case class ProofVarDecl(proofVar: ProofVar, p: Expr) extends Stmt
 case class FrameStmt(framedAssertion: Expr, body: CompositeStmt) extends Stmt
@@ -71,7 +68,7 @@ case class ReuseStmt(blockName: Id) extends Stmt {
 case class UseHintStmt(hint: Expr) extends Stmt
 case class MethodCallStmt(methodName: String, args: Seq[Id]) extends Stmt {
   var method: Method = null
-  var paramsToArgs: Map[Id, Id] = Map.empty
+  var paramsToArgs: Map[String, String] = Map.empty
 }
 
 sealed trait TopLevelDecl

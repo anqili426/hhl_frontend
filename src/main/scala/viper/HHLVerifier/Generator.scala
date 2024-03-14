@@ -92,7 +92,7 @@ object Generator {
 
   // This is true when we want to translate a method precondition with the parameters replaced with arguments
   var useParamsToArgsMap = false
-  var currParamsToArgsMap: Map[Id, Id] = Map.empty
+  var currParamsToArgsMap: Map[String, String] = Map.empty
 
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
@@ -341,15 +341,50 @@ object Generator {
             (newStmts, Seq.empty)
 
         case MultiAssignStmt(left, right) =>
-            // TODO: implement this
-            // Assert the callee's precondition
-            // havoc S_tmp
-            // havoc S_fail_tmp
-            // Inhale the callee's postcondition
-            // TODO: auto-framing
-            // Update S
-            // Update S_fail
-            (Seq.empty, Seq.empty)
+          val callee = right.method
+          if (!callee.pre.isEmpty) {
+            useParamsToArgsMap = true
+            currParamsToArgsMap = right.paramsToArgs
+            val pres = callee.pre.map(p => translateExp(p, state, currStates, currFailureStates))
+            useParamsToArgsMap = false
+            val assertPres = vpr.Assert(getAndOfExps(pres))()
+            newStmts = Seq(assertPres)
+          }
+
+          // Havoc S_tmp and S_fail_tmp
+          val tempFailedStates = vpr.LocalVar(tempFailedStatesVarName, currFailureStates.typ)()
+          val havocSFailTmp = havocSetMethodCall(tempFailedStates)
+          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp)
+
+          if (!callee.post.isEmpty) {
+            useParamsToArgsMap = true
+            currParamsToArgsMap = right.paramsToArgs
+            val posts = callee.post.map(p => translateExp(p, state, STmp, tempFailedStates))
+            useParamsToArgsMap = false
+            val assumePosts = vpr.Inhale(getAndOfExps(posts))()
+            newStmts = newStmts :+ assumePosts
+          }
+
+          // Auto-framing
+          if (frame) {
+            val modifiedVars = left.map(v => v.name -> v.typ).toMap
+            // For all
+            if (verifierOption != 1) {
+              val frame = frameUnmodifiedVars(modifiedVars, state, STmp, currStates, typVarMap, true)
+              newStmts = newStmts :+ frame
+            }
+            // Exists
+            if (verifierOption != 0) {
+              val frame = frameUnmodifiedVars(modifiedVars, state, STmp, currStates, typVarMap, false)
+              newStmts = newStmts :+ frame
+            }
+          }
+
+          // Update S and S_fail
+          val updateSFail = vpr.LocalVarAssign(currFailureStates,
+            getSetUnionApp(Seq(currFailureStates, tempFailedStates), typVarMap))()
+          newStmts = newStmts ++ Seq(updateSFail, updateProgStates)
+          (newStmts, Seq.empty)
 
         case HavocStmt(id, hintDecl) =>
             val leftVar = vpr.LocalVarDecl(id.name, typVarMap.get(typeVar).get)()
@@ -495,7 +530,7 @@ object Generator {
             (res._1, res._2)
         case ReuseStmt(_) =>
             throw UnknownException("Reuse statement shouldn't be translated on its own")
-        case loop@WhileLoopStmt(cond, body, invWithHints, decr, rule) =>
+        case WhileLoopStmt(cond, body, invWithHints, decr, rule) =>
             loopCounter = loopCounter + 1
             val getSkFuncName = "get_Sk_" + loopCounter
             // Connect all invariants with && to form 1 invariant
@@ -549,17 +584,16 @@ object Generator {
             newStmts = newStmts ++ Seq(havocSTmp, havocFailureStates)
 
             // Auto-framing
-            val frameUnmodifiedVarsStmt = if (!frame) Seq.empty else {
-              var res : Seq[vpr.Stmt] = Seq.empty
+            if (frame)  {
               if (verifierOption != 1)
                 // ForAll
-                res = res :+ translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars(body, state, currStates, typVarMap, true), typVarMap)
-              if (verifierOption != 0)
+                newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, STmp, currStates, typVarMap, true)
+              if (verifierOption != 0) {
+                // TODO: check that the body contains no assume statements and all while loops have a decreases clause
                 // Exists
-                res = res :+ translateAssumeWithViperExpr(state, STmp, frameUnmodifiedVars(body, state, currStates, typVarMap, false), typVarMap, useForAll = false)
-              res
+                newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, currStates, STmp, typVarMap, false)
+              }
             }
-            newStmts = newStmts ++ frameUnmodifiedVarsStmt
 
             // Update S after the loop
             if (rule == "syncRule") {
@@ -626,36 +660,63 @@ object Generator {
           (newStmts, Seq.empty)
 
         case call@MethodCallStmt(_, _) =>
-          System.exit(0)
-          // TODO: in_set_forall & exists?? Need triggers?
           // Assert the callee's precondition
-          // TODO: replace vars in pres during translation
-          useParamsToArgsMap = true
-          currParamsToArgsMap = call.paramsToArgs
-          val pres = call.method.pre.map(p => translateExp(p, state, currStates, currFailureStates))
-          useParamsToArgsMap = false
-          val assertPres = vpr.Assert(getAndOfExps(pres))()
+          if (!call.method.pre.isEmpty) {
+            useParamsToArgsMap = true
+            currParamsToArgsMap = call.paramsToArgs
+            val pres = call.method.pre.map(p => translateExp(p, state, currStates, currFailureStates))
+            useParamsToArgsMap = false
+            val assertPres = vpr.Assert(getAndOfExps(pres))()
+            newStmts = Seq(assertPres)
+          }
+
           // Havoc S_tmp and S_fail_tmp
           val tempFailedStates = vpr.LocalVar(tempFailedStatesVarName, currFailureStates.typ)()
           val havocSFailTmp = havocSetMethodCall(tempFailedStates)
-          newStmts = Seq(assertPres, havocSTmp, havocSFailTmp)
-          val posts = call.method.post.map(p => translateExp(p, state, STmp, tempFailedStates))
-          val assumePosts = vpr.Inhale(getAndOfExps(posts))()
-          // TODO: auto-framing
+          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp)
+
+          // Assume the callee's postcondition
+          if (!call.method.post.isEmpty) {
+            useParamsToArgsMap = true
+            currParamsToArgsMap = call.paramsToArgs
+            val posts = call.method.post.map(p => translateExp(p, state, STmp, tempFailedStates))
+            useParamsToArgsMap = false
+            val assumePosts = vpr.Inhale(getAndOfExps(posts))()
+            newStmts = newStmts :+ assumePosts
+          }
+
+          // Auto-framing
+          if (frame)  {
+            // For all
+            if (verifierOption != 1) {
+              val frame = frameUnmodifiedVars(Map.empty, state, STmp, currStates, typVarMap, true)
+              newStmts = newStmts :+ frame
+            }
+            // Exists
+            if (verifierOption != 0) {
+              val frame = frameUnmodifiedVars(Map.empty, state, STmp, currStates, typVarMap, false)
+              newStmts = newStmts :+ frame
+            }
+          }
+
           // Update S and S_fail
           val updateSFail = vpr.LocalVarAssign(currFailureStates,
             getSetUnionApp(Seq(currFailureStates, tempFailedStates), typVarMap))()
-          newStmts = newStmts ++ Seq(assumePosts, updateSFail, updateProgStates)
+          newStmts = newStmts ++ Seq(updateSFail, updateProgStates)
           (newStmts, Seq.empty)
       }
     }
 
-    def frameUnmodifiedVars(body: CompositeStmt, state: vpr.LocalVar, currStates: vpr.Exp, typVarMap: Map[vpr.TypeVar, vpr.Type], useForAll: Boolean): vpr.Exp = {
-      val s_prime = vpr.LocalVarDecl(if (verifierOption == 0) s0VarName else s1VarName, state.typ)()
+    // This returns:
+    // forall s: State :: in_set(s, S1) ==>
+    //    exists s': State :: in_set(s', S2) &&
+    //      (forall progVar: Int :: progVar != modVar ==> get(s', progVar) == get(state, progVar))
+    def frameUnmodifiedVars(modifiedVars: Map[String, Type], state: vpr.LocalVar, S1: vpr.LocalVar, S2: vpr.LocalVar, typVarMap: Map[vpr.TypeVar, vpr.Type], useForAll: Boolean): vpr.Stmt = {
+      val s_prime = vpr.LocalVarDecl(if (useForAll) s0VarName else s1VarName, state.typ)()
       val vVar = vpr.LocalVarDecl("progVar", vpr.Int)()
-      if (body.modifiedProgVars.isEmpty) {
+      val rightExpr = if (modifiedVars.isEmpty) {
         vpr.Exists(Seq(s_prime), Seq.empty,
-          vpr.And(getInSetApp(Seq(s_prime.localVar, currStates), typVarMap, useForAll),
+          vpr.And(getInSetApp(Seq(s_prime.localVar, S2), typVarMap, useForAll),
             vpr.Forall(Seq(vVar), Seq.empty,
               vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
                 getGetApp(Seq(state, vVar.localVar), typVarMap))()
@@ -663,13 +724,13 @@ object Generator {
           )()
         )()
       } else {
-        // varsModifiedByLoop is guaranteed to be non-empty
-        val varsModifiedByLoop = body.modifiedProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
+        // modifiedVarsVpr is guaranteed to be non-empty
+        val modifiedVarsVpr = modifiedVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
         vpr.Exists(Seq(s_prime), Seq.empty,
-          vpr.And(getInSetApp(Seq(s_prime.localVar, currStates), typVarMap, useForAll),
+          vpr.And(getInSetApp(Seq(s_prime.localVar, S2), typVarMap, useForAll),
             vpr.Forall(Seq(vVar), Seq.empty,
               vpr.Implies(
-                getAndOfExps(varsModifiedByLoop.map(t => vpr.NeCmp(vVar.localVar, t)()).toList),
+                getAndOfExps(modifiedVarsVpr.map(t => vpr.NeCmp(vVar.localVar, t)()).toList),
                 vpr.EqCmp(getGetApp(Seq(s_prime.localVar, vVar.localVar), typVarMap),
                   getGetApp(Seq(state, vVar.localVar), typVarMap))()
               )()
@@ -677,6 +738,7 @@ object Generator {
           )()
         )()
       }
+      translateAssumeWithViperExpr(state, S1, rightExpr, typVarMap, useForAll=useForAll)
     }
 
     def getAllInvariants(invs: Seq[Expr], currStates: vpr.Exp, failureStates: vpr.Exp, normalize: Boolean = false): vpr.Exp = {
@@ -903,8 +965,9 @@ object Generator {
       e match {
         case id@Id(name) =>
           // Any reference to a var is translated to get(state, var)
-          val viperId = if (useParamsToArgsMap) vpr.LocalVar(currParamsToArgsMap.get(id).get.name, translateType(id.typ, typVarMap))()
-                        else vpr.LocalVar(name, translateType(id.typ, typVarMap))()
+          val viperId = if (useParamsToArgsMap) {
+                            vpr.LocalVar(currParamsToArgsMap.get(id.name).get, translateType(id.typ, typVarMap))()
+          } else vpr.LocalVar(name, translateType(id.typ, typVarMap))()
           getGetApp(Seq(state, viperId), state.typ.asInstanceOf[vpr.DomainType].partialTypVarsMap)
         case Num(value) => vpr.IntLit(value)()
         case BoolLit(value) => vpr.BoolLit(value)()
