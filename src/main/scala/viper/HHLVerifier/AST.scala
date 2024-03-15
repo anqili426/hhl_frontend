@@ -21,7 +21,6 @@ case class ImpliesExpr(left: Expr, right: Expr) extends Expr
 case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], body: Expr) extends Expr {
   var proForAll: Boolean = false
   var topExists: Boolean = false
-  var isPre: Boolean = false
   var triggers: Seq[Seq[StateExistsExpr]] = Seq.empty
 }
 case class GetValExpr(state: SpecialId, id: Id) extends Expr
@@ -57,7 +56,13 @@ case class AssertStmt(e: Expr) extends Stmt
 case class HyperAssumeStmt(e: Expr) extends Stmt
 case class HyperAssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: CompositeStmt, elseStmt: CompositeStmt) extends Stmt
-case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)], decr: Option[Expr], rule: String = "default") extends Stmt
+case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)], decr: Option[Expr], rule: String = "default") extends Stmt {
+  // This is true if
+  // 1. The loop body contains no assume statements
+  // 2. The loop itself has a decreases clause
+  // 3. All the loops nested in the loop body have a decreases clause
+  var isTotal = !decr.isEmpty
+}
 case class PVarDecl(vName: Id, vType: Type) extends Stmt
 case class ProofVarDecl(proofVar: ProofVar, p: Expr) extends Stmt
 case class FrameStmt(framedAssertion: Expr, body: CompositeStmt) extends Stmt

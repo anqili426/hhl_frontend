@@ -32,14 +32,18 @@ object TypeChecker {
     if (!isHyperAssertion) throw TypeException("At least one precondition of method " + m.mName + " is not a hyper assertion")
     m.post.foreach(p => isHyperAssertion = isHyperAssertion && typeCheckExpr(p, true))
     if (!isHyperAssertion) throw TypeException("At least one postcondition of method " + m.mName + " is not a hyper assertion")
-    typeCheckStmt(m.body)
+    typeCheckStmt(m.body, false)
   }
 
-  def typeCheckStmt(s: Stmt): Unit = {
+  def typeCheckStmt(s: Stmt, isInLoop: Boolean): Boolean = {
     var res = true
+    var isTotal = true
     s match {
       case CompositeStmt(stmts) =>
-        stmts.foreach(stmt => typeCheckStmt(stmt))
+        stmts.foreach(stmt => {
+          val stmtIsTotal = typeCheckStmt(stmt, isInLoop)
+          isTotal = isTotal && stmtIsTotal
+        })
       case AssignStmt(left, right) =>
         typeCheckExpr(left, false)
         typeCheckExpr(right, false)
@@ -56,6 +60,7 @@ object TypeChecker {
       case AssumeStmt(e) =>
         typeCheckExpr(e, false)
         res = checkIfTypeMatch(e.typ, boolType)
+        isTotal = !isInLoop
       case AssertStmt(e) =>
         typeCheckExpr(e, false)
         res = checkIfTypeMatch(e.typ, boolType)
@@ -70,14 +75,16 @@ object TypeChecker {
       case IfElseStmt(cond, ifStmt, elseStmt) =>
         typeCheckExpr(cond, false)
         res =  checkIfTypeMatch(cond.typ, boolType)
-        typeCheckStmt(ifStmt)
-        typeCheckStmt(elseStmt)
+        val isTotalIf = typeCheckStmt(ifStmt, isInLoop)
+        val isTotalElse = typeCheckStmt(elseStmt, isInLoop)
+        isTotal = isTotal && isTotalIf && isTotalElse
       case DeclareStmt(blockId, stmts) =>
         res = checkIfTypeMatch(blockId.typ, blockType)
-        typeCheckStmt(stmts)
+        val isTotalBody = typeCheckStmt(stmts, isInLoop)
+        isTotal = isTotal && isTotalBody
       case ReuseStmt(blockId) =>
         res = checkIfTypeMatch(blockId.typ, blockType)
-      case WhileLoopStmt(cond, body, inv, decr, _) =>
+      case loop@WhileLoopStmt(cond, body, inv, decr, rule) =>
         var isHyperAssertion = true
         typeCheckExpr(cond, false)
         res = checkIfTypeMatch(cond.typ, boolType)
@@ -90,12 +97,18 @@ object TypeChecker {
           typeCheckExpr(decr.get, false)
           res = res && checkIfTypeMatch(decr.get.typ, intType)
         }
-        typeCheckStmt(body)
+        val loopBodyIsTotal = typeCheckStmt(body, true)
+        loop.isTotal = !decr.isEmpty && loopBodyIsTotal
+        isTotal = isTotal && loop.isTotal
+        if (!loop.isTotal && rule == "syncTotRule")
+          throw UnknownException("To use the syncTot rule, the loop itself must have a decreases clause," +
+            " and its body must not contain any assume statements or nested loops without decreases clauses")
       case FrameStmt(framedAssertion, body) =>
         val isHyperAssertion = typeCheckExpr(framedAssertion, true)
         if (!isHyperAssertion) throw TypeException("Only hyper assertions can be framed")
         res = checkIfTypeMatch(framedAssertion.typ, boolType)
-        typeCheckStmt(body)
+        val bodyIsTotal = typeCheckStmt(body, isInLoop)
+        isTotal = isTotal && bodyIsTotal
       case PVarDecl(vName, vType) =>
         vName.typ = vType
         res = true
@@ -116,6 +129,7 @@ object TypeChecker {
         if (!res) throw TypeException("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters")
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
+    else isTotal
   }
 
   // hyperAssertionExpected is true if e is expected to be (part of) a hyper assertion

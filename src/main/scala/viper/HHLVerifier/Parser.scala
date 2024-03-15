@@ -81,13 +81,14 @@ object Parser {
   def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ otherExpr ~ ")" ~ "{" ~ stmtsInIf ~ "}" ~ ("else" ~ "{" ~ stmtsInElse ~ "}").?).map{
     case (e, s1, s2) => IfElseStmt(e, s1, s2.getOrElse(CompositeStmt(Seq()))) }
 
-  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~~ spaces ~ ("syncRule" | "forAllExistsRule" | "existsRule").?.! ~ "(" ~ otherExpr ~ ")"  ~ loopInv.rep ~ ("decreases" ~ arithExpr).? ~ "{" ~ stmts ~ "}").map {
+  def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~~ spaces ~ ("syncRule" | "forAllExistsRule" | "existsRule" | "syncTotRule").?.! ~ "(" ~ otherExpr ~ ")"  ~ loopInv.rep ~ ("decreases" ~ arithExpr).? ~ "{" ~ stmts ~ "}").map {
     items =>
       val rule = if (items._1 == "") "default" else items._1
       val cond = items._2
       val invs = if (items._3 == Nil) Seq.empty else items._3
       val decr = if (items._4.isEmpty) Option.empty else items._4
       val body = items._5
+      if (rule == "syncTotRule" && decr.isEmpty) throw UnknownException("Users must provide a decreases clause to use the syncTot Rule")
       WhileLoopStmt(cond, body, invs, decr, rule)
   }
   def loopInv[$: P]: P[(Option[HintDecl], Expr)] = P(hintDecl.? ~ "invariant" ~~ spaces ~ expr)

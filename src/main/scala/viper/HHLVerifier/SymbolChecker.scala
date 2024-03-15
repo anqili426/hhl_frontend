@@ -46,7 +46,7 @@ object SymbolChecker {
       allVars = allVars + (r.name -> r.typ)
       varsAllowedInPost = varsAllowedInPost + (r.name -> r.typ)
     }
-    checkSymbolsStmt(m.body, true)
+    checkSymbolsStmt(m.body)
     m.allVars = allVars
 
     // Because postconditions can contain hints declared in the method body
@@ -64,7 +64,7 @@ object SymbolChecker {
   // Returns
   // 1. Sequence of all program variables that appear in the statement
   // 2. Sequence of all program variables that are modified in the statement
-  def checkSymbolsStmt(stmt: Stmt, checkMethodBody: Boolean = false): (Seq[(String, Type)], Seq[(String, Type)]) = {
+  def checkSymbolsStmt(stmt: Stmt): (Seq[(String, Type)], Seq[(String, Type)]) = {
     stmt match {
       case cs@CompositeStmt(stmts) =>
         val varsBeforeNewScope = allVarsInCurrScope
