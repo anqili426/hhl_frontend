@@ -966,7 +966,7 @@ object Generator {
 
         // Update loop index to be $n + 1 (Note that this only matters when the rule is default)
         currLoopIndex = vpr.Add(currLoopIndexDecl.localVar, one)()
-        val assertI = vpr.Assert(getAllInvariants(inv, currStates, currFailureStates, true))()
+        val assertI = vpr.Assert(getAllInvariants(inv, currStates, currFailureStates))()
         ifBodyStmts = ifBodyStmts :+ assertI
 
         // This is different when the rule is forAllExists

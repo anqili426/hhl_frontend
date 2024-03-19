@@ -31,24 +31,37 @@ object Parser {
 
   def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ notStateTypeName).map(items => PVarDecl(items._1, items._2))
 
-  def assertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ anyTypeName).map(items => AssertVarDecl(items._1, items._2))
+  def normalAssertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ notStateTypeName).map(items => AssertVarDecl(items._1, items._2))
 
   def notStateTypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
     case "Int" => IntType()
     case "Bool" => BoolType()
   }
 
-  def anyTypeName[$: P]: P[Type] = P("Int" | "Bool" | "State").!.map {
-    case "Int" => IntType()
-    case "Bool" => BoolType()
-    case "State" => StateType()
-  }
+  def proofVarDecl[$: P]: P[ProofVarDecl] = P(stateProofVarDeclErr | stateProofVarDecl | normalProofVarDecl)
 
-  def proofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ anyTypeName ~ "::" ~ expr).map{
+  def normalProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ notStateTypeName ~ "::" ~ expr).map{
     items =>
       items._1.typ = items._2
       ProofVarDecl(items._1, items._3)
   }
+
+  def stateProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ "<" ~ proofVar ~ ">" ~ ":" ~ "State" ~ ("::" ~ expr).?).map {
+    items =>
+      items._1.typ = StateType()
+      val stateExistsExpr = StateExistsExpr(items._1, false)
+      val body = if (items._2.isEmpty) stateExistsExpr else BinaryExpr(stateExistsExpr, "&&", items._2.get)
+      ProofVarDecl(items._1, body)
+  }
+
+  def stateProofVarDeclErr[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ "<<" ~ proofVar ~ ">>" ~ ":" ~ "State" ~ ("::" ~ expr).?).map {
+    items =>
+      items._1.typ = StateType()
+      val stateExistsExpr = StateExistsExpr(items._1, true)
+      val body = if (items._2.isEmpty) stateExistsExpr else BinaryExpr(stateExistsExpr, "&&", items._2.get)
+      ProofVarDecl(items._1, body)
+  }
+
   def proofVar[$: P]: P[ProofVar] = P("$" ~~ CharIn("a-mo-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(ProofVar)
   def methodCall[$: P]: P[(String, Seq[Id])] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")")
 
@@ -107,12 +120,43 @@ object Parser {
 
   def expr[$: P]: P[Expr] = P(assertion | otherExpr)
 
-  // TODO:
   // Syntax 1: assertVar is NOT of type State -- forall n: Int :: P(n)
   // Syntax 2: assertVar is of type State -- forall <s1>: State :: P(s1)
   // Syntax 2 is translated to (forall s1: State :: <s1> ==> P)
   // This also means that <s> can only appear at this position (might affect proof var decl?)
-  def assertion[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
+  def assertion[$: P]: P[Assertion] = P(hyperAssertionErr | hyperAssertion | normalAssertion)
+  def normalAssertion[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (normalAssertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
+  def hyperAssertion[$: P]: P[Assertion] = P(quantifier ~ ("<"  ~ assertVar ~ ">" ~ ":" ~ "State").rep(sep=",", min=1) ~ "::" ~ expr).map{
+    items =>
+      val quantifier = items._1
+      val assertVarDecl = items._2.map(i => AssertVarDecl(i, StateType()))
+      val allStatesExistSeq: Seq[Expr] = items._2.map(i => StateExistsExpr(i, false))
+      val body = {
+        if (allStatesExistSeq.isEmpty) items._3
+        else {
+          val allStatesExist = allStatesExistSeq.reduceLeft((e1, e2) => BinaryExpr(e1, "&&", e2))
+          if (quantifier == "forall") ImpliesExpr(allStatesExist, items._3)
+          else BinaryExpr(allStatesExist, "&&", items._3)
+        }
+      }
+      Assertion(quantifier, assertVarDecl, body)
+  }
+
+  def hyperAssertionErr[$: P]: P[Assertion] = P(quantifier ~ ("<<" ~ assertVar ~ ">>" ~ ":" ~ "State").rep(sep = ",", min = 1) ~ "::" ~ expr).map {
+    items =>
+      val quantifier = items._1
+      val assertVarDecl = items._2.map(i => AssertVarDecl(i, StateType()))
+      val allStatesExistSeq: Seq[Expr] = items._2.map(i => StateExistsExpr(i, true))
+      val body = {
+        if (allStatesExistSeq.isEmpty) items._3
+        else {
+          val allStatesExist = allStatesExistSeq.reduceLeft((e1, e2) => BinaryExpr(e1, "&&", e2))
+          if (quantifier == "forall") ImpliesExpr(allStatesExist, items._3)
+          else BinaryExpr(allStatesExist, "&&", items._3)
+        }
+      }
+      Assertion(quantifier, assertVarDecl, body)
+  }
 
   def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "}").map {HintDecl}
 
@@ -148,7 +192,7 @@ object Parser {
     case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
 
-  def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | stateExistsErrExpr | stateExistsExpr |  "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | "(" ~ expr ~ ")")
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   // Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
@@ -160,9 +204,6 @@ object Parser {
   def boolFalse[$: P]: P[BoolLit] = P("false").!.map(_ => BoolLit(false))
 
   def getProgVarExpr[$: P]: P[GetValExpr] = P("get(" ~ (assertVar | proofVar) ~ "," ~ progVar ~ ")").map(items => GetValExpr(items._1, items._2))
-
-  def stateExistsExpr[$: P]: P[StateExistsExpr] = P("<"  ~ (assertVar | proofVar) ~ ">").map(item => StateExistsExpr(item, false))
-  def stateExistsErrExpr[$: P]: P[StateExistsExpr] = P("<<"  ~ (assertVar | proofVar) ~ ">>").map(item => StateExistsExpr(item, true))
 
   def identifier[$: P]: P[Expr] = P(progVar | assertVar | proofVar)
 
