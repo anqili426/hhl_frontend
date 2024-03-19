@@ -55,6 +55,7 @@ object Generator {
   // The identifier of each logical variable starts with two underscores
   // This guarantees no name clash between logical variables and any variables written by users
   val nonDetBoolName = "__check_inv_cond" // Used during inline verification of invariants
+  val checkSyncCondName = "__use_sync_rule"
   val kVarName = "__k"
   val progVarName = "__progVar" // Used for auto-framing
   val tVarName = "__t"  // Used when there is a decreases clause
@@ -557,94 +558,139 @@ object Generator {
                 )()
               )()
 
-            // Assert I(0)
-            val I0 = getAllInvariants(inv, currStates, loopFailureStates)
-            val assertI0 = vpr.Assert(I0)()
-
             newVars = Seq(loopFailureStates)
-            newStmts = Seq(assumeEmptyFailureStates, assertI0)
 
-            if (rule == "default" && !inline) {
-              newMethods = translateInvariantVerificationModular(inv, cond, body, decr, typVarMap)
-              allMethods = allMethods ++ newMethods
+            if (autoSelectRules && rule == "unspecified") {
+              val loopStates = vpr.LocalVar("S_loop" + loopCounter, currStates.typ)()
+              val havocCurrStates = havocSetMethodCall(loopStates)
+              val havocFailureStates = havocSetMethodCall(loopFailureStates)
+
+              val inSetEq = inhaleInSetEqStmt(stateDecl, loopStates, typVarMap)
+              val inSetEqFail = inhaleInSetEqStmt(stateDecl, loopFailureStates, typVarMap)
+              allowLimitedFunctions = true
+              val inhaleI = vpr.Inhale(getAllInvariants(inv, loopStates, loopFailureStates, true))()
+              allowLimitedFunctions = false
+
+              val checkRuleCond = vpr.LocalVar(checkSyncCondName + loopCounter, vpr.Bool)()
+              val s1 = vpr.LocalVarDecl(s1VarName, getConcreteStateType(typVarMap))()
+              val s2 = vpr.LocalVarDecl(s2VarName, getConcreteStateType(typVarMap))()
+              val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
+                vpr.And(getInSetApp(Seq(s1.localVar, loopStates), typVarMap), getInSetApp(Seq(s2.localVar, loopStates), typVarMap))(),
+                vpr.EqCmp(translateExp(cond, s1.localVar, loopStates, loopFailureStates), translateExp(cond, s2.localVar, loopStates, loopFailureStates))()
+              )())()
+              val assignToCondVar = vpr.LocalVarAssign(checkRuleCond, sameGuardValue)()
+
+              newStmts = newStmts ++ Seq(havocCurrStates, havocFailureStates, inSetEq, inSetEqFail, inhaleI, assignToCondVar)
+              newVars = newVars ++ Seq(loopStates, checkRuleCond)
+
+              // If branch
+              val useSyncRule = if (loop.isTotal) {
+                val dupLoop = WhileLoopStmt(loop.cond, loop.body, loop.inv, decr, "syncTotRule")
+                dupLoop.isTotal = true
+                translateStmt(dupLoop, currStates, currFailureStates)
+              } else {
+                val dupLoop = WhileLoopStmt(loop.cond, loop.body, loop.inv, decr, "syncRule")
+                dupLoop.isTotal = false
+                translateStmt(dupLoop, currStates, currFailureStates)
+              }
+
+              // Else branch
+              val dupLoop = WhileLoopStmt(loop.cond, loop.body, loop.inv, decr, "forAllExistsRule")
+              dupLoop.isTotal = loop.isTotal
+              val useForAllExistsRule = translateStmt(dupLoop, currStates, currFailureStates)
+
+              val applyRule = vpr.If(checkRuleCond, vpr.Seqn(useSyncRule._1, Seq.empty)(), vpr.Seqn(useForAllExistsRule._1, Seq.empty)())()
+
+              newStmts = newStmts :+ applyRule
+              newVars = newVars ++ useSyncRule._2 ++ useForAllExistsRule._2
             } else {
-              val invVerification = translateInvariantVerificationInline(inv, cond, body, decr, currStates, loopFailureStates, rule, typVarMap)
-              newStmts = newStmts ++ invVerification._1
-              newVars = newVars ++ invVerification._2
-            }
+              // Assert I(0)
+              val I0 = getAllInvariants(inv, currStates, loopFailureStates)
+              val assertI0 = vpr.Assert(I0)()
+              newStmts = newStmts ++ Seq(assumeEmptyFailureStates, assertI0)
 
-            val havocFailureStates = havocSetMethodCall(loopFailureStates)
-            newStmts = newStmts ++ Seq(havocSTmp, havocFailureStates)
+              // Use the rule specified by the user
+              if (rule == "desugaredRule" && !inline) {
+                newMethods = translateInvariantVerificationModular(inv, cond, body, decr, typVarMap)
+                allMethods = allMethods ++ newMethods
+              } else {
+                val invVerification = translateInvariantVerificationInline(inv, cond, body, decr, currStates, loopFailureStates, rule, typVarMap)
+                newStmts = newStmts ++ invVerification._1
+                newVars = newVars ++ invVerification._2
+              }
 
-            // Auto-framing
-            if (frame)  {
-              if (verifierOption != 1) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, STmp, currStates, typVarMap, true)
-              if (verifierOption != 0 && loop.isTotal) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, currStates, STmp, typVarMap, false)
-            }
+              val havocFailureStates = havocSetMethodCall(loopFailureStates)
+              newStmts = newStmts ++ Seq(havocSTmp, havocFailureStates)
 
-            // Update S after the loop
-            if (rule == "syncRule") {
-              val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
-              val empS = vpr.Forall(Seq(stateDecl), Seq.empty, vpr.Not(getInSetApp(Seq(state, STmp), typVarMap, false))())()
-              newStmts = newStmts :+ vpr.Inhale(vpr.Or(translatedInv, empS)())()
-            } else if (rule == "forAllExistsRule") {
-              // TODO: test this!
-              val invsToTranslate = inv.map(i => transformExpr(Normalizer.normalize(i, false), UnaryExpr("!", cond), false))
-              val translatedInvs = getAllInvariants(invsToTranslate, STmp, loopFailureStates)
-              newStmts = newStmts :+ vpr.Inhale(translatedInvs)()
-            } else if (rule == "syncTotRule") {
-              val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
-              newStmts = newStmts :+ vpr.Inhale(translatedInv)()
-            }
-            else {
-              // Let currStates be a union of Sk's
-              // TODO: this needs to be updated to handle S_fail
-              val k = vpr.LocalVarDecl(kVarName, vpr.Int)()
-              val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
-              val getSkFuncApp = vpr.FuncApp(getSkFuncName, Seq(k.localVar))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
-              allFuncs = allFuncs :+ getSkFunc
-              currLoopIndex = k.localVar
+              // Auto-framing
+              if (frame) {
+                if (verifierOption != 1) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, STmp, currStates, typVarMap, true)
+                if (verifierOption != 0 && loop.isTotal) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, currStates, STmp, typVarMap, false)
+              }
 
-              if (verifierOption != 1) {
-                // ForAll
-                val unionStates = vpr.Exists(Seq(k), Seq.empty,
-                  vpr.And(vpr.GeCmp(k.localVar, zero)(),
-                    vpr.And(getInSetApp(Seq(state, getSkFuncApp), typVarMap),
-                      getAllInvariants(inv, getSkFuncApp, loopFailureStates)
+              // Update S after the loop
+              if (rule == "syncRule") {
+                val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
+                val empS = vpr.Forall(Seq(stateDecl), Seq.empty, vpr.Not(getInSetApp(Seq(state, STmp), typVarMap, false))())()
+                newStmts = newStmts :+ vpr.Inhale(vpr.Or(translatedInv, empS)())()
+              } else if (rule == "forAllExistsRule") {
+                val invsToTranslate = inv.map(i => transformExpr(Normalizer.normalize(i, false), UnaryExpr("!", cond), false))
+                val translatedInvs = getAllInvariants(invsToTranslate, STmp, loopFailureStates)
+                newStmts = newStmts :+ vpr.Inhale(translatedInvs)()
+              } else if (rule == "syncTotRule") {
+                val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
+                newStmts = newStmts :+ vpr.Inhale(translatedInv)()
+              }
+              else {
+                // Let currStates be a union of Sk's
+                // TODO: this needs to be updated to handle S_fail
+                val k = vpr.LocalVarDecl(kVarName, vpr.Int)()
+                val getSkFunc = vpr.Function(getSkFuncName, Seq(k), getConcreteSetStateType(typVarMap), Seq.empty, Seq.empty, Option.empty)()
+                val getSkFuncApp = vpr.FuncApp(getSkFuncName, Seq(k.localVar))(vpr.NoPosition, vpr.NoInfo, getConcreteSetStateType(typVarMap), vpr.NoTrafos)
+                allFuncs = allFuncs :+ getSkFunc
+                currLoopIndex = k.localVar
+
+                if (verifierOption != 1) {
+                  // ForAll
+                  val unionStates = vpr.Exists(Seq(k), Seq.empty,
+                    vpr.And(vpr.GeCmp(k.localVar, zero)(),
+                      vpr.And(getInSetApp(Seq(state, getSkFuncApp), typVarMap),
+                        getAllInvariants(inv, getSkFuncApp, loopFailureStates)
+                      )()
                     )()
                   )()
-                )()
-                newStmts = newStmts :+ translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap)
-              }
+                  newStmts = newStmts :+ translateAssumeWithViperExpr(state, STmp, unionStates, typVarMap)
+                }
 
-              if (verifierOption != 0) {
-                // Exists
-                // Get all declarations of hints
-                val allHintDecls = invWithHints.map(i => i._1).filter(h => !h.isEmpty)
-                val translatedHintDecls = allHintDecls.map(h => translateHintDecl(h.get, k.localVar))
-                val triggers = if (translatedHintDecls.isEmpty) Seq.empty else translatedHintDecls.map(h => vpr.Trigger(Seq(h))())
-                newStmts = newStmts ++ Seq(
-                  vpr.Inhale(vpr.Forall(Seq(k), triggers,
-                    vpr.Implies(vpr.GeCmp(k.localVar, zero)(),
-                      getAllInvariants(inv, getSkFuncApp, loopFailureStates))())())(),
-                  vpr.Inhale(vpr.Forall(Seq(stateDecl, k), Seq.empty,
-                    vpr.Implies(vpr.And(vpr.GeCmp(k.localVar, zero)(),
-                      getInSetApp(Seq(state, getSkFuncApp), typVarMap, false))(),
-                      getInSetApp(Seq(state, STmp), typVarMap, false))())())()
-                )
+                if (verifierOption != 0) {
+                  // Exists
+                  // Get all declarations of hints
+                  val allHintDecls = invWithHints.map(i => i._1).filter(h => !h.isEmpty)
+                  val translatedHintDecls = allHintDecls.map(h => translateHintDecl(h.get, k.localVar))
+                  val triggers = if (translatedHintDecls.isEmpty) Seq.empty else translatedHintDecls.map(h => vpr.Trigger(Seq(h))())
+                  newStmts = newStmts ++ Seq(
+                    vpr.Inhale(vpr.Forall(Seq(k), triggers,
+                      vpr.Implies(vpr.GeCmp(k.localVar, zero)(),
+                        getAllInvariants(inv, getSkFuncApp, loopFailureStates))())())(),
+                    vpr.Inhale(vpr.Forall(Seq(stateDecl, k), Seq.empty,
+                      vpr.Implies(vpr.And(vpr.GeCmp(k.localVar, zero)(),
+                        getInSetApp(Seq(state, getSkFuncApp), typVarMap, false))(),
+                        getInSetApp(Seq(state, STmp), typVarMap, false))())())()
+                  )
+                }
               }
-            }
-            // S_fail = S_fail union S_loop_fail
-            val updateSFail = vpr.LocalVarAssign(currFailureStates, getSetUnionApp(Seq(currFailureStates, loopFailureStates), typVarMap))()
-            newStmts = newStmts ++ Seq(updateSFail, updateProgStates)
-            if (rule == "default" || rule == "forAllExistsRule") {
-              val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates, currFailureStates)
-              newStmts = newStmts ++ notCond._1
-            } else {
-              // Inhale not b
-              val negatedLoopGuard = translateExp(UnaryExpr("!", cond), state, currStates, currFailureStates)
-              val notCond = translateAssumeWithViperExpr(state, currStates, negatedLoopGuard, typVarMap)
-              newStmts = newStmts :+ notCond
+              // S_fail = S_fail union S_loop_fail
+              val updateSFail = vpr.LocalVarAssign(currFailureStates, getSetUnionApp(Seq(currFailureStates, loopFailureStates), typVarMap))()
+              newStmts = newStmts ++ Seq(updateSFail, updateProgStates)
+              if (rule == "desugaredRule" || rule == "forAllExistsRule") {
+                val notCond = translateStmt(AssumeStmt(UnaryExpr("!", cond)), currStates, currFailureStates)
+                newStmts = newStmts ++ notCond._1
+              } else {
+                // Inhale not b
+                val negatedLoopGuard = translateExp(UnaryExpr("!", cond), state, currStates, currFailureStates)
+                val notCond = translateAssumeWithViperExpr(state, currStates, negatedLoopGuard, typVarMap)
+                newStmts = newStmts :+ notCond
+              }
             }
 
             (newStmts, newVars)
@@ -897,7 +943,7 @@ object Generator {
         val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
         currLoopIndex = currLoopIndexDecl.localVar
 
-        if (rule == "default") {
+        if (rule == "desugaredRule") {
           // Assume loop index $n >= 0
           val havocIndex = havocIntMethodCall(currLoopIndexDecl.localVar)
           val indexNonNeg = vpr.Inhale(vpr.GeCmp(currLoopIndex, zero)())()
@@ -938,7 +984,7 @@ object Generator {
           ifBodyStmts = ifBodyStmts :+ vpr.Assert(sameGuardValue)()
           // Assume that the loop guard holds in all states
           ifBodyStmts = ifBodyStmts :+ vpr.Inhale(loopGuardHoldsForAll)()
-        } else if (rule == "default") {
+        } else if (rule == "desugaredRule") {
           val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates, currFailureStates)._1
           ifBodyStmts = ifBodyStmts ++ assumeLoopGuard
         }
