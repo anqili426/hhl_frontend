@@ -589,21 +589,9 @@ object Generator {
               newStmts = newStmts :+ vpr.Inhale(vpr.Or(translatedInv, empS)())()
             } else if (rule == "forAllExistsRule") {
               // TODO: test this!
-              // var invToTranslate: Seq[Expr] = Seq.empty
-//              inv.foreach( i => {
-//                if (i.isInstanceOf[Assertion]) {
-//                  val thisInv = i.asInstanceOf[Assertion]
-//                  if (thisInv.quantifier == "forall")
-//                  else {
-//                    // TODO: how to do this if there are multiple states?
-//                    // val newInvBody = BinaryExpr(ImpliesExpr(UnaryExpr("!", cond), StateExistsExpr(, false)), "&&", thisInv.body)
-//
-//                    // = Assertion("exists", thisInv.assertVarDecls, )
-//                  }
-//                } else invToTranslate = invToTranslate :+ i
-//              })
-              val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
-              newStmts = newStmts :+ vpr.Inhale(translatedInv)()
+              val invsToTranslate = inv.map(i => transformExpr(Normalizer.normalize(i, false), UnaryExpr("!", cond), false))
+              val translatedInvs = getAllInvariants(invsToTranslate, STmp, loopFailureStates)
+              newStmts = newStmts :+ vpr.Inhale(translatedInvs)()
             } else if (rule == "syncTotRule") {
               val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
               newStmts = newStmts :+ vpr.Inhale(translatedInv)()
@@ -717,6 +705,37 @@ object Generator {
             getSetUnionApp(Seq(currFailureStates, tempFailedStates), typVarMap))()
           newStmts = newStmts ++ Seq(updateSFail, updateProgStates)
           (newStmts, Seq.empty)
+      }
+    }
+
+    // Question: is e expected to be normalized? -- I think yes, but not sure
+    def transformExpr(e: Expr, negLoopGuard: UnaryExpr, transform: Boolean): Expr = {
+      e match {
+        case Assertion(quantifier, assertVarDecls, body) =>
+          if (quantifier == "forall") {
+            Assertion(quantifier, assertVarDecls, transformExpr(body, negLoopGuard, transform))
+          } else {
+            // Note that all assertion variables either have type State or primitive types
+            val transformBody = assertVarDecls(0).vType.isInstanceOf[StateType]
+            Assertion(quantifier, assertVarDecls, transformExpr(body, negLoopGuard, transformBody))
+          }
+        case BinaryExpr(e1, op, e2) => BinaryExpr(transformExpr(e1, negLoopGuard, transform), op, transformExpr(e2, negLoopGuard, transform))
+        case UnaryExpr(op, e) => UnaryExpr(op, transformExpr(e, negLoopGuard, transform))
+        case StateExistsExpr(state, _) =>
+          if (transform) ImpliesExpr(transformLoopGuard(negLoopGuard, state), e)
+          else e
+        case _ => e
+      }
+    }
+
+    // This only needs to handle the types of expressions that are valid loop guards in the input program
+    def transformLoopGuard(e: Expr, state: SpecialId): Expr = {
+      e match {
+        case id@Id(_) => GetValExpr(state, id)
+        case ImpliesExpr(left, right) => ImpliesExpr(transformLoopGuard(left, state), transformLoopGuard(right, state))
+        case BinaryExpr(e1, op, e2) => BinaryExpr(transformLoopGuard(e1, state), op, transformLoopGuard(e2, state))
+        case UnaryExpr(op, body) => UnaryExpr(op, transformLoopGuard(body, state))
+        case _ => e
       }
     }
 
