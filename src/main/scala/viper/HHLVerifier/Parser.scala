@@ -107,6 +107,11 @@ object Parser {
 
   def expr[$: P]: P[Expr] = P(assertion | otherExpr)
 
+  // TODO:
+  // Syntax 1: assertVar is NOT of type State -- forall n: Int :: P(n)
+  // Syntax 2: assertVar is of type State -- forall <s1>: State :: P(s1)
+  // Syntax 2 is translated to (forall s1: State :: <s1> ==> P)
+  // This also means that <s> can only appear at this position (might affect proof var decl?)
   def assertion[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (assertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
 
   def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "}").map {HintDecl}

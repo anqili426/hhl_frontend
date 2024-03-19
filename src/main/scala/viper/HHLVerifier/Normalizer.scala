@@ -81,7 +81,7 @@ object Normalizer {
               var forAllTriggers: Seq[StateExistsExpr] = Seq.empty
               var existsTriggers: Seq[StateExistsExpr] = Seq.empty
               val ownedStateExistsExprs = res._2.filter(se => assertVarIds.contains(se.state.idName))
-              if (ownedStateExistsExprs.size == 0) throw UnknownException("At least 1 assertion variable in the precondition is declared but never used")
+              if (ownedStateExistsExprs.size == 0) throw UnknownException("At least 1 assertion variable in an assertion is declared but never used")
               ownedStateExistsExprs.foreach(se => {
                 se.useLimited = !a.proForAll
                 val trigger1 = se.copy()
