@@ -1,7 +1,7 @@
 method p1_gni1() returns (h: Int, o: Int)
 {
     o := 1
-    while (true) 
+    while (true)
     invariant forall _s1: State, _s2: State :: <_s1> && <_s2> ==> 
             (exists _s3: State :: <_s3> && get(_s3, h) == get(_s2, h) && get(_s3, o) == get(_s1, o))
     {

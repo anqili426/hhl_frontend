@@ -359,14 +359,19 @@ object Generator {
           // Havoc S_tmp and S_fail_tmp
           val tempFailedStates = vpr.LocalVar(tempFailedStatesVarName, currFailureStates.typ)()
           val havocSFailTmp = havocSetMethodCall(tempFailedStates)
-          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp)
+          val inSetEq = inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
+          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp, inSetEq)
 
           if (!callee.post.isEmpty) {
+            val normalizedPosts = callee.post.map(p => Normalizer.normalize(p, false))
+            normalizedPosts.foreach(p => Normalizer.detQuantifier(p, false))
             useParamsToArgsMap = true
             currParamsToArgsMap = right.paramsToArgs
-            val posts = callee.post.map(p => translateExp(p, state, STmp, tempFailedStates))
+            allowLimitedFunctions = true
+            val translatedPosts = normalizedPosts.map(p => translateExp(p, state, STmp, tempFailedStates))
             useParamsToArgsMap = false
-            val assumePosts = vpr.Inhale(getAndOfExps(posts))()
+            allowLimitedFunctions = false
+            val assumePosts = vpr.Inhale(getAndOfExps(translatedPosts))()
             newStmts = newStmts :+ assumePosts
           }
 
@@ -567,9 +572,7 @@ object Generator {
 
               val inSetEq = inhaleInSetEqStmt(stateDecl, loopStates, typVarMap)
               val inSetEqFail = inhaleInSetEqStmt(stateDecl, loopFailureStates, typVarMap)
-              allowLimitedFunctions = true
               val inhaleI = vpr.Inhale(getAllInvariants(inv, loopStates, loopFailureStates, true))()
-              allowLimitedFunctions = false
 
               val checkRuleCond = vpr.LocalVar(checkSyncCondName + loopCounter, vpr.Bool)()
               val s1 = vpr.LocalVarDecl(s1VarName, getConcreteStateType(typVarMap))()
@@ -626,19 +629,25 @@ object Generator {
               if (frame) {
                 if (verifierOption != 1) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, STmp, currStates, typVarMap, true)
                 if (verifierOption != 0 && loop.isTotal) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, currStates, STmp, typVarMap, false)
+                else newStmts = newStmts :+ inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
               }
 
               // Update S after the loop
               if (rule == "syncRule") {
-                val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
+                val translatedInv = getAllInvariants(inv, STmp, loopFailureStates, true)
                 val empS = vpr.Forall(Seq(stateDecl), Seq.empty, vpr.Not(getInSetApp(Seq(state, STmp), typVarMap, false))())()
                 newStmts = newStmts :+ vpr.Inhale(vpr.Or(translatedInv, empS)())()
               } else if (rule == "forAllExistsRule") {
-                val invsToTranslate = inv.map(i => transformExpr(Normalizer.normalize(i, false), UnaryExpr("!", cond), false))
-                val translatedInvs = getAllInvariants(invsToTranslate, STmp, loopFailureStates)
+                // Normalize the invs
+                val normalizedInvs = inv.map(i => Normalizer.normalize(i, false))
+                val transformedInvs = normalizedInvs.map(i => transformExpr(Normalizer.normalize(i, false), cond, false))
+                transformedInvs.foreach(i => Normalizer.detQuantifier(i, false))
+                allowLimitedFunctions = true
+                val translatedInvs = getAllInvariants(transformedInvs, STmp, loopFailureStates)
+                allowLimitedFunctions = false
                 newStmts = newStmts :+ vpr.Inhale(translatedInvs)()
               } else if (rule == "syncTotRule") {
-                val translatedInv = getAllInvariants(inv, STmp, loopFailureStates)
+                val translatedInv = getAllInvariants(inv, STmp, loopFailureStates, true)
                 newStmts = newStmts :+ vpr.Inhale(translatedInv)()
               }
               else {
@@ -720,15 +729,20 @@ object Generator {
           // Havoc S_tmp and S_fail_tmp
           val tempFailedStates = vpr.LocalVar(tempFailedStatesVarName, currFailureStates.typ)()
           val havocSFailTmp = havocSetMethodCall(tempFailedStates)
-          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp)
+          val inSetEq = inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
+          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp, inSetEq)
 
           // Assume the callee's postcondition
           if (!call.method.post.isEmpty) {
             useParamsToArgsMap = true
             currParamsToArgsMap = call.paramsToArgs
-            val posts = call.method.post.map(p => translateExp(p, state, STmp, tempFailedStates))
+            val normalizedPosts = call.method.post.map(p => Normalizer.normalize(p, false))
+            normalizedPosts.foreach(p => Normalizer.detQuantifier(p, false))
+            allowLimitedFunctions = true
+            val translatedPosts = normalizedPosts.map(p => translateExp(p, state, STmp, tempFailedStates))
             useParamsToArgsMap = false
-            val assumePosts = vpr.Inhale(getAndOfExps(posts))()
+            allowLimitedFunctions = false
+            val assumePosts = vpr.Inhale(getAndOfExps(translatedPosts))()
             newStmts = newStmts :+ assumePosts
           }
 
@@ -754,21 +768,20 @@ object Generator {
       }
     }
 
-    // Question: is e expected to be normalized? -- I think yes, but not sure
-    def transformExpr(e: Expr, negLoopGuard: UnaryExpr, transform: Boolean): Expr = {
+    def transformExpr(e: Expr, loopGuard: Expr, transform: Boolean): Expr = {
       e match {
         case Assertion(quantifier, assertVarDecls, body) =>
           if (quantifier == "forall") {
-            Assertion(quantifier, assertVarDecls, transformExpr(body, negLoopGuard, transform))
+            Assertion(quantifier, assertVarDecls, transformExpr(body, loopGuard, transform))
           } else {
             // Note that all assertion variables either have type State or primitive types
             val transformBody = assertVarDecls(0).vType.isInstanceOf[StateType]
-            Assertion(quantifier, assertVarDecls, transformExpr(body, negLoopGuard, transformBody))
+            Assertion(quantifier, assertVarDecls, transformExpr(body, loopGuard, transformBody))
           }
-        case BinaryExpr(e1, op, e2) => BinaryExpr(transformExpr(e1, negLoopGuard, transform), op, transformExpr(e2, negLoopGuard, transform))
-        case UnaryExpr(op, e) => UnaryExpr(op, transformExpr(e, negLoopGuard, transform))
+        case BinaryExpr(e1, op, e2) => BinaryExpr(transformExpr(e1, loopGuard, transform), op, transformExpr(e2, loopGuard, transform))
+        case UnaryExpr(op, e) => UnaryExpr(op, transformExpr(e, loopGuard, transform))
         case StateExistsExpr(state, _) =>
-          if (transform) ImpliesExpr(transformLoopGuard(negLoopGuard, state), e)
+          if (transform) BinaryExpr(transformLoopGuard(loopGuard, state), "||", e)
           else e
         case _ => e
       }
@@ -848,7 +861,9 @@ object Generator {
           })
         }
         normalizedInvs.foreach(i => Normalizer.detQuantifier(i, false))
+        allowLimitedFunctions = true
         val translatedInvs = normalizedInvs.map(i => translateExp(i, null, currStates, failureStates))
+        allowLimitedFunctions = false
         getAndOfExps(translatedInvs)
       } else {
         val translatedInvs = invs.map(i => translateExp(i, null, currStates, failureStates))
@@ -866,9 +881,7 @@ object Generator {
       val t = vpr.LocalVar(tVarName + loopCounter, vpr.Int)()
 
       currLoopIndex = currLoopIndexDecl.localVar
-      allowLimitedFunctions = true
       val In = getAllInvariants(inv, inputStates.localVar, inputFailureStates.localVar, true)
-      allowLimitedFunctions = false
       currLoopIndex = vpr.Add(currLoopIndex, one)()
       val InPlus1 = getAllInvariants(inv, outputStates.localVar, outputFailureStates.localVar)
 
@@ -956,9 +969,7 @@ object Generator {
         val inSetEq = inhaleInSetEqStmt(state, currStates, typVarMap)
         val inSetEqFail = inhaleInSetEqStmt(state, currFailureStates, typVarMap)
         // Assume I(n)
-        allowLimitedFunctions = true
         val inhaleIn = vpr.Inhale(getAllInvariants(inv, currStates, currFailureStates, true, rule))()
-        allowLimitedFunctions = false
         ifBodyStmts = ifBodyStmts ++ Seq(havocStates, havocFailureStates, inSetEq, inSetEqFail, inhaleIn)
 
         if (!decrExpr.isEmpty) {
