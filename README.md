@@ -42,7 +42,6 @@ method <method_name> (<parameter_name>: <parameter_type>)
 ```
 
 ## Loops
-When `<ruleToUse>` is unspecified, the verifier will automatically select a rule to use when it is run with the option `--auto`.
 ```
 while <ruleToUse> (<loop_guard>)
 invariant <hyper-assertion>
@@ -51,6 +50,8 @@ decreases <expression>
   <stmt>
 }
 ```
+`<ruleToUse>` has 4 possible values: `syncRule`, `syncTotRule`, `forAllExistsRule`, `desugaredRule`.\
+When `<ruleToUse>` is unspecified, the verifier will automatically select one from the first 3 above when it is run with the option `--auto`.
 
 
 
