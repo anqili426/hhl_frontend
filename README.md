@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 # Installation
 1. Install Z3
 2. Clone the project with the command `git clone --recursive https://github.com/anqili426/hhl_frontend.git`
