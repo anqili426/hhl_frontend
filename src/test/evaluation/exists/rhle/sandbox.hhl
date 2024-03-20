@@ -1,6 +1,6 @@
 method test() returns (sum: Int) 
 requires exists _s: State :: <_s>
-ensures exists _s: State :: <_s> && _s[sum] == 0
+ensures exists <_s> :: _s[sum] == 0
 {
     sum := 0
     var i: Int
@@ -12,7 +12,7 @@ ensures exists _s: State :: <_s> && _s[sum] == 0
     p := 0
 
     while (i < 10) 
-    {hint1} invariant $n <= 10 ==> exists _s: State :: <_s> && 
+    {hint1} invariant $n <= 10 ==> exists <_s> :: 
                                     ((_s[i] <= 5) ==> ((_s[j] == 0) && (_s[p] == 0))) &&
                                     ((_s[i] > 5) ==> ((_s[j] == 1) && (_s[p] == 1))) &&        
                                     _s[sum] == 0 &&
@@ -22,8 +22,8 @@ ensures exists _s: State :: <_s> && _s[sum] == 0
 
         // g(j, p)
         havoc increment {hint3}
-        use forall _s: State:: <_s> ==> hint3(_s[p])
-        use forall _s: State:: <_s> ==> hint3(_s[p] - 1)
+        use forall <_s> :: hint3(_s[p])
+        use forall <_s> :: hint3(_s[p] - 1)
         use hint3(1)
         assume (j == 0 ==> increment == p) &&
                (j == 1 ==> increment == p - 1) &&

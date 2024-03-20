@@ -1,9 +1,9 @@
 method compare1(name1: Int, name2: Int, priority1: Int, priority2: Int, priority3: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==>
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
     _s1[name1] == _s2[name2] && _s1[name2] == _s2[name1]
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[priority1] == _s2[priority1] &&
+requires forall <_s1>, <_s2> :: _s1[priority1] == _s2[priority1] &&
     _s1[priority2] == _s2[priority2] && _s1[priority3] == _s2[priority3]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==>
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
     _s1[res] == -1 * _s2[res]
 {
     if (name1 == name2) {
@@ -49,7 +49,7 @@ method compare2(name1: Int, name2: Int, priority1: Int, priority2: Int, priority
 requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
             (_s1[name1] == _s3[name1]) && (_s1[name2] == _s2[name1]) &&
             (_s2[name2] == _s3[name2])
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[priority1] == _s2[priority1] &&
+requires forall <_s1>, <_s2> :: _s1[priority1] == _s2[priority1] &&
     _s1[priority2] == _s2[priority2] && _s1[priority3] == _s2[priority3]
 ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
         ((_s1[res] > 0 && _s2[res] > 0) ==> _s3[res] > 0)
@@ -97,7 +97,7 @@ method compare3(name1: Int, name2: Int, priority1: Int, priority2: Int, priority
 requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
            (_s1[name1] == _s3[name1]) && (_s1[name2] == _s2[name1]) &&
            (_s2[name2] == _s3[name2])
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[priority1] == _s2[priority1] &&
+requires forall <_s1>, <_s2> :: _s1[priority1] == _s2[priority1] &&
             _s1[priority2] == _s2[priority2] && _s1[priority3] == _s2[priority3]
 ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
         (_s1[res] == 0 ==> ((_s2[res] > 0 && _s3[res] > 0) || (_s2[res] < 0 && _s3[res] < 0) ||

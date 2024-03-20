@@ -1,9 +1,9 @@
 // P1
 method compare1(intVal1: Int, fileName1: Int, intVal2: Int, fileName2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==>
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
     _s1[intVal1] == _s2[intVal2] && _s1[fileName1] == _s2[fileName2] &&
     _s1[intVal2] == _s2[intVal1] && _s1[fileName2] == _s2[fileName1]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==>
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
     ((_s1[res] > 0 && _s2[res] < 0) || (_s1[res] < 0 && _s2[res] > 0) || (_s1[res] == 0 &&
         _s2[res] == 0))
 {

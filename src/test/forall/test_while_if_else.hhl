@@ -1,7 +1,7 @@
 method test(x: Int) returns (y: Int)
-    requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x]
-    ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[y] == _s2[y]
-    ensures forall _s: State :: <_s> ==> _s[y] == _s[x]
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
+    ensures forall <_s> :: _s[y] == _s[x]
 {
     assume x > 0
 
@@ -9,9 +9,9 @@ method test(x: Int) returns (y: Int)
     i := x
 
 
-    frame forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x] {
+    frame forall <_s1>, <_s2> :: _s1[x] == _s2[x] {
         while (i > 0)
-            invariant forall _s: State :: <_s> ==> _s[i] >= 0 && (_s[i] == 0 ==> _s[y] == _s[x])
+            invariant forall <_s> :: _s[i] >= 0 && (_s[i] == 0 ==> _s[y] == _s[x])
         {
             if (i == 1) {
                 y := x

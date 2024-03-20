@@ -1,11 +1,11 @@
 method test(x: Int) returns (y: Int)
-requires exists _s: State:: <_s> && _s[x] == 2
-ensures exists _s: State :: <_s> && _s[y] == 5
+requires exists <_s> :: _s[x] == 2
+ensures exists <_s> :: _s[y] == 5
 {
     y := 0
     let $s: State :: <$s> && $s[x] == 2 && $s[y] == 0
     while (y < 5)
-    {hint} invariant $n <= 5 ==> exists _s: State :: <_s> && _s[y] <= 5 && _s[y] == $n
+    {hint} invariant $n <= 5 ==> exists <_s> :: _s[y] <= 5 && _s[y] == $n
     {
         y := y + 1
     }

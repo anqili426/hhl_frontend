@@ -1,5 +1,5 @@
 method smaller() returns (x: Int)
-ensures forall _s1: State :: <_s1> ==> (exists _s2: State :: <_s2> && _s2[x] <= _s1[x])
+ensures forall <_s1> :: (exists <_s2> :: _s2[x] <= _s1[x])
 {
     // Model non-det choice
     var r: Int
@@ -17,6 +17,6 @@ ensures forall _s1: State :: <_s1> ==> (exists _s2: State :: <_s2> && _s2[x] <= 
         x := x + x
     }
 
-    use forall _s: State :: <_s> ==> hint2(_s[x] - 1)
-    use forall _s: State :: <_s> ==> hint2(_s[x] / 2)
+    use forall <_s> :: hint2(_s[x] - 1)
+    use forall <_s> :: hint2(_s[x] / 2)
 }

@@ -1,5 +1,5 @@
 method p4_gni() returns (h: Int, o: Int)
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> (exists _s3: State :: <_s3> && _s3[h] == _s2[h] && _s3[o] == _s1[o])
+ensures forall <_s1>, <_s2> :: (exists <_s3> :: _s3[h] == _s2[h] && _s3[o] == _s1[o])
 {
     havoc h {hint1}
 
@@ -11,5 +11,5 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> (exists _s3: State :
         o := 1
     }
 
-    use forall _s: State :: <_s> ==> hint1(_s[h])
+    use forall <_s> :: hint1(_s[h])
 }

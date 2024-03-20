@@ -37,8 +37,8 @@ ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 }
 
 method antisym(x1: Int, x2: Int, y1: Int, y2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> (_s1[x1] != _s1[y1] && _s1[x2] != _s1[y2]) && _s1[x1] == _s2[y1] && _s1[x2] == _s2[y2] && _s1[y1] == _s2[x1] && _s1[y2] == _s2[x2]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] == 0 || _s2[res] == 0
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> (_s1[x1] != _s1[y1] && _s1[x2] != _s1[y2]) && _s1[x1] == _s2[y1] && _s1[x2] == _s2[y2] && _s1[y1] == _s2[x1] && _s1[y2] == _s2[x2]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] == 0 || _s2[res] == 0
 {
    if (x1 < y1) {
         res := 1
@@ -56,8 +56,8 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
 }
 
 method antisymBug(x1: Int, x2: Int, y1: Int, y2: Int, i: Int) returns (res: Int)
-requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 && (_s1[x1] != _s1[y1] && _s1[x2] != _s1[y2]) && _s1[x1] == _s2[y1] && _s1[x2] == _s2[y2] && _s1[y1] == _s2[x1] && _s1[y2] == _s2[x2]
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 && _s1[res] == 1 && _s2[res] == 1
+requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 && (_s1[x1] != _s1[y1] && _s1[x2] != _s1[y2]) && _s1[x1] == _s2[y1] && _s1[x2] == _s2[y2] && _s1[y1] == _s2[x1] && _s1[y2] == _s2[x2]
+ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 && _s1[res] == 1 && _s2[res] == 1
 {
    if (x1 < y1) {
         res := 1

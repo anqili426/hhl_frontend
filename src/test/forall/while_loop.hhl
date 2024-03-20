@@ -1,5 +1,5 @@
 method test() returns (sum: Int)
-    ensures forall _s: State :: <_s> ==> _s[sum] == 102
+    ensures forall <_s> :: _s[sum] == 102
 {
 
     var n: Int
@@ -7,7 +7,7 @@ method test() returns (sum: Int)
     sum := 1
 
     while (n <= 100)
-    invariant forall _s: State :: <_s> ==> (_s[sum] == _s[n] + 1) && (_s[n] <= 101)
+    invariant forall <_s> :: (_s[sum] == _s[n] + 1) && (_s[n] <= 101)
     {
             n := n + 1
             sum := sum + 1
@@ -16,7 +16,7 @@ method test() returns (sum: Int)
 }
 
 method test2() returns (sum: Int)
-    ensures forall _s: State :: <_s> ==> _s[sum] == 102
+    ensures forall <_s> :: _s[sum] == 102
 {
 
    var n: Int
@@ -24,7 +24,7 @@ method test2() returns (sum: Int)
    sum := 1
 
    while (n <= 100)
-   invariant forall _s: State :: <_s> ==> _s[n] == $n && _s[sum] == $n + 1 && $n <= 101
+   invariant forall <_s> :: _s[n] == $n && _s[sum] == $n + 1 && $n <= 101
    {
            n := n + 1
            sum := sum + 1
@@ -41,8 +41,8 @@ method test3(n: Int) returns (res: Int)
     i := n
 
     while (i > 10)
-    invariant forall _s: State :: <_s> ==> _s[i] >= 10 && _s[res] == _s[n] - _s[i]
-    invariant forall _s: State :: <_s> ==> _s[n] == 11
+    invariant forall <_s> :: _s[i] >= 10 && _s[res] == _s[n] - _s[i]
+    invariant forall <_s> :: _s[n] == 11
     {
         i := i - 1
         res := res + 1
@@ -50,8 +50,8 @@ method test3(n: Int) returns (res: Int)
 }
 
 method divisible(x: Int, y: Int, i: Int) returns (res: Int)
-requires forall _s: State :: <_s> ==> _s[x] >= _s[y] && _s[y] > 0 && _s[x] % _s[y] == 0
-ensures forall _s: State :: <_s> ==> _s[res] == 1
+requires forall <_s> :: _s[x] >= _s[y] && _s[y] > 0 && _s[x] % _s[y] == 0
+ensures forall <_s> :: _s[res] == 1
 {
     var remain_x: Int
     remain_x := x
@@ -59,9 +59,9 @@ ensures forall _s: State :: <_s> ==> _s[res] == 1
     var ind: Int
     ind := 0
 
-    // frame forall _s: State :: <_s> ==> _s[x] >= _s[y] && _s[y] > 0 && _s[x] % _s[y] == 0 {
+    // frame forall <_s> :: _s[x] >= _s[y] && _s[y] > 0 && _s[x] % _s[y] == 0 {
         while (ind < x / y)
-        invariant forall _s: State :: <_s> ==> _s[remain_x] == _s[x] - _s[ind] * _s[y] && _s[x] >= _s[y] && _s[y] > 0 &&  _s[ind] <= _s[x] / _s[y]
+        invariant forall <_s> :: _s[remain_x] == _s[x] - _s[ind] * _s[y] && _s[x] >= _s[y] && _s[y] > 0 &&  _s[ind] <= _s[x] / _s[y]
         {
             remain_x := remain_x - y
             ind := ind + 1

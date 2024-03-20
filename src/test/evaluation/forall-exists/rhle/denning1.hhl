@@ -1,8 +1,8 @@
 method denning1(f1_in: Int, f2_in: Int, f3_in: Int) returns (f1_out: Int, f2_out: Int)
-requires forall _s1: State :: <_s1> ==>
-    (exists _s2: State :: <_s2> && _s1[f1_in] == _s2[f1_in] && _s1[f2_in] == _s2[f2_in] && _s1[f3_in] != _s2[f3_in])
-ensures forall _s1: State :: <_s1> ==>
-    (exists _s2: State :: <_s2> && _s1[f1_out] == _s2[f1_out] && _s1[f2_out] == _s2[f2_out] && _s1[f3_in] != _s2[f3_in])
+requires forall <_s1> ::
+    (exists <_s2> :: _s1[f1_in] == _s2[f1_in] && _s1[f2_in] == _s2[f2_in] && _s1[f3_in] != _s2[f3_in])
+ensures forall <_s1> ::
+    (exists <_s2> :: _s1[f1_out] == _s2[f1_out] && _s1[f2_out] == _s2[f2_out] && _s1[f3_in] != _s2[f3_in])
 {
     var i: Int
     var n: Int
@@ -16,9 +16,9 @@ ensures forall _s1: State :: <_s1> ==>
     f2_out := f2_in
 
     while (i <= 100)
-    {hint1} invariant forall _s1: State :: <_s1> ==>
+    {hint1} invariant forall <_s1> ::
          (_s1[f1_in] == _s1[f1_out] && _s1[i] <= 101 && _s1[i] == $n + 1)  &&
-         (exists _s2: State :: <_s2> && _s1[f1_out] == _s2[f1_out]
+         (exists <_s2> :: _s1[f1_out] == _s2[f1_out]
                                     && _s1[f2_out] == _s2[f2_out]
                                     && _s1[f3_in] != _s2[f3_in]
                                     && _s1[i] == _s2[i]

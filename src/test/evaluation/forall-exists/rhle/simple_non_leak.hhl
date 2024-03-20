@@ -1,8 +1,8 @@
 method non_leak(h: Int, l: Int) returns (res: Int)
-requires forall _s1: State :: <_s1> ==>
-    (exists _s2: State :: <_s2> && _s1[h] != _s2[h] && _s1[l] == _s2[l])
-ensures forall _s1: State :: <_s1> ==>
-    (exists _s2: State :: <_s2> && _s1[l] == _s2[l] && _s1[res] == _s2[res] && _s1[h] != _s2[h])
+requires forall <_s1> ::
+    (exists <_s2> :: _s1[h] != _s2[h] && _s1[l] == _s2[l])
+ensures forall <_s1> ::
+    (exists <_s2> :: _s1[l] == _s2[l] && _s1[res] == _s2[res] && _s1[h] != _s2[h])
 {
     var x: Int
     x := h + l

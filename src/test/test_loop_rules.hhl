@@ -1,13 +1,13 @@
 // WhileSync
 /*
 method test_forall(x: Int) returns (y: Int)
-requires forall _s: State :: <_s> ==> _s[x] > 0
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[y] == _s2[y]
+requires forall <_s> :: _s[x] > 0
+requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
 {
     y := 0
     while syncRule (y < x)
-    invariant forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x] && _s1[y] == _s2[y]
+    invariant forall <_s1>, <_s2> :: _s1[x] == _s2[x] && _s1[y] == _s2[y]
     decreases x - y
     {
         y := y + 1
@@ -15,14 +15,14 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[y] == _s2[y]
 }
 
 method test_exists(x: Int) returns (y: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x] && _s1[x] > 0
+requires forall <_s1>, <_s2> :: _s1[x] == _s2[x] && _s1[x] > 0
 requires exists _s1: State, _s2: State :: <_s1> && <_s2>
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[y] == _s2[y]
+ensures exists <_s1>, <_s2> :: _s1[y] == _s2[y]
 {
     y := 0
     while syncTotRule (y < x)
-    invariant forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x] && _s1[y] == _s2[y]
-    invariant exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[x] == _s2[x] && _s1[y] == _s2[y]
+    invariant forall <_s1>, <_s2> :: _s1[x] == _s2[x] && _s1[y] == _s2[y]
+    invariant exists <_s1>, <_s2> :: _s1[x] == _s2[x] && _s1[y] == _s2[y]
     decreases x - y
     {
         y := y + 1
@@ -32,13 +32,13 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[y] == _s2[y]
 
 // WhileSyncTot
 method test_forall1(x: Int) returns (y: Int)
-requires forall _s: State :: <_s> ==> _s[x] > 0
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[y] == _s2[y]
+requires forall <_s> :: _s[x] > 0
+requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
 {
     y := 0
     while syncRule (y < x)
-    invariant forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x] && _s1[y] == _s2[y]
+    invariant forall <_s1>, <_s2> :: _s1[x] == _s2[x] && _s1[y] == _s2[y]
     decreases x - y
     {
         y := y + 1

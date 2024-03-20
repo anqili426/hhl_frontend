@@ -1,6 +1,6 @@
 method test() returns (success: Int)
 requires exists _s1: State, _s2: State :: <_s1> && <_s2>
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[success] != _s2[success]
+ensures exists <_s1>, <_s2> :: _s1[success] != _s2[success]
 {
     var currTime: Int
     var lastTime: Int
@@ -36,14 +36,14 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[success] != _s2[s
     use hint5(101)
     use hint5(103)
     // If the following hint is used instead, verification doesn't terminate
-    // use forall _s: State :: <_s> ==> hint5(_s[old_currTime] + _s[sleepTime])
+    // use forall <_s> :: hint5(_s[old_currTime] + _s[sleepTime])
     assume currTime == old_currTime + sleepTime
 
     var counter : Int
     counter := 0
 
     while (counter < 5)
-    {hint4} invariant $n <= 5 ==> exists _s1: State, _s2: State :: <_s1> && <_s2> && 
+    {hint4} invariant $n <= 5 ==> exists <_s1>, <_s2> :: 
                                 _s1[counter] == $n && _s2[counter] == $n &&
                                 _s1[currTime] - _s1[lastTime] == 100 &&
                                 _s2[currTime] - _s2[lastTime] == 101 &&
@@ -68,7 +68,7 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[success] != _s2[s
         old_currTime := currTime
 
         havoc currTime {hint6}
-        use forall _s: State :: <_s> ==> hint6(_s[old_currTime] + _s[sleepTime])
+        use forall <_s> :: hint6(_s[old_currTime] + _s[sleepTime])
         assume currTime == old_currTime + sleepTime
 
         counter := counter + 1

@@ -1,9 +1,9 @@
  /* method denning3(e_in: Int, i_in: Int, f_in: Int, x_in: Int, sum_in: Int)
 returns (e_out: Int, i_out: Int, f_out: Int, x_out: Int, sum_out: Int, res: Int)
-requires forall _s1: State :: <_s1> ==>
-    (exists _s2: State :: <_s2> && _s1[e_in] == _s2[e_in] && _s1[i_in] == _s2[i_in] && _s1[x_in] != _s2[x_in])
-ensures forall _s1: State :: <_s1> ==>
-    (exists _s2: State :: <_s2> && _s1[e_out] == _s2[e_out] && _s1[i_out] == _s2[i_out] && _s1[x_out] != _s2[x_out])
+requires forall <_s1> ::
+    (exists <_s2> :: _s1[e_in] == _s2[e_in] && _s1[i_in] == _s2[i_in] && _s1[x_in] != _s2[x_in])
+ensures forall <_s1> ::
+    (exists <_s2> :: _s1[e_out] == _s2[e_out] && _s1[i_out] == _s2[i_out] && _s1[x_out] != _s2[x_out])
 {
     var max_sum: Int
     var err: Int
@@ -19,7 +19,7 @@ ensures forall _s1: State :: <_s1> ==>
     assume x_out > 0
 
     while (e_out == 1 && err == 0)
-    {hint1} invariant forall _s1: State :: <_s1> ==>
+    {hint1} invariant forall <_s1> ::
                           (_s1[e_out] == 1) &&
                           (_s1[x_out] > 0) &&
                           (_s1[err] == 0 || _s1[err] == 1) &&
@@ -39,7 +39,7 @@ ensures forall _s1: State :: <_s1> ==>
         }
     }
 
-    // use forall _s: State :: <_s> ==> hint1(_s[max_sum] / _s[x_out]) && hint2(_s[max_sum] / _s[x_out])
+    // use forall <_s> :: hint1(_s[max_sum] / _s[x_out]) && hint2(_s[max_sum] / _s[x_out])
     if (err == 1) {
         res := 0
     } else {
@@ -49,10 +49,10 @@ ensures forall _s1: State :: <_s1> ==>
 
 method simplified(i_in: Int, x_in: Int)
 returns (i_out: Int, sum_out: Int)
-requires forall _s: State :: <_s> ==> _s[x_in] > 0
-requires exists _s1: State, _s2: State :: <_s1> && <_s2>  && _s1[x_in] == 5 && _s2[x_in] == 20
-// ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i_out] == 21 && _s2[i_out] == 6
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && (forall _s3: State :: <_s3> && _s3[x_in] == _s1[x_in] ==> _s3[i_out] > _s2[i_out])
+requires forall <_s> :: _s[x_in] > 0
+requires exists <_s1>, <_s2> :: _s1[x_in] == 5 && _s2[x_in] == 20
+// ensures exists <_s1>, <_s2> :: _s1[i_out] == 21 && _s2[i_out] == 6
+ensures exists <_s1>, <_s2> :: (forall _s3: State :: <_s3> && _s3[x_in] == _s1[x_in] ==> _s3[i_out] > _s2[i_out])
 {
         var err: Int
         err := 0
@@ -65,7 +65,7 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && (forall _s3: State ::
 
         while (err == 0)
         {hint2} invariant ($n - 1) * $s1[x_in] <= 100 && $s1[x_in] > 0 ==>
-            exists _s: State :: <_s> &&
+            exists <_s> ::
             _s[x_in] == $s1[x_in] &&
             _s[x_in] > 0 &&
             _s[sum_out] == _s[i_out] * _s[x_in] &&
@@ -73,14 +73,14 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && (forall _s3: State ::
             (_s[sum_out] <= 100 ==> _s[err] == 0) &&
             (_s[i_out] == $n)
         {hint3} invariant ($n - 1) * $s2[x_in] <= 100 && $s2[x_in] > 0 ==>
-                    exists _s: State :: <_s> &&
+                    exists <_s> ::
                     _s[x_in] == $s2[x_in] &&
                     _s[x_in] > 0 &&
                     _s[sum_out] == _s[i_out] * _s[x_in] &&
                     (_s[sum_out] > 100 ==> _s[err] == 1) &&
                     (_s[sum_out] <= 100 ==> _s[err] == 0) &&
                     (_s[i_out] == $n)
-        invariant forall _s: State :: <_s> ==> (_s[i_out] == $n &&
+        invariant forall <_s> :: (_s[i_out] == $n &&
                      (_s[err] == 0 || _s[err] == 1) &&
                      _s[sum_out] == _s[x_in] * _s[i_out] &&
                      _s[x_in] > 0 &&
@@ -101,9 +101,9 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && (forall _s3: State ::
 /*
 method simplified(i_in: Int, x_in: Int)
 returns (i_out: Int, sum_out: Int)
-requires forall _s: State :: <_s> ==> _s[x_in] > 0
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x_in] == _s2[x_in]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[i_out] == _s2[i_out]
+requires forall <_s> :: _s[x_in] > 0
+requires forall <_s1>, <_s2> :: _s1[x_in] == _s2[x_in]
+ensures forall <_s1>, <_s2> :: _s1[i_out] == _s2[i_out]
 {
         var err: Int
         err := 0
@@ -112,9 +112,9 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[i_out] == _s2[i_
         sum_out := 0
 
         while (err == 0)
-        invariant forall _s1: State, _s2: State :: <_s1> && <_s2> ==>
+        invariant forall <_s1>, <_s2> ::
             _s1[i_out] == _s2[i_out]
-        invariant forall _s: State :: <_s> ==> (_s[i_out] == $n &&
+        invariant forall <_s> :: (_s[i_out] == $n &&
             (_s[err] == 0 || _s[err] == 1) &&
             _s[sum_out] == _s[x_in] * _s[i_out] &&
             _s[x_in] > 0 &&

@@ -1,12 +1,12 @@
 // P1
 method compare1(fiscalQuarter1: Int, sectorCode1: Int, industryCode1: Int, fiscalQuarter2: Int, sectorCode2: Int, industryCode2: Int, i: Int) returns (res: Int)
-requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 && 
+requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 && 
     _s1[fiscalQuarter1] == _s2[fiscalQuarter2] && _s1[sectorCode1] == _s2[sectorCode2] && 
     _s1[industryCode1] == _s2[industryCode2] && _s1[fiscalQuarter2] == _s2[fiscalQuarter1] && 
     _s1[sectorCode2] == _s2[sectorCode1] && _s1[industryCode2] == _s2[industryCode1] &&
     _s1[fiscalQuarter1] == _s1[fiscalQuarter2] && _s1[sectorCode1] > 0 && _s1[sectorCode2] < 0 &&
     _s1[industryCode1] == _s1[industryCode2] && _s1[industryCode1] > 0
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 &&
+ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 &&
     !((_s1[res] > 0 && _s2[res] < 0) || (_s1[res] < 0 && _s2[res] > 0) || (_s1[res] == 0 &&
     _s2[res] == 0))
 {

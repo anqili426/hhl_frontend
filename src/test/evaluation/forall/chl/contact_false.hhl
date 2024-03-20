@@ -1,10 +1,10 @@
 // P1
 method compare1(firstName1: Int, lastName1: Int, emails1: Int, firstName2: Int, lastName2: Int, emails2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==>
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
     _s1[firstName1] == _s2[firstName2] && _s1[lastName1] == _s2[lastName2] &&
     _s1[emails1] == _s2[emails2] && _s1[firstName2] == _s2[firstName1] &&
     _s1[lastName2] == _s2[lastName1] && _s1[emails2] == _s2[emails1]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==>
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
     ((_s1[res] > 0 && _s2[res] < 0) || (_s1[res] < 0 && _s2[res] > 0) ||
         (_s1[res] == 0 && _s2[res] == 0))
 {

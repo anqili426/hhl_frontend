@@ -1,14 +1,13 @@
 /*
 // Functional inv
 method functional(x: Int) returns (res: Int)
-requires exists _s: State :: <_s> && _s[x] == 3
-ensures exists _s: State :: <_s> && _s[res] == _s[x]
+requires exists <_s> :: _s[x] == 3
+ensures exists <_s> :: _s[res] == _s[x]
 {
      let $s: State :: <$s> && $s[x] == 3
      res := 0
      while (res < x)
-     {hint2} invariant $n <= $s[x] ==> exists _s: State :: <_s>
-     && _s[res] <= _s[x] && _s[res] == $n && _s[x] == $s[x]
+     {hint2} invariant $n <= $s[x] ==> exists <_s> :: _s[res] <= _s[x] && _s[res] == $n && _s[x] == $s[x]
      {
          res := res + 1
      }
@@ -37,23 +36,23 @@ ensures exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 
 // Loops in if-else
 method loop_in_if_else(y: Int) returns (res: Int)
-requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[y] == _s2[y] && _s1[y] >= 0
-requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[y] == _s2[y] && _s1[y] < 0
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[y] >= 0 && _s1[res] == _s2[res]
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[y] < 0 && _s1[res] == _s2[res]
+requires exists <_s1>, <_s2> :: _s1[y] == _s2[y] && _s1[y] >= 0
+requires exists <_s1>, <_s2> :: _s1[y] == _s2[y] && _s1[y] < 0
+ensures exists <_s1>, <_s2> :: _s1[y] >= 0 && _s1[res] == _s2[res]
+ensures exists <_s1>, <_s2> :: _s1[y] < 0 && _s1[res] == _s2[res]
 {
     let $s1: State :: <$s1> && $s1[y] >= 0
     let $s2: State :: <$s2> && $s2[y] < 0
     res := 0
         if (y >= 0) {
             while (res < y)
-                {hint4} invariant $n <= $s1[y] ==> exists _s: State :: <_s> && _s[res] <= _s[y] && _s[res] == $n && _s[y] == $s1[y]
+                {hint4} invariant $n <= $s1[y] ==> exists <_s> :: _s[res] <= _s[y] && _s[res] == $n && _s[y] == $s1[y]
             {
                 res := res + 1
             }
         } else {
             while (res < (-1) * y)
-                {hint5} invariant $n <= -1 * $s2[y] ==> exists _s: State :: <_s> && _s[res] <= -1 * _s[y] && _s[res] == $n && _s[y] == $s2[y]
+                {hint5} invariant $n <= -1 * $s2[y] ==> exists <_s> :: _s[res] <= -1 * _s[y] && _s[res] == $n && _s[y] == $s2[y]
             {
                 res := res + 1
             }
@@ -64,8 +63,8 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[y] < 0 && _s1[res
 /*
 // Nested loops
 method nested_loops(x: Int) returns (res: Int)
-requires exists _s: State :: <_s> && _s[x] > 0
-ensures exists _s: State :: <_s> && _s[res] == _s[x]
+requires exists <_s> :: _s[x] > 0
+ensures exists <_s> :: _s[res] == _s[x]
 {
     var i: Int
     i := 0
@@ -74,18 +73,17 @@ ensures exists _s: State :: <_s> && _s[res] == _s[x]
     let $s: State :: <$s> && $s[x] > 0 && $s[i] == 0 && $s[res] == 0
 
     while (i < x)
-    {hint6} invariant $n <= 1 ==> exists _s: State:: <_s>
-                                    && _s[i] <= _s[x]
+    {hint6} invariant $n <= 1 ==> exists <_s> :: _s[i] <= _s[x]
                                     && _s[x] == $s[x]
                                     && _s[i] == _s[res]
                                     && _s[i] == $n * _s[x]
                                     && $s[x] > 0
     {
         // $s1 doesn't necessarily exist
-        let $b: Bool :: $b == (exists _s: State :: <_s> && _s[i] <= _s[x] && _s[x] == $s[x])
+        let $b: Bool :: $b == (exists <_s> :: _s[i] <= _s[x] && _s[x] == $s[x])
         let $s1: State :: $b ==> <$s1> && $s1[i] <= $s1[x] && $s1[x] == $s[x]
         while (i < x)
-        {hint7} invariant $b ==> ($n <= $s1[x] - $s1[i] ==> exists _s: State :: <_s> && _s[i] == $n + $s1[i]
+        {hint7} invariant $b ==> ($n <= $s1[x] - $s1[i] ==> exists <_s> :: _s[i] == $n + $s1[i]
                                                                         && _s[i] <= _s[x]
                                                                         && _s[x] == $s1[x])
         {
@@ -99,23 +97,22 @@ ensures exists _s: State :: <_s> && _s[res] == _s[x]
 } */
 
 method nested_loops2(x: Int) returns (res: Int)
-requires exists _s: State :: <_s> && _s[x] > 0
-ensures exists _s: State :: <_s> && _s[res] == _s[x]
+requires exists <_s> :: _s[x] > 0
+ensures exists <_s> :: _s[res] == _s[x]
 {
 
     let $s: State :: <$s> && $s[x] > 0
     res := 0
     while (res < x)
-    {hint6} invariant $n <= 1 ==> exists _s: State:: <_s>
-                                    && _s[res] <= _s[x]
+    {hint6} invariant $n <= 1 ==> exists <_s> :: _s[res] <= _s[x]
                                     && _s[x] == $s[x]
                                     && _s[res] == $n * _s[x]
                                     && $s[x] > 0
     {
-        let $b: Bool :: $b == (exists _s: State :: <_s> && _s[res] <= _s[x] && _s[x] == $s[x])
+        let $b: Bool :: $b == (exists <_s> :: _s[res] <= _s[x] && _s[x] == $s[x])
         let $s1: State :: $b ==> <$s1> && $s1[res] <= $s1[x] && $s1[x] == $s[x]
         while (res < x)
-        {hint7} invariant $b ==> ($n <= $s1[x] - $s1[res] ==> exists _s: State :: <_s> && _s[res] == $n + $s1[res]
+        {hint7} invariant $b ==> ($n <= $s1[x] - $s1[res] ==> exists <_s> :: _s[res] == $n + $s1[res]
                                                                         && _s[res] <= _s[x]
                                                                         && _s[x] == $s1[x])
         {
@@ -129,8 +126,8 @@ ensures exists _s: State :: <_s> && _s[res] == _s[x]
 /*
 // Two loops
 method two_loops(x: Int) returns (res: Int)
-requires exists _s: State :: <_s> && _s[x] == 3
-ensures exists _s: State :: <_s> && _s[x] * _s[x] + _s[x] == _s[res]
+requires exists <_s> :: _s[x] == 3
+ensures exists <_s> :: _s[x] * _s[x] + _s[x] == _s[res]
 {
     var i: Int
     i := 0
@@ -140,8 +137,7 @@ ensures exists _s: State :: <_s> && _s[x] * _s[x] + _s[x] == _s[res]
 
     // Compute res = x * x
     while (i < x)
-    {hint8} invariant $n <= $s[x] ==> exists _s: State :: <_s>
-                                                  && _s[i] == $n
+    {hint8} invariant $n <= $s[x] ==> exists <_s> :: _s[i] == $n
                                                   && _s[x] == $s[x]
                                                   && _s[res] == _s[i] * _s[x]
     {
@@ -155,8 +151,7 @@ ensures exists _s: State :: <_s> && _s[x] * _s[x] + _s[x] == _s[res]
 
     // Compute res = res + x
     while (i < x)
-    {hint9} invariant $n <= $s[x] ==> exists _s: State :: <_s>
-                                                  && _s[i] == $n
+    {hint9} invariant $n <= $s[x] ==> exists <_s> :: _s[i] == $n
                                                   && _s[x] == $s[x]
                                                   && _s[res] == _s[x] * _s[x] + _s[i]
     {
@@ -169,10 +164,10 @@ ensures exists _s: State :: <_s> && _s[x] * _s[x] + _s[x] == _s[res]
 
 // If-else in loops
 method if_else_in_loop(x: Int) returns (y: Int)
-requires exists _s: State :: <_s> && _s[x] == 3
-requires exists _s: State :: <_s> && _s[x] == 0
-ensures exists _s: State :: <_s> && _s[y] == 3
-ensures exists _s: State :: <_s> && _s[y] == -1
+requires exists <_s> :: _s[x] == 3
+requires exists <_s> :: _s[x] == 0
+ensures exists <_s> :: _s[y] == 3
+ensures exists <_s> :: _s[y] == -1
 {
     y := -1
     var i: Int
@@ -182,12 +177,11 @@ ensures exists _s: State :: <_s> && _s[y] == -1
     let $s1: State :: <$s1> && $s1[x] == 0 && $s[i] == $s[x] && $s1[y] == -1
 
     while (i > 0)
-    {hint10} invariant $n <= $s[x] ==> exists _s: State :: <_s>
-                                                    && _s[i] >= 0
+    {hint10} invariant $n <= $s[x] ==> exists <_s> :: _s[i] >= 0
                                                     && _s[x] - _s[i] == $n
                                                     && _s[x] == $s[x]
                                                     && (_s[i] == 0 ==> _s[x] == _s[y])
-    {hint11} invariant $n == 0 ==> exists _s: State :: <_s> && _s[x] == 0
+    {hint11} invariant $n == 0 ==> exists <_s> :: _s[x] == 0
                                                         && _s[i] == 0
                                                         && _s[y] == $s1[y]
     {
@@ -205,10 +199,10 @@ ensures exists _s: State :: <_s> && _s[y] == -1
 
 // Relational inv
 method relational(x: Int, n: Int, i: Int) returns (res: Int)
-requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2
+requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
                                             && _s1[n] == _s2[n] && _s1[n] == 3
                                             && _s1[x] <= _s2[x] && _s1[x] == 4
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2
+ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
                                             && _s1[res] <= _s2[res]
 {
     res := 0
@@ -224,8 +218,7 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
                             && $s2[ind] == 0
                             && $s2[res] == 0
     while (ind < n)
-    {hint12} invariant $n <= $s1[n] ==> exists _s1: State, _s2: State :: <_s1> && <_s2>
-                                                        && _s1[i] == 1 && _s2[i] == 2
+    {hint12} invariant $n <= $s1[n] ==> exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
                                                         && _s2[x] >= _s1[x]
                                                         && _s1[n] == _s2[n]
                                                         && _s1[n] == $s1[n]
@@ -243,10 +236,10 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
 
 // Alignment -- not supported for exists-HHL at the moment
 method align(x: Int, n: Int, i: Int) returns (res: Int)
-requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2
+requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
                                             && _s1[n] == _s2[n] && _s1[n] == 3
                                             && _s1[x] <= _s2[x] && _s1[x] == -1
-ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2
+ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
                                             && _s1[res] <= _s2[res]
 {
     res := 0
@@ -265,8 +258,7 @@ ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
     if (x > 0) {
         declare commonLoop {
             while (ind < n)
-                {hint13} invariant $n <= $s1[n] ==> exists _s1: State, _s2: State :: <_s1> && <_s2>
-                                                                    && _s1[i] == 1 && _s2[i] == 2
+                {hint13} invariant $n <= $s1[n] ==> exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
                                                                     && _s2[x] >= _s1[x]
                                                                     && _s1[n] == _s2[n]
                                                                     && _s1[n] == $s1[n]

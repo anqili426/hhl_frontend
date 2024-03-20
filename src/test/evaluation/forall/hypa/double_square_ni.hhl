@@ -1,7 +1,7 @@
 method test(h: Int, x: Int) returns (y: Int)
-requires forall _s: State :: <_s> ==> (_s[h] == 0) || (_s[h] == 1)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[y] == _s2[y]
+requires forall <_s> :: (_s[h] == 0) || (_s[h] == 1)
+requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
 {
     var z: Int 
 
@@ -20,7 +20,7 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[y] == _s2[y]
     while (z > 0)
     invariant forall _s: State :: <_s> && _s[x] < 0 ==> _s[z] < 0 && _s[y] == 0
     invariant forall _s: State :: <_s> && _s[x] >= 0 ==> _s[z] >= 0
-    invariant forall _s: State :: <_s> ==> (_s[y] == _s[x] * (_s[old_z] - _s[z]))
+    invariant forall <_s> :: (_s[y] == _s[x] * (_s[old_z] - _s[z]))
     // Note that if we merge the 2nd and 3rd invariants into one invariant, Viper will not terminate 
     // invariant forall _s: State :: <_s> && _s[x] >= 0 ==> _s[z] >= 0 && (_s[y] == _s[x] * (_s[old_z] - _s[z]))
     {

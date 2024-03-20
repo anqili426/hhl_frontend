@@ -1,6 +1,6 @@
 method test_exists_forall(h: Int) returns (l: Int)
-requires exists <_s1>: State, <_s2>: State :: get(_s1, h) + 100 < get(_s2, h)
-ensures exists <_s1>: State, <_s2>: State :: (forall <_s>: State :: get(_s, h) != get(_s1, h) || get(_s, l) != get(_s2, l))
+requires exists <_s1>: State, <_s2>: State :: _s1[h] + 100 < _s2[h]
+ensures exists <_s1>: State, <_s2>: State :: (forall <_s>: State :: _s[h] != _s1[h] || _s[l] != _s2[l])
 {
     var i: Int
     i := 0
@@ -10,10 +10,10 @@ ensures exists <_s1>: State, <_s2>: State :: (forall <_s>: State :: get(_s, h) !
 	//assume 0 <= inc && inc <= 1
 
     while syncTotRule (i < 100)
-		invariant forall <_s>: State :: get(_s, i) <= 100 //&& 0 <= get(_s, inc) && get(_s, inc) <= 1
-		invariant forall <_s1>: State, <_s2>: State :: get(_s1, i) == get(_s2, i)
+		invariant forall <_s>: State :: _s[i] <= 100 //&& 0 <= _s[inc] && _s[inc] <= 1
+		invariant forall <_s1>: State, <_s2>: State :: _s1[i] == _s2[i]
 		invariant exists <_s1>: State, <_s2>: State ::
-			(forall <_s>: State :: get(_s, h) == get(_s1, h) ==> get(_s, l) + 100 - get(_s, i) < get(_s2, l))
+			(forall <_s>: State :: _s[h] == _s1[h] ==> _s[l] + 100 - _s[i] < _s2[l])
 		decreases 100 - i
     {
 		l := l + 1

@@ -1,6 +1,6 @@
 method test1 (x: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[x] >= _s2[x]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] >= _s2[res]
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[x] >= _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] >= _s2[res]
 {
     assume x >= 0
 
@@ -11,9 +11,9 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
     var y: Int
     y := x
 
-    // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[old_x] >= _s2[old_x] {
+    // frame forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[old_x] >= _s2[old_x] {
         while (y > 0)
-            invariant forall _s: State :: <_s> ==> _s[y] >= 0 && _s[res] == _s[old_x] - _s[y]
+            invariant forall <_s> :: _s[y] >= 0 && _s[res] == _s[old_x] - _s[y]
         {
             res := res + 1
             y := y - 1
@@ -22,18 +22,18 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
 }
 
 method test2(x: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[x] >= _s2[x]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] >= _s2[res]
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[x] >= _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] >= _s2[res]
 {
     assume x >= 11
     var new_x: Int
     new_x := x
     res := 0
 
-    // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[x] >= _s2[x] {
+    // frame forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[x] >= _s2[x] {
         while (new_x > 11)
-            invariant forall _s: State :: <_s> ==> _s[new_x] >= 11
-            invariant forall _s: State :: <_s> ==> _s[res] == _s[x] - _s[new_x]
+            invariant forall <_s> :: _s[new_x] >= 11
+            invariant forall <_s> :: _s[res] == _s[x] - _s[new_x]
         {
             res := res + 1
             new_x := new_x - 1
@@ -42,18 +42,18 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
 }
 
 method test3(x: Int, i: Int, n: Int) returns (res: Int)
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[n] == _s2[n] && _s1[x] >= _s2[x]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] >= _s2[res]
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[n] == _s2[n] && _s1[x] >= _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] >= _s2[res]
 {
     assume x >= n
     var new_x: Int
     new_x := x
     res := 0
 
-    // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[x] >= _s2[x] && _s1[n] == _s2[n] {
+    // frame forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[x] >= _s2[x] && _s1[n] == _s2[n] {
         while (new_x > n)
-            invariant forall _s: State :: <_s> ==> _s[new_x] >= _s[n]
-            invariant forall _s: State :: <_s> ==> _s[res] == _s[x] - _s[new_x]
+            invariant forall <_s> :: _s[new_x] >= _s[n]
+            invariant forall <_s> :: _s[res] == _s[x] - _s[new_x]
         {
             res := res + 1
             new_x := new_x - 1
@@ -62,10 +62,10 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
 }
 
 method test4(x: Int, n: Int, i: Int) returns (y: Int)
-requires forall _s: State :: <_s> ==> _s[x] > 1
-requires forall _s: State :: <_s> ==> _s[n] >= 0
-requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[n] == _s2[n] && _s1[x] >= _s2[x]
-ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[y] >= _s2[y]
+requires forall <_s> :: _s[x] > 1
+requires forall <_s> :: _s[n] >= 0
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[n] == _s2[n] && _s1[x] >= _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[y] >= _s2[y]
 {
     var ind: Int
     ind := 0
@@ -75,11 +75,11 @@ ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i]
 
     y := 1
 
-    // frame forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[n] == _s2[n] && _s1[x] >= _s2[x] {
+    // frame forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[n] == _s2[n] && _s1[x] >= _s2[x] {
         while (ind < n)
-        invariant forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[new_x] >= _s2[new_x] && _s1[y] >= _s2[y]
-        invariant forall _s: State :: <_s> ==> _s[ind] == $n
-        invariant forall _s: State :: <_s> ==> _s[ind] <= _s[n]
+        invariant forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[new_x] >= _s2[new_x] && _s1[y] >= _s2[y]
+        invariant forall <_s> :: _s[ind] == $n
+        invariant forall <_s> :: _s[ind] <= _s[n]
         {
             new_x := new_x * 2 - 1
             y := new_x + 1
