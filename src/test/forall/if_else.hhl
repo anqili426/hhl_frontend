@@ -1,0 +1,36 @@
+method test(x: Int, y: Int) returns (res: Int)
+    requires forall _s: State :: <_s> ==> _s[x] >= _s[y]
+    ensures forall _s: State :: <_s> ==> _s[res] == 1
+{
+    if (x >= y) {
+        res := 1
+    } else {
+        res := 0
+    }
+}
+
+method test1(x: Int) returns (res: Int)
+    requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[x] == _s2[x]
+    ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[res] == _s2[res]
+{
+    if (x >= 0) {
+        res := 0
+    } else {
+        res := 1
+    }
+}
+
+method test2(x: Int, y: Int, i: Int) returns (res: Int)
+    requires forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s2[x] == 2 * _s1[x] && _s2[y] == 2 * _s1[y]
+    ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> _s1[res] == _s2[res]
+{
+    var t: Int
+    if (x == y * i) {
+        t := 1
+    } else {
+        t := 0
+    }
+
+    res := t
+}
+

@@ -1,0 +1,6 @@
+method test(handValue_in: Int) returns (handValue_out: Int)
+requires exists _s: State :: <_s> && _s[handValue_in] >= 2 && _s[handValue_in] <= 20
+ensures exists _s: State :: <_s> && _s[handValue_out] == 21
+{
+    handValue_out := handValue_in
+}

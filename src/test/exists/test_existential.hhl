@@ -1,0 +1,73 @@
+method testForAll(x: Int) returns (y: Int)
+    ensures forall _s: State :: <_s> ==> _s[y] == _s[x]
+{
+    y := x
+}
+
+method testExistsAssign(x: Int) returns (y: Int)
+    requires exists _s: State :: <_s>
+    ensures exists _s: State :: <_s> && _s[y] == _s[x]
+{
+    y := x
+}
+
+method testAssume(x: Int)
+requires exists _s: State :: <_s> && _s[x] == 1
+ensures exists _s: State :: <_s> && _s[x] > 0
+{
+    assume x == 1
+}
+
+method testAssert(x: Int)
+requires exists _s: State :: <_s> && _s[x] == 2
+ensures exists _s: State :: <_s> && _s[x] > 1
+{
+    assert x > 1
+}
+
+method testIfElse(x: Int) returns (y: Int)
+requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[x] == 3 && _s2[x] == 1
+ensures exists _s: State :: <_s> && _s[y] == 2
+ensures exists _s: State :: <_s> && _s[y] == 1
+{
+    if (x > 2) {
+      y := 2
+    } else {
+      y := x
+    }
+}
+
+method testHavoc(x: Int) returns (res: Int)
+requires exists _s: State :: <_s> && _s[x] == 2
+ensures exists _s: State :: <_s> && _s[res] == 1
+{
+    res := x
+    havoc res {hint}
+    use hint(1)
+}
+
+method testWhile() returns (sum: Int)
+requires exists _s: State :: <_s>
+ensures exists _s: State :: <_s> && _s[sum] == 102
+{
+    var n: Int
+    n := 0
+    sum := 1
+
+    while (n <= 100)
+        {hint1} invariant $n <= 101 ==> exists _s: State :: <_s> && _s[sum] == _s[n] + 1 && _s[n] <= 101 && _s[n] == $n
+    {
+        n := n + 1
+        sum := sum + 1
+    }
+
+    use hint1(101)
+}
+
+method testHyperAssumeAssert()
+requires exists _s : State :: <_s>
+{
+     var x: Int
+     hyperAssume forall _s: State :: <_s> && _s[x] == 1
+     hyperAssert exists _s: State :: <_s> && _s[x] == 1
+}

@@ -1,0 +1,17 @@
+method counter_diff() returns (a: Int)
+ensures forall _s1: State :: <_s1> ==> (exists _s2: State :: <_s2> && _s1[a] == ((-1) * _s2[a]))
+{
+    a := 0
+
+    var x: Int
+    havoc x {hint1}
+
+    var iter: Int
+    havoc iter {hint2}
+    assume iter >= 0
+
+    a := a + x * iter
+
+    use forall _s: State :: <_s> ==> hint1(-1 * _s[a])
+    use hint2(1)
+}

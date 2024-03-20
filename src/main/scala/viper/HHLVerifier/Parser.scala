@@ -46,7 +46,7 @@ object Parser {
       ProofVarDecl(items._1, items._3)
   }
 
-  def stateProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ "<" ~ proofVar ~ ">" ~ ":" ~ "State" ~ ("::" ~ expr).?).map {
+  def stateProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ "<" ~ proofVar ~ ">" ~ ("::" ~ expr).?).map {
     items =>
       items._1.typ = StateType()
       val stateExistsExpr = StateExistsExpr(items._1, false)
@@ -54,7 +54,7 @@ object Parser {
       ProofVarDecl(items._1, body)
   }
 
-  def stateProofVarDeclErr[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ "<<" ~ proofVar ~ ">>" ~ ":" ~ "State" ~ ("::" ~ expr).?).map {
+  def stateProofVarDeclErr[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ "<<" ~ proofVar ~ ">>" ~ ("::" ~ expr).?).map {
     items =>
       items._1.typ = StateType()
       val stateExistsExpr = StateExistsExpr(items._1, true)
@@ -127,7 +127,7 @@ object Parser {
   // This also means that <s> can only appear at this position (might affect proof var decl?)
   def assertion[$: P]: P[Assertion] = P(hyperAssertionErr | hyperAssertion | normalAssertion)
   def normalAssertion[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (normalAssertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
-  def hyperAssertion[$: P]: P[Assertion] = P(quantifier ~ ("<"  ~ assertVar ~ ">" ~ ":" ~ "State").rep(sep=",", min=1) ~ "::" ~ expr).map{
+  def hyperAssertion[$: P]: P[Assertion] = P(quantifier ~ ("<"  ~ assertVar ~ ">").rep(sep=",", min=1) ~ "::" ~ expr).map{
     items =>
       val quantifier = items._1
       val assertVarDecl = items._2.map(i => AssertVarDecl(i, StateType()))
@@ -143,7 +143,7 @@ object Parser {
       Assertion(quantifier, assertVarDecl, body)
   }
 
-  def hyperAssertionErr[$: P]: P[Assertion] = P(quantifier ~ ("<<" ~ assertVar ~ ">>" ~ ":" ~ "State").rep(sep = ",", min = 1) ~ "::" ~ expr).map {
+  def hyperAssertionErr[$: P]: P[Assertion] = P(quantifier ~ ("<<" ~ assertVar ~ ">>").rep(sep = ",", min = 1) ~ "::" ~ expr).map {
     items =>
       val quantifier = items._1
       val assertVarDecl = items._2.map(i => AssertVarDecl(i, StateType()))
@@ -204,7 +204,8 @@ object Parser {
   def boolTrue[$: P]: P[BoolLit] = P("true").!.map(_ => BoolLit(true))
   def boolFalse[$: P]: P[BoolLit] = P("false").!.map(_ => BoolLit(false))
 
-  def getProgVarExpr[$: P]: P[GetValExpr] = P("get(" ~ (assertVar | proofVar) ~ "," ~ progVar ~ ")").map(items => GetValExpr(items._1, items._2))
+  //def getProgVarExpr[$: P]: P[GetValExpr] = P("get(" ~ (assertVar | proofVar) ~ "," ~ progVar ~ ")").map(items => GetValExpr(items._1, items._2))
+  def getProgVarExpr[$: P]: P[GetValExpr] = P((assertVar | proofVar) ~ "[" ~ progVar ~ "]").map(items => GetValExpr(items._1, items._2))
 
   def identifier[$: P]: P[Expr] = P(progVar | assertVar | proofVar)
 

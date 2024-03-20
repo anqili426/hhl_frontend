@@ -1,0 +1,79 @@
+method test(x1: Int, x2: Int, y1: Int, y2: Int) returns (res: Int)
+ensures forall _s: State :: <_s> && (_s[x1] < _s[y1]) || (_s[x1] == _s[y1] && _s[x2] <= _s[y2]) ==> _s[res] == 1
+{
+   if (x1 < y1) {
+        res := 1
+   } else {
+    if (x1 == y1) {
+        if (x2 <= y2) {
+            res := 1
+        } else {
+            res := 0
+        }
+    } else {
+        res := 0
+    }
+   }
+}
+
+
+method trans(x1: Int, x2: Int, y1: Int, y2: Int, i: Int) returns (res: Int)
+requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> _s1[x1] == _s3[x1] && _s1[x2] == _s3[x2] && _s2[y1] == _s3[y1] && _s2[y2] == _s3[y2] && _s1[y1] == _s2[x1] && _s1[y2] == _s2[x2]
+ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> (_s1[res] == 1 && _s2[res] == 1 ==> _s3[res] == 1)
+{
+   if (x1 < y1) {
+        res := 1
+   } else {
+    if (x1 == y1) {
+        if (x2 <= y2) {
+            res := 1
+        } else {
+            res := 0
+        }
+    } else {
+        res := 0
+    }
+   }
+}
+
+method antisym(x1: Int, x2: Int, y1: Int, y2: Int, i: Int) returns (res: Int)
+requires forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> (_s1[x1] != _s1[y1] && _s1[x2] != _s1[y2]) && _s1[x1] == _s2[y1] && _s1[x2] == _s2[y2] && _s1[y1] == _s2[x1] && _s1[y2] == _s2[x2]
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 ==> _s1[res] == 0 || _s2[res] == 0
+{
+   if (x1 < y1) {
+        res := 1
+   } else {
+    if (x1 == y1) {
+        if (x2 <= y2) {
+            res := 1
+        } else {
+            res := 0
+        }
+    } else {
+        res := 0
+    }
+   }
+}
+
+method antisymBug(x1: Int, x2: Int, y1: Int, y2: Int, i: Int) returns (res: Int)
+requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 && (_s1[x1] != _s1[y1] && _s1[x2] != _s1[y2]) && _s1[x1] == _s2[y1] && _s1[x2] == _s2[y2] && _s1[y1] == _s2[x1] && _s1[y2] == _s2[x2]
+ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 && _s1[res] == 1 && _s2[res] == 1
+{
+   if (x1 < y1) {
+        res := 1
+   } else {
+    if (x1 == y1) {
+        if (x2 <= y2) {
+            res := 1
+        } else {
+            res := 0
+        }
+    } else {
+        res := 1
+    }
+   }
+}
+
+
+
+

@@ -1,0 +1,23 @@
+method GNI(h: Int, i: Int) returns (l_out: Int)
+   ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==> (exists _s: State :: <_s> && _s[h] == _s1[h] && _s[l_out] == _s2[l_out])
+{
+        var y: Int
+        havoc y {hint1}
+        use forall _s1: State, _s2: State :: <_s1> && <_s2> ==> hint1(_s2[h] + _s2[y] - _s1[h])
+        l_out := h + y
+}
+
+method GNI_bad(h: Int, i: Int) returns (l_out: Int)
+   requires exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 && _s1[h] < _s2[h]
+   ensures exists _s1: State, _s2: State :: <_s1> && <_s2> && _s1[i] == 1 && _s2[i] == 2 && (forall _s: State :: (<_s> && (_s[h] == _s1[h])
+    ==> _s[l_out] < _s2[l_out]))
+{
+        var y: Int
+        havoc y {hint2}
+        use hint2(100)
+        assume y >= 0 && y <= 100
+        l_out := h + y
+}
+
+
+

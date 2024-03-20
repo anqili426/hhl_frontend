@@ -1,0 +1,19 @@
+method test(handValue_in: Int) returns (handValue_out: Int)
+requires exists _s: State :: <_s> && _s[handValue_in] >= 2 && _s[handValue_in] <= 20
+ensures exists _s: State :: <_s> && _s[handValue_out] == 21
+{
+    var card: Int
+    havoc card {hint1}
+    assume card >= 1 && card <= 10
+    use hint1(1)
+    use hint1(2)
+    use hint1(3)
+    use hint1(4)
+    use hint1(5)
+    use hint1(6)
+    use hint1(7)
+    use hint1(8)
+    use hint1(9)
+    use hint1(10)
+    handValue_out := handValue_in + card
+}

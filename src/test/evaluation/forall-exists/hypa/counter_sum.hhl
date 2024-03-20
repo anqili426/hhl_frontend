@@ -1,0 +1,18 @@
+method counter_diff() returns (a: Int)
+ensures forall _s1: State, _s2: State :: <_s1> && <_s2> ==>
+    (exists _s3: State :: <_s3> && _s3[a] == (_s1[a] + _s2[a]))
+{
+    a := 0
+
+    var x: Int
+    havoc x {hint1}
+
+    var iter: Int
+    havoc iter {hint2}
+    assume iter >= 0
+
+    a := a + x * iter
+
+    use forall _s1: State, _s2: State :: <_s1> && <_s2> ==> hint1(_s1[a] + _s2[a])
+    use hint2(1)
+}

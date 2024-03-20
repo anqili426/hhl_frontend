@@ -1,0 +1,10 @@
+method testHavoc() returns (x: Int)
+requires exists _s: State :: <_s>
+// ensures forall _s: State :: <_s> ==> _s[x] > 0
+ensures exists _s: State :: <_s> && _s[x] == 1
+
+{
+    havoc x {hintX}
+    // assume x > 0
+    use hintX(1)
+}

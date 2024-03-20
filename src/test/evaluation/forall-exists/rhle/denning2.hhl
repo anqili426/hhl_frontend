@@ -1,0 +1,44 @@
+//Question: why should this verify?
+method denning2(f1_in: Int, f2_in: Int, f3_in: Int) returns (f1_out: Int, f2_out: Int)
+requires forall _s1: State :: <_s1> ==>
+    (exists _s2: State :: <_s2> && _s1[f1_in] == _s2[f1_in] && _s1[f2_in] == _s2[f2_in] && _s1[f3_in] != _s2[f3_in])
+ensures forall _s1: State :: <_s1> ==>
+    (exists _s2: State :: <_s2> && _s1[f1_out] == _s2[f1_out] && _s1[f2_out] == _s2[f2_out] && _s1[f3_in] != _s2[f3_in])
+{
+    var i: Int
+    var n: Int
+    var sum: Int
+
+    i := 1
+    n := 0
+    sum := 0
+
+    f1_out := f1_in
+    f2_out := f2_in
+
+    while (i <= 100)
+    {hint1} invariant forall _s1: State :: <_s1> ==>
+         (_s1[f1_in] == _s1[f1_out] && _s1[i] <= 101 && _s1[i] == $n + 1)  &&
+         (exists _s2: State :: <_s2> && _s1[f1_out] == _s2[f1_out]
+                                    && _s1[f2_out] == _s2[f2_out]
+                                    && _s1[f3_in] != _s2[f3_in]
+                                    && _s1[i] == _s2[i]
+                                    && _s1[n] == _s2[n]
+         )
+    {
+        var flag: Int
+        flag := f1_in
+        f2_out := flag
+        var x: Int
+        x := f3_in
+        if (flag != 0) {
+            n := n + 1
+            sum := sum + x
+        }
+        i := i + 1
+    }
+    use hint1(101)
+    // TODO: if we add sum/n to the RHS below, we don't have the info that n >= 0, check why!
+    f2_out := n + sum
+    f1_out := f2_out
+}

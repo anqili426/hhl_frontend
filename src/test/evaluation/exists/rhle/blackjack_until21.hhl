@@ -1,0 +1,21 @@
+method test(handValue_in: Int) returns (handValue_out: Int)
+requires exists _s: State :: <_s> && _s[handValue_in] >= 2 && _s[handValue_in] <= 20
+ensures exists _s: State :: <_s> && _s[handValue_out] == 21
+{
+    handValue_out := handValue_in
+
+    let $s: State :: <$s> && $s[handValue_out] >= 2 && $s[handValue_out] <= 20
+    while (handValue_out < 21) 
+    {hint2} invariant $n <= (21 - $s[handValue_out]) ==> 
+            exists _s: State :: <_s> && _s[handValue_out] <= 21 &&
+                $n == _s[handValue_out] - $s[handValue_out]
+    {
+        var card: Int
+        havoc card {hint1}
+        assume card >= 1 && card <= 10
+        use hint1(1)
+        handValue_out := handValue_out + card
+    }
+
+    use hint2(21 - $s[handValue_out])
+}
