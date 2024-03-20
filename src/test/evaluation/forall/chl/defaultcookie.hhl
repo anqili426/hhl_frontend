@@ -56,11 +56,11 @@ ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
 
 // Transitive
 method compare2(name1: Int, domain1: Int, path1: Int, name2: Int, domain2: Int, path2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> 
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> 
     _s1[name1] == _s3[name1] && _s1[domain1] == _s3[domain1] && _s1[path1] == _s3[path1] &&
     _s1[name2] == _s2[name1] && _s1[domain2] == _s2[domain1] && _s1[path2] == _s2[path1] &&
     _s2[name2] == _s3[name2] && _s2[domain2] == _s3[domain2] && _s2[path2] == _s3[path2]
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     ((_s1[res] == 1 && _s2[res] == 1) ==> _s3[res] == 1)
 {
     res := -1

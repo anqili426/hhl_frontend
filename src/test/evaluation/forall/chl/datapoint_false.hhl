@@ -60,11 +60,11 @@ ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
 
 // P2
 method compare2(fiscalQuarter1: Int, sectorCode1: Int, industryCode1: Int, fiscalQuarter2: Int, sectorCode2: Int, industryCode2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> 
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> 
     _s1[fiscalQuarter1] == _s3[fiscalQuarter1] && _s1[sectorCode1] == _s3[sectorCode1] && _s1[industryCode1] == _s3[industryCode1] &&
     _s1[fiscalQuarter2] == _s2[fiscalQuarter1] && _s1[sectorCode2] == _s2[sectorCode1] && _s1[industryCode2] == _s2[industryCode1] &&
     _s2[fiscalQuarter2] == _s3[fiscalQuarter2] && _s2[sectorCode2] == _s3[sectorCode2] && _s2[industryCode2] == _s3[industryCode2]
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     (_s1[res] > 0 && _s2[res] > 0 ==> _s3[res] > 0)
 {
     var fiscalRes: Int 
@@ -119,11 +119,11 @@ ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 
 // P3
 method compare3(fiscalQuarter1: Int, sectorCode1: Int, industryCode1: Int, fiscalQuarter2: Int, sectorCode2: Int, industryCode2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> 
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> 
     _s1[fiscalQuarter1] == _s3[fiscalQuarter1] && _s1[sectorCode1] == _s3[sectorCode1] && _s1[industryCode1] == _s3[industryCode1] &&
     _s1[fiscalQuarter2] == _s2[fiscalQuarter1] && _s1[sectorCode2] == _s2[sectorCode1] && _s1[industryCode2] == _s2[industryCode1] &&
     _s2[fiscalQuarter2] == _s3[fiscalQuarter2] && _s2[sectorCode2] == _s3[sectorCode2] && _s2[industryCode2] == _s3[industryCode2]
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     (_s1[res] == 0 ==> ((_s2[res] > 0 && _s3[res] > 0) || (_s2[res] < 0 && _s3[res] < 0) ||
         (_s2[res] == 0 && _s3[res] == 0)))
 {

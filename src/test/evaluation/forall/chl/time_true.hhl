@@ -31,11 +31,11 @@ ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
 
 // P2
 method compare2(ora1: Int, voltot1: Int, ora2: Int, voltot2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     _s1[ora1] == _s3[ora1] && _s1[voltot1] == _s3[voltot1] &&
     _s2[ora2] == _s3[ora2] && _s2[voltot2] == _s3[voltot2] &&
     _s1[ora2] == _s2[ora1] && _s1[voltot2] == _s2[voltot1]
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     (_s1[res] > 0 && _s2[res] > 0 ==> _s3[res] > 0)
 {
        if (ora1 == ora2) {
@@ -63,11 +63,11 @@ ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 
 // P3
 method compare3(ora1: Int, voltot1: Int, ora2: Int, voltot2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     _s1[ora1] == _s3[ora1] && _s1[voltot1] == _s3[voltot1] &&
     _s2[ora2] == _s3[ora2] && _s2[voltot2] == _s3[voltot2] &&
     _s1[ora2] == _s2[ora1] && _s1[voltot2] == _s2[voltot1]
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     (_s1[res] == 0 ==> ((_s2[res] > 0 && _s3[res] > 0) ||
         (_s2[res] < 0 && _s3[res] < 0) || (_s2[res] == 0 && _s3[res] == 0)))
 {

@@ -16,7 +16,7 @@ ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
 
 method test_exists(x: Int) returns (y: Int)
 requires forall <_s1>, <_s2> :: _s1[x] == _s2[x] && _s1[x] > 0
-requires exists _s1: State, _s2: State :: <_s1> && <_s2>
+requires exists <_s1>, <_s2> :: true
 ensures exists <_s1>, <_s2> :: _s1[y] == _s2[y]
 {
     y := 0

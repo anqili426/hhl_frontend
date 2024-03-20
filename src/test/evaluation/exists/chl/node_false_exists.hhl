@@ -1,12 +1,12 @@
 // P3
 method compare3(containsKey1: Int, order1: Int, containsKey2: Int, order2: Int, i: Int) returns (res: Int)
-requires exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 &&
+requires exists <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 &&
                  _s1[containsKey1] == _s3[containsKey1] && _s1[order1] == _s3[order1] && 
                  _s2[containsKey2] == _s3[containsKey2] && _s2[order2] == _s3[order2] && 
                  _s1[containsKey2] == _s2[containsKey1] && _s1[order2] == _s2[order1] &&
                  _s1[containsKey1] == 1 && _s1[containsKey2] == 0 && _s2[containsKey2] == 1 &&
                  _s3[order1] > _s3[order2]
-ensures exists _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 &&
+ensures exists <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 &&
                 (_s1[res] == 0 && !((_s2[res] > 0 && _s3[res] > 0) || (_s2[res] < 0 && _s3[res] < 0) ||
                 (_s2[res] == 0 && _s3[res] == 0)))
 {

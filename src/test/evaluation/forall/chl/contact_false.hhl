@@ -127,11 +127,11 @@ ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
 
 // P2
 method compare2(firstName1: Int, lastName1: Int, emails1: Int, firstName2: Int, lastName2: Int, emails2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     _s1[firstName1] == _s3[firstName1] && _s1[lastName1] == _s3[lastName1] && _s1[emails1] == _s3[emails1] &&
     _s1[firstName2] == _s2[firstName1] && _s1[lastName2] == _s2[lastName1] && _s1[emails2] == _s2[emails1] &&
     _s2[firstName2] == _s3[firstName2] && _s2[lastName2] == _s3[lastName2] && _s2[emails2] == _s3[emails2]
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     (_s1[res] > 0 && _s2[res] > 0 ==> _s3[res] > 0)
 {
     if (firstName1 != 0 && firstName2 != 0) {
@@ -252,11 +252,11 @@ ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && 
 
 // P3
 method compare3(firstName1: Int, lastName1: Int, emails1: Int, firstName2: Int, lastName2: Int, emails2: Int, i: Int) returns (res: Int)
-requires forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     _s1[firstName1] == _s3[firstName1] && _s1[lastName1] == _s3[lastName1] && _s1[emails1] == _s3[emails1] &&
     _s1[firstName2] == _s2[firstName1] && _s1[lastName2] == _s2[lastName1] && _s1[emails2] == _s2[emails1] &&
     _s2[firstName2] == _s3[firstName2] && _s2[lastName2] == _s3[lastName2] && _s2[emails2] == _s3[emails2]
-ensures forall _s1: State, _s2: State, _s3: State :: <_s1> && <_s2> && <_s3> && _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
     (_s1[res] == 0 ==> ((_s2[res] > 0 && _s3[res] > 0) || (_s2[res] < 0 && _s3[res] < 0) ||
         (_s2[res] == 0 && _s3[res] == 0)))
 {
