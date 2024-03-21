@@ -1,0 +1,214 @@
+// P1
+method compare1(value1: Int, cost1: Int, value2: Int, cost2: Int, i: Int, target: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[value1] == _s2[value2] && _s1[cost1] == _s2[cost2] &&
+    _s1[value2] == _s2[value1] && _s1[cost2] == _s2[cost1]
+requires forall <_s1>, <_s2> :: _s1[target] == _s2[target]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[res] == -1 * _s2[res]
+{
+    var comp1: Int 
+    var abscomp1: Int
+    comp1 := target - value1
+    abscomp1 := 0 
+
+    if (comp1 >= 0) {
+        abscomp1 := comp1
+    } else {
+        abscomp1 := -1 * comp1
+    }
+
+    var comp2: Int 
+    var abscomp2: Int
+    comp2 := target - value2
+    abscomp2 := 0 
+
+    if (comp2 >= 0) {
+        abscomp2 := comp2
+    } else {
+        abscomp2 := -1 * comp2
+    }
+
+    if (value1 == -1 && value2 == -1) {
+        res := 0
+    } else {
+        if (value1 == -1) {
+            res := 1
+        } else {
+            if (value2 == -1) {
+                res := -1
+            } else {
+                if (abscomp1 == abscomp2) {
+                    var comp: Int
+                    comp := cost1 - cost2
+                    if (comp > 0) {
+                        res := 1
+                    } else {
+                        if (comp < 0) {
+                            res := -1
+                        } else {
+                            res := 0
+                        }
+                    }
+                } else {
+                    var comp3: Int
+                    comp3 := abscomp1 - abscomp2
+                    if (comp3 > 0) {
+                        res := 1
+                    } else {
+                        if (comp3 < 0) {
+                            res := -1
+                        } else {
+                            res := 0
+                        }
+                    } 
+                }
+            }
+        }
+    }
+}
+
+// P2
+// Verification doesn't terminate
+method compare2(value1: Int, cost1: Int, value2: Int, cost2: Int, i: Int, target: Int) returns (res: Int)
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+    _s1[value1] == _s3[value1] && _s1[cost1] == _s3[cost1] &&
+    _s2[value2] == _s3[value2] && _s2[cost2] == _s3[cost2] &&
+    _s1[value2] == _s2[value1] && _s1[cost2] == _s2[cost1]
+requires forall <_s1>, <_s2> :: _s1[target] == _s2[target]
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+    (_s1[res] > 0 && _s2[res] > 0 ==> _s3[res] > 0)
+{
+    var comp1: Int 
+    var abscomp1: Int
+    comp1 := target - value1
+    abscomp1 := 0 
+
+    if (comp1 >= 0) {
+        abscomp1 := comp1
+    } else {
+        abscomp1 := -1 * comp1
+    }
+
+    var comp2: Int 
+    var abscomp2: Int
+    comp2 := target - value2
+    abscomp2 := 0 
+
+    if (comp2 >= 0) {
+        abscomp2 := comp2
+    } else {
+        abscomp2 := -1 * comp2
+    }
+
+    if (value1 == -1 && value2 == -1) {
+        res := 0
+    } else {
+        if (value1 == -1) {
+            res := 1
+        } else {
+            if (value2 == -1) {
+                res := -1
+            } else {
+                if (abscomp1 == abscomp2) {
+                    var comp: Int
+                    comp := cost1 - cost2
+                    if (comp > 0) {
+                        res := 1
+                    } else {
+                        if (comp < 0) {
+                            res := -1
+                        } else {
+                            res := 0
+                        }
+                    }
+                } else {
+                    var comp3: Int
+                    comp3 := abscomp1 - abscomp2
+                    if (comp3 > 0) {
+                        res := 1
+                    } else {
+                        if (comp3 < 0) {
+                            res := -1
+                        } else {
+                            res := 0
+                        }
+                    } 
+                }
+            }
+        }
+    }
+}
+
+// P3
+// Verification doesn't terminate
+method compare3(value1: Int, cost1: Int, value2: Int, cost2: Int, i: Int, target: Int) returns (res: Int)
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+    _s1[value1] == _s3[value1] && _s1[cost1] == _s3[cost1] &&
+    _s2[value2] == _s3[value2] && _s2[cost2] == _s3[cost2] &&
+    _s1[value2] == _s2[value1] && _s1[cost2] == _s2[cost1]
+requires forall <_s1>, <_s2> :: _s1[target] == _s2[target]
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+    (_s1[res] == 0 ==> ((_s2[res] > 0 && _s3[res] > 0) || (_s2[res] < 0 && _s3[res] < 0) ||
+        (_s2[res] == 0 && _s3[res] == 0)))
+{
+    var comp1: Int 
+    var abscomp1: Int
+    comp1 := target - value1
+    abscomp1 := 0 
+
+    if (comp1 >= 0) {
+        abscomp1 := comp1
+    } else {
+        abscomp1 := -1 * comp1
+    }
+
+    var comp2: Int 
+    var abscomp2: Int
+    comp2 := target - value2
+    abscomp2 := 0 
+
+    if (comp2 >= 0) {
+        abscomp2 := comp2
+    } else {
+        abscomp2 := -1 * comp2
+    }
+
+    if (value1 == -1 && value2 == -1) {
+        res := 0
+    } else {
+        if (value1 == -1) {
+            res := 1
+        } else {
+            if (value2 == -1) {
+                res := -1
+            } else {
+                if (abscomp1 == abscomp2) {
+                    var comp: Int
+                    comp := cost1 - cost2
+                    if (comp > 0) {
+                        res := 1
+                    } else {
+                        if (comp < 0) {
+                            res := -1
+                        } else {
+                            res := 0
+                        }
+                    }
+                } else {
+                    var comp3: Int
+                    comp3 := abscomp1 - abscomp2
+                    if (comp3 > 0) {
+                        res := 1
+                    } else {
+                        if (comp3 < 0) {
+                            res := -1
+                        } else {
+                            res := 0
+                        }
+                    } 
+                }
+            }
+        }
+    }
+}

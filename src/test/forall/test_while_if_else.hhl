@@ -1,0 +1,31 @@
+method test(x: Int) returns (y: Int)
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
+    ensures forall <_s> :: _s[y] == _s[x]
+{
+    assume x > 0
+
+    var i: Int
+    i := x
+
+
+    frame forall <_s1>, <_s2> :: _s1[x] == _s2[x] {
+        while (i > 0)
+            invariant forall <_s> :: _s[i] >= 0 && (_s[i] == 0 ==> _s[y] == _s[x])
+        {
+            if (i == 1) {
+                y := x
+            } else {
+                y := 2
+            }
+            i := i - 1
+        }
+    }
+
+}
+
+
+
+
+
+

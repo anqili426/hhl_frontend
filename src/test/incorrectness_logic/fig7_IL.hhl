@@ -1,0 +1,27 @@
+method maxing() returns (locked: Int)
+	requires exists <_s>:: true
+	ensures exists <_s>:: _s[locked] == 1
+{
+	var z: Int
+	havoc z {hint}
+	use hint(0)
+	if (z > 0) {
+		locked := 0
+	}
+	else {
+		locked := 1
+	}
+}
+
+method true_positive() returns (locked: Int)
+	requires exists <_s>:: true
+	ensures exists <<_s>>:: _s[locked] == 0
+{
+	locked := maxing()
+	if (locked > 0) {
+		locked := locked - 1
+	}
+	if (locked == 0) {
+		assert false
+	}
+}

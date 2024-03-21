@@ -1,0 +1,18 @@
+method leak2(high: Int, low: Int) returns (res: Int)
+requires forall <_s1> ::
+    (exists <_s2> :: _s1[low] == _s2[low] && _s1[high] != _s2[high])
+ensures forall <_s1> ::
+    (exists <_s2> :: _s1[low] == _s2[low] && _s1[res] == _s2[res] && _s1[high] != _s2[high])
+{
+    var coin: Int
+    havoc coin {hint1}
+    use hint1(0)
+    use hint1(1)
+    assume coin == 0 || coin == 1
+
+    if (coin == 0) {
+        res := high + low
+    } else {
+        res := low
+    }
+}

@@ -1,0 +1,164 @@
+// Symmetric
+method compare1(name1: Int, domain1: Int, path1: Int, name2: Int, domain2: Int, path2: Int, i: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[name1] == _s2[name2] && _s1[domain1] == _s2[domain2] &&
+    _s1[path1] == _s2[path2] && _s1[name2] == _s2[name1] &&
+    _s1[domain2] == _s2[domain1] && _s1[path2] == _s2[path1]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[res] == _s2[res]
+{
+    res := -1
+
+    if (name1 != name2) {
+        res := 0
+    } else {
+        if (path1 == 0) {
+            if (path2 != 0) {
+                res := 0
+            }
+        } else {
+            // Here path1 != 0
+            if (path2 == 0) {
+                res := 0
+            } else {
+                // Here path1 != 0 && path2 != 0
+                if (path1 != path2) {
+                    res := 0
+                }
+            }
+        }
+
+        if (res == -1) {
+            if (domain1 == 0) {
+                if (domain2 != 0) {
+                    res := 0 
+                }
+            } else {
+                // Here domain1 != 0
+                if (domain2 == 0) {
+                    res := 0
+                } else {
+                    // Here domain1 != 0 && domain2 !=0
+                    if (domain1 != domain2) {
+                        res := 0
+                    } else {
+                        res := 1
+                    }
+                }
+            }
+        }   
+    }
+
+    if (res == -1) {
+        res := 1
+    }
+}
+
+// Transitive
+method compare2(name1: Int, domain1: Int, path1: Int, name2: Int, domain2: Int, path2: Int, i: Int) returns (res: Int)
+requires forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==> 
+    _s1[name1] == _s3[name1] && _s1[domain1] == _s3[domain1] && _s1[path1] == _s3[path1] &&
+    _s1[name2] == _s2[name1] && _s1[domain2] == _s2[domain1] && _s1[path2] == _s2[path1] &&
+    _s2[name2] == _s3[name2] && _s2[domain2] == _s3[domain2] && _s2[path2] == _s3[path2]
+ensures forall <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 ==>
+    ((_s1[res] == 1 && _s2[res] == 1) ==> _s3[res] == 1)
+{
+    res := -1
+
+    if (name1 != name2) {
+        res := 0
+    } else {
+        if (path1 == 0) {
+            if (path2 != 0) {
+                res := 0
+            }
+        } else {
+            // Here path1 != 0
+            if (path2 == 0) {
+                res := 0
+            } else {
+                // Here path1 != 0 && path2 != 0
+                if (path1 != path2) {
+                    res := 0
+                }
+            }
+        }
+
+        if (res == -1) {
+            if (domain1 == 0) {
+                if (domain2 != 0) {
+                    res := 0 
+                }
+            } else {
+                // Here domain1 != 0
+                if (domain2 == 0) {
+                    res := 0
+                } else {
+                    // Here domain1 != 0 && domain2 !=0
+                    if (domain1 != domain2) {
+                        res := 0
+                    } else {
+                        res := 1
+                    }
+                }
+            }
+        }   
+    }
+
+    if (res == -1) {
+        res := 1
+    }
+}
+
+// Reflexive
+method compare3(name1: Int, domain1: Int, path1: Int, name2: Int, domain2: Int, path2: Int) returns (res: Int)
+requires forall <_s> :: _s[name1] == _s[name2] &&
+                                    _s[domain1] == _s[domain2] && _s[path1] == _s[path2]
+ensures forall <_s> :: _s[res] == 1
+{
+    res := -1
+
+    if (name1 != name2) {
+        res := 0
+    } else {
+        if (path1 == 0) {
+            if (path2 != 0) {
+                res := 0
+            }
+        } else {
+            // Here path1 != 0
+            if (path2 == 0) {
+                res := 0
+            } else {
+                // Here path1 != 0 && path2 != 0
+                if (path1 != path2) {
+                    res := 0
+                }
+            }
+        }
+
+        if (res == -1) {
+            if (domain1 == 0) {
+                if (domain2 != 0) {
+                    res := 0 
+                }
+            } else {
+                // Here domain1 != 0
+                if (domain2 == 0) {
+                    res := 0
+                } else {
+                    // Here domain1 != 0 && domain2 !=0
+                    if (domain1 != domain2) {
+                        res := 0
+                    } else {
+                        res := 1
+                    }
+                }
+            }
+        }   
+    }
+
+    if (res == -1) {
+        res := 1
+    }
+}

@@ -1,0 +1,127 @@
+method test4(x: Int) returns (res: Int)
+requires forall <_s> :: _s[x] >= 0
+ensures forall _s: State :: <_s> && _s[x] > 0 ==> _s[res] == _s[x]
+ensures forall _s: State :: <_s> && _s[x] <= 0 ==> _s[res] == -1 * _s[x]
+{
+    var old_x: Int
+    old_x := x
+    res := 0
+    if (old_x > 0) {
+        declare whileLoop
+        {
+            while (old_x != 0)
+                    invariant forall _s: State :: <_s> && _s[x] > 0 ==> _s[res] == _s[x] - _s[old_x]
+                    invariant forall _s: State :: <_s> && _s[x] <= 0 ==> _s[res] == -1 * _s[x] - _s[old_x]
+            {
+              old_x := old_x - 1
+              res := res + 1
+            }
+        }
+    } else {
+        old_x := old_x * (-1)
+        reuse whileLoop
+    }
+}
+
+method test5(x: Int, n: Int, i: Int) returns (y: Int)
+requires forall <_s> :: _s[n] >= 0
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[n] == _s2[n] && _s1[x] >= _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[y] >= _s2[y]
+{
+    var ind: Int
+    ind := 0
+
+    var new_x: Int
+    new_x := x
+
+    y := 1
+
+    if (x > 0) {
+        declare commonLoop {
+            // frame forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[n] == _s2[n] && _s1[x] >= _s2[x] {
+                while (ind < n)
+                invariant forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==> _s1[new_x] >= _s2[new_x] && _s1[y] >= _s2[y]
+                invariant forall <_s> :: _s[ind] == $n
+                invariant forall <_s> :: _s[ind] <= _s[n]
+                {
+                    new_x := new_x * 2 - 1
+                    y := new_x + 1
+                    ind := ind + 1
+                }
+            // }
+        }
+        y := y + 1
+    } else {
+        reuse commonLoop
+    }
+}
+
+
+method test1(x: Int) returns (res: Int)
+ensures forall _s: State :: <_s> && _s[x] > 1 ==> _s[res] == 1
+{
+    if (x > 1) {
+        declare setRes {
+            res := 1
+        }
+    } else {
+        res := 0
+        reuse setRes
+        res := 0
+    }
+}
+
+method test2(x: Int) returns (res: Int)
+ensures forall _s: State :: <_s> && _s[x] == 1 ==> _s[res] == 1
+ensures forall _s: State :: <_s> && _s[x] > 1 &&  _s[x] <= 2 ==> _s[res] == 4
+ensures forall _s: State :: <_s> && _s[x] < 1 ==> _s[res] == 0
+ensures forall _s: State :: <_s> && _s[x] > 2 ==> _s[res] == 3
+{
+    res := 0
+    if (x > 1) {
+        declare testBlock {
+            if (x > 2) {
+                res := 2
+                declare nestedTestBlock {
+                    res := 3
+                }
+            } else {
+                res := 1
+                reuse nestedTestBlock
+                res := 4
+            }
+        }
+    } else {
+        reuse testBlock
+        if (x == 1) {
+            res := 1
+        } else {
+            res := 0
+        }
+    }
+}
+
+method test3(x: Int) returns (y: Int)
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
+    ensures forall <_s> :: _s[y] == _s[x]
+{
+    assume x > 0
+
+    var i: Int
+    i := x
+
+        while (i > 0)
+            invariant forall <_s> :: _s[i] >= 0 && (_s[i] == 0 ==> _s[y] == _s[x])
+        {
+            if (i == 1) {
+                declare update {
+                    y := x
+                }
+            } else {
+                reuse update
+                y := 2
+            }
+            i := i - 1
+        }
+}

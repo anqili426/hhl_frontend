@@ -1,0 +1,39 @@
+method test1(x: Int, y: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: _s1[x] == _s2[y] && _s1[y] == _s2[x]
+ensures forall <_s1>, <_s2> :: _s1[res] == _s2[res]
+{
+    res := 0
+    assume x * y > 0
+
+    //frame forall <_s1>, <_s2> :: _s1[x] == _s2[y] && _s1[y] == _s2[x] {
+        while (res < x * y)
+        invariant forall <_s> :: _s[res] <= _s[x] * _s[y]
+        {
+            res := res + 1
+        }
+    //}
+}
+
+method test2(x: Int, y: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: _s1[x] == _s2[y] && _s1[y] == _s2[x]
+ensures forall <_s> :: _s[res] == _s[x] * _s[x] + 2 * _s[x] * _s[y] + _s[y] * _s[y]
+ensures forall <_s1>, <_s2> :: _s1[res] == _s2[res]
+{
+    res := x * x + 2 * x * y
+    var i: Int
+    i := 0
+
+    //frame forall <_s1>, <_s2> :: _s1[x] == _s2[y] && _s1[y] == _s2[x] {
+        while (i < y * y)
+        invariant forall <_s> :: _s[res] == _s[x] * _s[x] + 2 * _s[x] * _s[y]
+        invariant forall <_s> :: _s[i] <= _s[y] * _s[y]
+        {
+                i := i + 1
+        }
+    //}
+
+    res := res + i
+}
+
+
+

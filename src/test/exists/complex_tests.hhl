@@ -1,0 +1,283 @@
+/*
+// Functional inv
+method functional(x: Int) returns (res: Int)
+requires exists <_s> :: _s[x] == 3
+ensures exists <_s> :: _s[res] == _s[x]
+{
+     let $s: State :: <$s> && $s[x] == 3
+     res := 0
+     while (res < x)
+     {hint2} invariant $n <= $s[x] ==> exists <_s> :: _s[res] <= _s[x] && _s[res] == $n && _s[x] == $s[x]
+     {
+         res := res + 1
+     }
+     use hint2(3)
+}
+
+// Nested if-else
+method lex_transitivity(x1: Int, x2: Int, y1: Int, y2: Int, i: Int) returns (res: Int)
+requires exists <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 && _s1[x1] == _s3[x1] && _s1[x2] == _s3[x2] && _s2[y1] == _s3[y1] && _s2[y2] == _s3[y2] && _s1[y1] == _s2[x1] && _s1[y2] == _s2[x2]
+ensures exists <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 && (_s1[res] == 1 && _s2[res] == 1 ==> _s3[res] == 1)
+{
+   if (x1 < y1) {
+        res := 1
+   } else {
+    if (x1 == y1) {
+        if (x2 <= y2) {
+            res := 1
+        } else {
+            res := 0
+        }
+    } else {
+        res := 0
+    }
+   }
+}
+
+// Loops in if-else
+method loop_in_if_else(y: Int) returns (res: Int)
+requires exists <_s1>, <_s2> :: _s1[y] == _s2[y] && _s1[y] >= 0
+requires exists <_s1>, <_s2> :: _s1[y] == _s2[y] && _s1[y] < 0
+ensures exists <_s1>, <_s2> :: _s1[y] >= 0 && _s1[res] == _s2[res]
+ensures exists <_s1>, <_s2> :: _s1[y] < 0 && _s1[res] == _s2[res]
+{
+    let $s1: State :: <$s1> && $s1[y] >= 0
+    let $s2: State :: <$s2> && $s2[y] < 0
+    res := 0
+        if (y >= 0) {
+            while (res < y)
+                {hint4} invariant $n <= $s1[y] ==> exists <_s> :: _s[res] <= _s[y] && _s[res] == $n && _s[y] == $s1[y]
+            {
+                res := res + 1
+            }
+        } else {
+            while (res < (-1) * y)
+                {hint5} invariant $n <= -1 * $s2[y] ==> exists <_s> :: _s[res] <= -1 * _s[y] && _s[res] == $n && _s[y] == $s2[y]
+            {
+                res := res + 1
+            }
+        }
+    use hint4($s1[y])
+    use hint5(-1 * $s2[y])
+} */
+/*
+// Nested loops
+method nested_loops(x: Int) returns (res: Int)
+requires exists <_s> :: _s[x] > 0
+ensures exists <_s> :: _s[res] == _s[x]
+{
+    var i: Int
+    i := 0
+    res := 0
+
+    let $s: State :: <$s> && $s[x] > 0 && $s[i] == 0 && $s[res] == 0
+
+    while (i < x)
+    {hint6} invariant $n <= 1 ==> exists <_s> :: _s[i] <= _s[x]
+                                    && _s[x] == $s[x]
+                                    && _s[i] == _s[res]
+                                    && _s[i] == $n * _s[x]
+                                    && $s[x] > 0
+    {
+        // $s1 doesn't necessarily exist
+        let $b: Bool :: $b == (exists <_s> :: _s[i] <= _s[x] && _s[x] == $s[x])
+        let $s1: State :: $b ==> <$s1> && $s1[i] <= $s1[x] && $s1[x] == $s[x]
+        while (i < x)
+        {hint7} invariant $b ==> ($n <= $s1[x] - $s1[i] ==> exists <_s> :: _s[i] == $n + $s1[i]
+                                                                        && _s[i] <= _s[x]
+                                                                        && _s[x] == $s1[x])
+        {
+            i := i + 1
+        }
+        use hint7($s1[x] - $s1[i])
+        res := i
+    }
+
+    use hint6(1)
+} */
+
+method nested_loops2(x: Int) returns (res: Int)
+requires exists <_s> :: _s[x] > 0
+ensures exists <_s> :: _s[res] == _s[x]
+{
+
+    let $s: State :: <$s> && $s[x] > 0
+    res := 0
+    while (res < x)
+    {hint6} invariant $n <= 1 ==> exists <_s> :: _s[res] <= _s[x]
+                                    && _s[x] == $s[x]
+                                    && _s[res] == $n * _s[x]
+                                    && $s[x] > 0
+    {
+        let $b: Bool :: $b == (exists <_s> :: _s[res] <= _s[x] && _s[x] == $s[x])
+        let $s1: State :: $b ==> <$s1> && $s1[res] <= $s1[x] && $s1[x] == $s[x]
+        while (res < x)
+        {hint7} invariant $b ==> ($n <= $s1[x] - $s1[res] ==> exists <_s> :: _s[res] == $n + $s1[res]
+                                                                        && _s[res] <= _s[x]
+                                                                        && _s[x] == $s1[x])
+        {
+            res := res + 1
+        }
+        use hint7($s1[x] - $s1[res])
+    }
+    use hint6(1)
+}
+
+/*
+// Two loops
+method two_loops(x: Int) returns (res: Int)
+requires exists <_s> :: _s[x] == 3
+ensures exists <_s> :: _s[x] * _s[x] + _s[x] == _s[res]
+{
+    var i: Int
+    i := 0
+    res := 0
+
+    let $s: State :: <$s> && $s[x] == 3
+
+    // Compute res = x * x
+    while (i < x)
+    {hint8} invariant $n <= $s[x] ==> exists <_s> :: _s[i] == $n
+                                                  && _s[x] == $s[x]
+                                                  && _s[res] == _s[i] * _s[x]
+    {
+        res := res + x
+        i := i + 1
+    }
+
+    use hint8($s[x])
+
+    i := 0
+
+    // Compute res = res + x
+    while (i < x)
+    {hint9} invariant $n <= $s[x] ==> exists <_s> :: _s[i] == $n
+                                                  && _s[x] == $s[x]
+                                                  && _s[res] == _s[x] * _s[x] + _s[i]
+    {
+        res := res + 1
+        i := i + 1
+    }
+
+    use hint9($s[x])
+}
+
+// If-else in loops
+method if_else_in_loop(x: Int) returns (y: Int)
+requires exists <_s> :: _s[x] == 3
+requires exists <_s> :: _s[x] == 0
+ensures exists <_s> :: _s[y] == 3
+ensures exists <_s> :: _s[y] == -1
+{
+    y := -1
+    var i: Int
+    i := x
+
+    let $s: State :: <$s> && $s[x] == 3 && $s[i] == $s[x]
+    let $s1: State :: <$s1> && $s1[x] == 0 && $s[i] == $s[x] && $s1[y] == -1
+
+    while (i > 0)
+    {hint10} invariant $n <= $s[x] ==> exists <_s> :: _s[i] >= 0
+                                                    && _s[x] - _s[i] == $n
+                                                    && _s[x] == $s[x]
+                                                    && (_s[i] == 0 ==> _s[x] == _s[y])
+    {hint11} invariant $n == 0 ==> exists <_s> :: _s[x] == 0
+                                                        && _s[i] == 0
+                                                        && _s[y] == $s1[y]
+    {
+       if (i == 1) {
+         y := x
+       } else {
+         y := 2
+       }
+       i := i - 1
+    }
+
+    use hint10($s[x])
+    use hint11(0)
+}
+
+// Relational inv
+method relational(x: Int, n: Int, i: Int) returns (res: Int)
+requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
+                                            && _s1[n] == _s2[n] && _s1[n] == 3
+                                            && _s1[x] <= _s2[x] && _s1[x] == 4
+ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
+                                            && _s1[res] <= _s2[res]
+{
+    res := 0
+    var ind: Int
+    ind := 0
+
+    let $s1: State :: <$s1> && $s1[i] == 1 && $s1[n] == 3
+                            && $s1[x] == 4 && $s1[ind] == 0
+                            && $s1[res] == 0
+    let $s2: State :: <$s2> && $s2[i] == 2
+                            && $s2[x] >= $s1[x]
+                            && $s2[n] == $s1[n]
+                            && $s2[ind] == 0
+                            && $s2[res] == 0
+    while (ind < n)
+    {hint12} invariant $n <= $s1[n] ==> exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
+                                                        && _s2[x] >= _s1[x]
+                                                        && _s1[n] == _s2[n]
+                                                        && _s1[n] == $s1[n]
+                                                        && _s1[ind] == $n
+                                                        && _s2[ind] == _s1[ind]
+                                                        && _s1[res] <= _s2[res]
+                                                        && _s1[ind] <= _s1[n]
+    {
+        res := 2 * x
+        ind := ind + 1
+    }
+    use hint12($s1[n])
+}
+
+
+// Alignment -- not supported for exists-HHL at the moment
+method align(x: Int, n: Int, i: Int) returns (res: Int)
+requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
+                                            && _s1[n] == _s2[n] && _s1[n] == 3
+                                            && _s1[x] <= _s2[x] && _s1[x] == -1
+ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
+                                            && _s1[res] <= _s2[res]
+{
+    res := 0
+    var ind: Int
+    ind := 0
+
+    let $s1: State :: <$s1> && $s1[i] == 1 && $s1[n] == 3
+                            && $s1[x] == -1 && $s1[ind] == 0
+                            && $s1[res] == 0
+    let $s2: State :: <$s2> && $s2[i] == 2
+                            && $s2[x] >= $s1[x]
+                            && $s2[n] == $s1[n]
+                            && $s2[ind] == 0
+                            && $s2[res] == 0
+
+    if (x > 0) {
+        declare commonLoop {
+            while (ind < n)
+                {hint13} invariant $n <= $s1[n] ==> exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2
+                                                                    && _s2[x] >= _s1[x]
+                                                                    && _s1[n] == _s2[n]
+                                                                    && _s1[n] == $s1[n]
+                                                                    && _s1[ind] == $n
+                                                                    && _s2[ind] == _s1[ind]
+                                                                    && _s1[res] <= _s2[res]
+                                                                    && _s1[ind] <= _s1[n]
+                                                                    && _s1[x] == $s1[x]
+                {
+                    res := 2 * x
+                    ind := ind + 1
+                }
+        }
+        // TODO: adding this line doesn't work any more...
+        // res := res + 1
+    } else {
+        reuse commonLoop
+    }
+
+    use hint13($s1[n])
+}
+*/

@@ -1,0 +1,40 @@
+method testAssign(x: Int) returns (y: Int)
+    ensures forall <_s> :: _s[y] == _s[x]
+{
+    y := x
+}
+
+method testAssume(x: Int) returns (res: Int)
+requires forall <_s> :: _s[x] == 1
+ensures forall <_s> :: _s[x] > 0
+ensures forall <_s> :: _s[res] == 2
+{
+    assume x == 1
+    assume res == x + 1
+}
+
+method testAssert(x: Int)
+requires forall <_s> :: _s[x] == 2
+ensures forall <_s> :: _s[x] == 2
+{
+    assert x > 1
+}
+
+method testIfElse(x: Int) returns (y: Int)
+requires forall <_s> :: _s[x] == 3
+ensures forall <_s> :: _s[y] == 2
+{
+    if (x > 2) {
+      y := 2
+    } else {
+      y := x
+    }
+}
+
+method testHavoc(x: Int) returns (res: Int)
+requires forall <_s> :: _s[x] == 2
+ensures forall <_s> :: _s[res] == 1
+{
+    res := x
+    havoc res
+}

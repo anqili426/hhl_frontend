@@ -1,0 +1,22 @@
+method smaller() returns (x: Int)
+ensures forall <_s1> :: (exists <_s2> :: _s2[x] <= _s1[x])
+{
+    // Model non-det choice
+    var r: Int
+    havoc r {hint1}
+    assume 0 <= r && r <= 1
+    use hint1(0)
+    use hint1(1)
+
+    havoc x {hint2}
+    assume x >= 0
+
+    if (r > 0) {
+        x := x + 1
+    } else {
+        x := x + x
+    }
+
+    use forall <_s> :: hint2(_s[x] - 1)
+    use forall <_s> :: hint2(_s[x] / 2)
+}

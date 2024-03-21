@@ -1,0 +1,19 @@
+method test(a: Int, b: Int, i: Int) returns (c: Int)
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+        _s1[a] < _s2[a] && _s1[b] > _s2[b]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+        _s1[c] > _s2[c]
+{
+    assume a > 0 && b > a
+    c := 0
+
+    var new_a: Int 
+    new_a := a
+
+    while (new_a < b) 
+    invariant forall <_s> :: _s[new_a] <= _s[b] && _s[c] == _s[new_a] - _s[a]
+    {
+        c := c + 1
+        new_a := new_a + 1
+    }
+}

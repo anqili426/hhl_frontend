@@ -1,0 +1,75 @@
+method foo_sturdy(x: Int)
+	requires exists <_s> :: _s[x] % 2 == 0
+	ensures exists <<_s>>:: _s[x] % 2 == 0
+{
+	if (x % 2 == 0)
+	{
+		assert false
+	}
+	else {
+		var b: Int
+		if (b > 0) {
+			assert true
+		}
+		else {
+			assert false
+		}
+	}
+}
+
+method foo_flaky(x: Int)
+	requires exists <_s> :: _s[x] % 2 == 1
+	ensures exists <_s>:: _s[x] % 2 == 1
+	ensures exists <<_s>>:: _s[x] % 2 == 1
+{
+	if (x % 2 == 0)
+	{
+		assert false
+	}
+	else {
+		var b: Int
+		havoc b {hint}
+		use hint(0)
+		use hint(1)
+		if (b > 0) {
+			assert true
+		}
+		else {
+			assert false
+		}
+	}
+}
+
+method foo_flaky_alt(x: Int)
+	requires exists <_s> :: _s[x] == 3
+	ensures exists <_s>:: _s[x] == 3
+	ensures exists <<_s>>:: _s[x] == 3
+{
+	if (x % 2 == 0)
+	{
+		assert false
+	}
+	else {
+		var b: Int
+		havoc b {hint2}
+		use hint2(0)
+		use hint2(1)
+		if (b > 0) {
+			assert true
+		}
+		else {
+			assert false
+		}
+	}
+}
+
+method flaky_client() returns (x: Int)
+	requires exists <_s> :: true
+	ensures exists <<_s>>:: _s[x] == 3
+	ensures exists <<_s>>:: _s[x] == 5
+{
+	x := 3
+	foo_flaky_alt(x)
+	x := x + 2
+	assert x == 4
+}
