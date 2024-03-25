@@ -1,0 +1,51 @@
+method difficult(y: Int) returns (res: Int)
+ensures forall <_s> :: _s[res] == _s[y] * _s[y]
+{
+    res := y * y
+}
+
+/*
+method difficult_alt(y: Int) returns (res: Int)
+requires exists <_s> :: _s[y] == 7
+ensures exists <_s> :: _s[y] == 7
+ensures forall <_s> :: _s[res] == _s[y] * _s[y]
+{
+    res := y * y
+}
+
+method client(y: Int) returns (x: Int, diff_z: Int)
+requires exists <_s> :: _s[y] == 49
+ensures exists <_s> :: _s[x] == 1
+ensures forall <_s> :: (_s[x] == 1) || (_s[x] == 2)
+ensures forall <_s> :: (_s[y] == _s[diff_z] ==> _s[x] == 1) || (_s[y] != _s[diff_z] ==> _s[x] == 2)
+{
+    var z: Int
+    havoc z {hint}
+    use hint(7)
+    diff_z := difficult_alt(z)
+    // Cannot verify line 17 because we lose the information that exists <_s> :: _s[y] == 49 after the method call
+    if (y == diff_z) {
+        x := 1
+    } else {
+        x := 2
+    }
+}
+*/
+
+// This inlines the method call
+method client_alt(y: Int) returns (x: Int, diff_z: Int)
+requires exists <_s> :: _s[y] == 49
+ensures exists <_s> :: _s[x] == 1
+ensures forall <_s> :: (_s[x] == 1) || (_s[x] == 2)
+ensures forall <_s> :: (_s[y] == _s[diff_z] ==> _s[x] == 1) || (_s[y] != _s[diff_z] ==> _s[x] == 2)
+{
+    var z: Int
+    havoc z {hint}
+    use hint(7)
+    diff_z := z * z
+    if (y == diff_z) {
+        x := 1
+    } else {
+        x := 2
+    }
+}

@@ -1,9 +1,0 @@
-// Not sure about spec translation
-method leak(h: Int, l: Int) returns (res: Int)
-requires forall _s1: State :: <_s1> ==>
-    (exists _s2: State :: <_s2> && get(_s1, h) != get(_s2, h) && get(_s1, l) == get(_s2, l))
-ensures forall _s1: State :: <_s1> ==>
-    (exists _s2: State :: <_s2> && get(_s1, l) == get(_s2, l) && get(_s1, res) == get(_s2, res) && get(_s1, h) != get(_s2, h))
-{
-    res := h + l
-}
