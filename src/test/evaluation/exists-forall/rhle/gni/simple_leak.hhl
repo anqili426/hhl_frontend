@@ -1,0 +1,7 @@
+method leak(high: Int, low: Int, i: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==> (_s1[low] == _s2[low])
+requires exists <_s1> :: _s1[i] == 1 && (forall <_s2> :: _s2[i] == 2 ==> _s2[high] != _s1[high])
+ensures exists <_s1> :: _s1[i] == 1 && (forall <_s2> :: _s2[i] == 2 ==> _s2[res] != _s1[res])
+{
+    res := high + low
+}

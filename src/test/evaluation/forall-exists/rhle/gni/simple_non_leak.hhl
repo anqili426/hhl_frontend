@@ -1,0 +1,10 @@
+method non_leak(high: Int, low: Int, i: Int) returns (res: Int)
+requires exists <_s> :: _s[i] == 2
+requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==> (_s1[low] == _s2[low])
+ensures forall <_s1> :: _s1[i] == 1 ==>
+    (exists <_s2> :: (_s2[i] == 2 && _s1[res] == _s2[res]))
+{
+    var x: Int
+    x := high + low
+    res := x - high
+}

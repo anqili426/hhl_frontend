@@ -1,0 +1,17 @@
+method parity(h_in: Int, l_in: Int, i: Int) returns (h_out: Int, l_out: Int)
+requires exists <_s> :: _s[i] == 2
+requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+                    (_s1[l_in] == _s2[l_in] &&
+                     (_s1[h_in] % 2) == (_s2[h_in] % 2))
+ensures forall <_s1> :: _s1[i] == 1 ==>
+    (exists <_s2> :: (_s2[i] == 2 && _s1[l_out] == _s2[l_out]))
+{
+    h_out := h_in
+    if (h_out % 2 == 1) {
+        l_out := 1
+        h_out := 1
+    } else {
+        l_out := 0
+        h_out := 0
+    }
+}

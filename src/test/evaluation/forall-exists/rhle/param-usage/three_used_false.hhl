@@ -1,0 +1,21 @@
+method used(p1: Int, p2: Int, p3: Int, i: Int) returns (res: Int)
+requires forall <_s1a>, <_s2a>, <_s3a> :: _s1a[i] == 1 && _s2a[i] == 2 && _s3a[i] == 3 ==>
+                    (exists <_s1b>, <_s2b>, <_s3b> :: _s1b[i] == 4 && _s2b[i] == 5 && _s3b[i] == 6 &&
+                                              _s1a[p1] != _s1b[p1] &&
+                                              _s1a[p2] == _s1b[p2] &&
+                                              _s1a[p3] == _s1b[p3] &&
+
+                                              _s2a[p1] == _s2b[p1] &&
+                                              _s2a[p2] != _s2b[p2] &&
+                                              _s2a[p3] == _s2b[p3] &&
+
+                                              _s3a[p1] == _s3b[p1] &&
+                                              _s3a[p2] == _s3b[p2] &&
+                                              _s3a[p3] != _s3b[p3]
+                                              )
+ensures forall <_s1a>, <_s2a>, <_s3a> :: _s1a[i] == 1 && _s2a[i] == 2 && _s3a[i] == 3 ==>
+             (exists <_s1b>, <_s2b>, <_s3b> :: _s1b[i] == 4 && _s2b[i] == 5 && _s3b[i] == 6 &&
+                (_s1a[res] == _s1b[res] || _s2a[res] == _s2b[res] || _s3a[res] == _s3b[res]))
+{
+    res := p1 + p2 - p3
+}

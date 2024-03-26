@@ -1,0 +1,20 @@
+method buy_bad(spent_in: Int, cost_in: Int, funds_in: Int, i: Int) returns (spent_out: Int, cost_out: Int, res: Int)
+requires exists <_s> :: _s[i] == 2
+requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+                    (_s1[spent_in] == _s2[spent_in] &&
+                     _s1[cost_in] == _s2[cost_in])
+ensures forall <_s1> :: _s1[i] == 1 ==>
+    (exists <_s2> :: (_s2[i] == 2 && _s1[spent_out] == _s2[spent_out] && _s1[cost_out] == _s2[cost_out]))
+{
+    spent_out := spent_in
+    cost_out := cost_in
+
+    var funds_out: Int
+    funds_out := funds_in
+
+    if (funds_in >= cost_in) {
+        funds_out := funds_in - cost_in
+        spent_out := spent_in + cost_in
+    }
+    res := 0
+}

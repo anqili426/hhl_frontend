@@ -1,0 +1,59 @@
+method median(a1: Int, a2: Int, b1: Int, b2: Int, i: Int) returns (m: Int, res: Int)
+requires exists <_s> :: _s[i] == 2
+requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+                 (_s1[a1] == _s2[a1] &&
+                  _s1[a2] == _s2[a2] &&
+                  _s1[a1] < _s1[a2] &&
+                  _s1[b1] < _s1[b2] &&
+                  _s2[b1] < _s2[b2] &&
+                  _s1[a1] != _s1[a2] &&
+                  _s1[a1] != _s1[b1] &&
+                  _s1[a1] != _s1[b2] &&
+                  _s1[a2] != _s1[b1] &&
+                  _s1[a2] != _s1[b2] &&
+                  _s1[b1] != _s1[b2] &&
+                  _s2[a1] != _s2[a2] &&
+                  _s2[a1] != _s2[b1] &&
+                  _s2[a1] != _s2[b2] &&
+                  _s2[a2] != _s2[b1] &&
+                  _s2[a2] != _s2[b2] &&
+                  _s2[b1] != _s2[b2]
+                 )
+ensures forall <_s1> :: _s1[i] == 1 ==>
+            (exists <_s2> :: (_s2[i] == 2 && _s1[m] == _s2[m] && _s1[res] == _s2[res]))
+
+{
+    var x1: Int
+    var a3: Int
+    var x2: Int
+    var b3: Int
+
+    if (a1 <= b1) {
+        x1 := 1
+    } else {
+        x1 := 0
+    }
+
+    if (x1 == 1) {
+        a3 := a2
+        b3 := b1
+    } else {
+        a3 := a1
+        b3 := b2
+    }
+
+    if (a3 <= b3) {
+        x2 := 1
+    } else {
+        x2 := 0
+    }
+
+    if (x2 == 1) {
+        m := a3
+    } else {
+        m := b3
+    }
+    res := m
+
+
+}

@@ -1,0 +1,10 @@
+method smith(secret: Int, i: Int) returns (res: Int)
+requires exists <_s1> :: _s1[i] == 1 && (forall <_s2> :: _s2[i] == 2 ==> _s1[secret] == _s2[secret] + 1)
+ensures exists <_s1> :: _s1[i] == 1 && (forall <_s2> :: _s2[i] == 2 ==> _s2[res] != _s1[res])
+{
+    if (secret % 2 == 0) {
+        res := 0
+    } else {
+        res := 1
+    }
+}

@@ -1,0 +1,19 @@
+method cond(l: Int, h1: Int, h2: Int, i: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+            (exists <_s3> :: _s3[i] == 3 &&
+                     _s1[h1] == _s3[h1] &&
+                     _s1[h2] == _s3[h2] &&
+                     _s1[l] == _s2[l] &&
+                     _s2[l] == _s3[l] &&
+                     (_s1[l] == 0 ==> ( ((_s1[h1] % 2) == (_s2[h1] % 2)) && ((_s2[h1] % 2) == (_s3[h1] % 2))) ) &&
+                     (_s1[l] != 0 ==> ( ((_s1[h2] % 2) == (_s2[h2] % 2)) && ((_s2[h2] % 2) == (_s3[h2] % 2))) )
+                )
+ensures forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+    (exists <_s3> :: (_s3[i] == 3 && _s2[res] == _s3[res]))
+{
+    if (l == 0) {
+        res := h1 % 2
+    } else {
+        res := h2 % 2
+    }
+}

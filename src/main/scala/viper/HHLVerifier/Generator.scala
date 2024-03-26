@@ -99,6 +99,8 @@ object Generator {
   var useParamsToArgsMap = false
   var currParamsToArgsMap: Map[String, String] = Map.empty
 
+  var currMethod: Method = null
+
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
     var predicates: Seq[vpr.Predicate] = Seq.empty
@@ -124,6 +126,7 @@ object Generator {
   }
 
   def translateMethod(method: Method, typVarMap: Map[vpr.TypeVar, vpr.Type]): Unit = {
+    currMethod = method
     val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
     val outputStates = vpr.LocalVarDecl(currStatesVarName, getConcreteSetStateType(typVarMap))()
     val tempStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
@@ -651,7 +654,7 @@ object Generator {
 
               // Update S after the loop
               if (rule == "syncRule") {
-                val translatedInv = getAllInvariantsWithTriggers(inv, STmp, loopFailureStates)
+                val translatedInv = getAllInvariantsWithTriggers(normalizedInv, STmp, loopFailureStates)
                 val empS = vpr.Forall(Seq(stateDecl), Seq.empty, vpr.Not(getInSetApp(Seq(state, STmp), typVarMap, false))())()
                 newStmts = newStmts :+ vpr.Inhale(vpr.Or(translatedInv, empS)())()
               } else if (rule == "forAllExistsRule") {
@@ -659,7 +662,7 @@ object Generator {
                 val translatedInv = getAllInvariantsWithTriggers(transformedInvs, STmp, loopFailureStates)
                 newStmts = newStmts :+ vpr.Inhale(translatedInv)()
               } else if (rule == "syncTotRule") {
-                val translatedInv = getAllInvariantsWithTriggers(inv, STmp, loopFailureStates)
+                val translatedInv = getAllInvariantsWithTriggers(normalizedInv, STmp, loopFailureStates)
                 newStmts = newStmts :+ vpr.Inhale(translatedInv)()
               }
               else {
@@ -765,6 +768,7 @@ object Generator {
             }
             // Exists
             if (verifierOption != 0) {
+              // TODO: update this?
               val frame = frameUnmodifiedVars(Map.empty, state, STmp, currStates, typVarMap, false)
               newStmts = newStmts :+ frame
             }
