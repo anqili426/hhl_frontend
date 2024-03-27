@@ -69,7 +69,8 @@ object Generator {
 
   var verifierOption = 0 // 0: forall 1: exists 2: both
   var inline = false  // true: verification of the loop invariant will be inline
-  var frame = true // true: automatic framing is enabled
+  var forAllFrame = true // true: forall automatic framing is enabled
+  var existsFrame = false // true: forall automatic framing is enabled
   var autoSelectRules = false // true: selection of loop rules is automatic
 
   // This variable is used when translating declarations of proof variables
@@ -381,16 +382,11 @@ object Generator {
           }
 
           // Auto-framing
-          if (frame) {
+          if (forAllFrame) {
             val modifiedVars = left.map(v => v.name -> v.typ).toMap
             // For all
             if (verifierOption != 1) {
               val frame = frameUnmodifiedVars(modifiedVars, state, STmp, currStates, typVarMap, true)
-              newStmts = newStmts :+ frame
-            }
-            // Exists
-            if (verifierOption != 0) {
-              val frame = frameUnmodifiedVars(modifiedVars, state, STmp, currStates, typVarMap, false)
               newStmts = newStmts :+ frame
             }
           }
@@ -654,10 +650,10 @@ object Generator {
               newStmts = newStmts ++ Seq(havocSTmp, havocFailureStates)
 
               // Auto-framing
-              if (frame) {
+              if (forAllFrame) {
                 if (verifierOption != 1) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, STmp, currStates, typVarMap, true)
-                if (verifierOption != 0 && loop.isTotal) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, currStates, STmp, typVarMap, false)
-                else newStmts = newStmts :+ inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
+                if (verifierOption != 0 && loop.isTotal && existsFrame) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, currStates, STmp, typVarMap, false)
+                newStmts = newStmts :+ inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
               }
 
               // Update S after the loop
@@ -720,8 +716,9 @@ object Generator {
               } else {
                 // Inhale not b
                 val negatedLoopGuard = translateExp(UnaryExpr("!", cond), state, currStates, currFailureStates)
-                val notCond = translateAssumeWithViperExpr(state, currStates, negatedLoopGuard, typVarMap)
-                newStmts = newStmts :+ notCond
+                val notCondForAll = translateAssumeWithViperExpr(state, currStates, negatedLoopGuard, typVarMap, triggers=forAllTriggers)
+                val notCondExists = translateAssumeWithViperExpr(state, currStates, negatedLoopGuard, typVarMap, useForAll=false)
+                newStmts = newStmts ++ Seq(notCondForAll, notCondExists)
               }
             }
 
@@ -768,16 +765,10 @@ object Generator {
           }
 
           // Auto-framing
-          if (frame)  {
+          if (forAllFrame)  {
             // For all
             if (verifierOption != 1) {
               val frame = frameUnmodifiedVars(Map.empty, state, STmp, currStates, typVarMap, true)
-              newStmts = newStmts :+ frame
-            }
-            // Exists
-            if (verifierOption != 0) {
-              // TODO: update this?
-              val frame = frameUnmodifiedVars(Map.empty, state, STmp, currStates, typVarMap, false)
               newStmts = newStmts :+ frame
             }
           }

@@ -27,7 +27,11 @@ object Main {
     programSource.close()
 
     val outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
-    if (args.contains("--noframe")) Generator.frame = false
+    if (args.contains("--noframe")) Generator.forAllFrame = false
+    if (args.contains("--existsframe")) {
+      Generator.existsFrame = true
+      println("Warning: turning on existential framing might cause non-termination.")
+    }
     if (args.contains("--inline")) Generator.inline = true
     if (args.contains("--auto")) Generator.autoSelectRules = true
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0

@@ -24,8 +24,7 @@ ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==>
                                                          _s1[n] == _s2[n] &&
                                                          _s1[f3_in] < _s2[f3_in] &&
                                                          _s1[sum] <= _s2[sum] &&
-                                                         // Note: if we write _s1[i] > 1 ==> _s1[sum] > _s2[sum] , then we can't verify the postcondition because of triggers
-                                                         (_s2[i] > 1 ==> _s1[sum] < _s2[sum])
+                                                         (_s1[i] > 1 ==> _s1[sum] < _s2[sum])
                         )
     decreases 101 - i
     {
@@ -41,8 +40,8 @@ ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==>
         i := i + 1
     }
 
-    hyperAssume forall <_s> :: _s[n] > 0
-    // We omit sum / n from the assignment below
+    // We omit sum / n from the assignment below because n could be zero
+    // Removing this term doesn't affect whether postcondition should hold or not
     f2_out := n + sum
     f1_out := f2_out
 }

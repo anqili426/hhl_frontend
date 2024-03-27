@@ -23,7 +23,8 @@ You may provide the following options as program arguments to customize the veri
 - `--forall` Only generates overapproximation encodings
 - `--exists` Only generates underapproximation encodings
 - `--output <path_to_file>` Saves the generated Viper program in the specified file
-- `--noframe` Turns off auto-framing
+- `--noframe` Turns off forall framing after loops and method calls
+- `--existsframe` Turns on exists framing after loops
 - `--inline` Verifies the loop invariants in an inline fashion when using the whileDesugard rule
 - `--auto` Automatically selects the rule to verify loops when the rules are unspecified
 

@@ -1,12 +1,12 @@
 method callee(h: Int) returns (l: Int)
-ensures forall <_s1>: State, <_s2>: State :: (exists <_s3>: State :: _s1[h] == _s3[h] && _s2[l] == _s3[l])
+ensures forall <_s1>, <_s2> :: (exists <_s3> :: _s1[h] == _s3[h] && _s2[l] == _s3[l])
 {
     var i: Int
     i := 0
     l := 0
 
     while forAllExistsRule (i < 100)
-    invariant forall <_s1>: State, <_s2>: State :: (exists <_s3>: State :: _s1[i] == _s2[i] && _s3[i] == _s1[i] && _s1[h] == _s3[h] && _s2[l] == _s3[l])
+    invariant forall <_s1>, <_s2> :: (exists <_s3> :: _s1[i] == _s2[i] && _s3[i] == _s1[i] && _s1[h] == _s3[h] && _s2[l] == _s3[l])
     decreases 100 - i
     {
         l := l + h - h
@@ -15,7 +15,7 @@ ensures forall <_s1>: State, <_s2>: State :: (exists <_s3>: State :: _s1[h] == _
 }
 
 method caller (h2: Int) returns (l2: Int)
-ensures forall <_s1>: State, <_s2>: State :: (exists <_s3>: State :: _s1[h2] == _s3[h2] && _s2[l2] == _s3[l2]) {
+ensures forall <_s1>, <_s2> :: (exists <_s3> :: _s1[h2] == _s3[h2] && _s2[l2] == _s3[l2]) {
     l2 := callee(h2)
     l2 := l2 + h2 - h2
 }
