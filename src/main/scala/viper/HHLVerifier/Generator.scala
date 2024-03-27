@@ -69,8 +69,9 @@ object Generator {
 
   var verifierOption = 0 // 0: forall 1: exists 2: both
   var inline = false  // true: verification of the loop invariant will be inline
-  var forAllFrame = true // true: forall automatic framing is enabled
-  var existsFrame = false // true: forall automatic framing is enabled
+  var forAllFrame = true // true: forall automatic framing after loops and method calls is enabled
+  var existsFrame = false // true: exists automatic framing after loops is enabled
+  var iterFrame = false // true: forall automatic framing at the beginning of each loop iteration is enabled
   var autoSelectRules = false // true: selection of loop rules is automatic
 
   // This variable is used when translating declarations of proof variables
@@ -973,16 +974,19 @@ object Generator {
       Seq(thisMethod)
     }
 
-    def translateInvariantVerificationInline(inv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, decrExpr: Option[Expr], currStates: vpr.LocalVar, currFailureStates: vpr.LocalVar, rule: String, typVarMap: Map[vpr.TypeVar, vpr.Type], isAutoSelected: Boolean): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
+    def translateInvariantVerificationInline(inv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, decrExpr: Option[Expr], outerLoopStates: vpr.LocalVar, currFailureStates: vpr.LocalVar, rule: String, typVarMap: Map[vpr.TypeVar, vpr.Type], isAutoSelected: Boolean): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
         var returnedStmts: Seq[vpr.Stmt] = Seq.empty
         var ifBodyStmts: Seq[vpr.Stmt] = Seq.empty
         val nonDetBool = vpr.LocalVar(nonDetBoolName + loopCounter, vpr.Bool)()
         val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
         val s1 = vpr.LocalVarDecl(s1VarName, getConcreteStateType(typVarMap))()
         val s2 = vpr.LocalVarDecl(s2VarName, getConcreteStateType(typVarMap))()
+        val currStates = if (iterFrame) vpr.LocalVar("S_loop" + loopCounter, outerLoopStates.typ)() else outerLoopStates
         // A logical variable that holds the value of the expression in the decreases clause
         val t = vpr.LocalVar(tVarName + loopCounter, vpr.Int)()
         var returnedVars = Seq(nonDetBool)
+
+        if (iterFrame) returnedVars = returnedVars :+ currStates
 
         // This only matters when the rule is default
         val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
@@ -1045,12 +1049,18 @@ object Generator {
             val assumeCond = translateStmt(AssumeStmt(loopGuard), ifBlockStates, currFailureStates)
             val assign2 = vpr.LocalVarAssign(elseBlockStates, currStates)()
             val assumeNotCond = translateStmt(AssumeStmt(UnaryExpr("!", loopGuard)), elseBlockStates, currFailureStates)
+            bodyStmts = Seq(assign1) ++ assumeCond._1
+
+            if (iterFrame) {
+              val iterFrameStmt = frameUnmodifiedVars(loopBody.modifiedProgVars, state.localVar, ifBlockStates, outerLoopStates, typVarMap, true)
+              bodyStmts = bodyStmts :+ iterFrameStmt
+            }
 
             val STmp = vpr.LocalVar(tempStatesVarName, currStates.typ)()
             val ifBlock = translateStmt(loopBody, ifBlockStates, currFailureStates)
             val elseBlock = translateStmt(CompositeStmt(Seq.empty), elseBlockStates, currFailureStates)
 
-            bodyStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1
+            bodyStmts = bodyStmts ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1
             bodyVars = Seq(ifBlockStates, elseBlockStates) ++ ifBlock._2 ++ elseBlock._2
 
             if (!decrExpr.isEmpty) {
@@ -1068,6 +1078,12 @@ object Generator {
             (bodyStmts, bodyVars)
           } else translateStmt(loopBody, currStates, currFailureStates)
         }
+
+        if (iterFrame && rule != "forAllExistsRule") {
+          val iterFrameStmt = frameUnmodifiedVars(loopBody.modifiedProgVars, state.localVar, currStates, outerLoopStates, typVarMap, true)
+          ifBodyStmts = ifBodyStmts :+ iterFrameStmt
+        }
+
         ifBodyStmts = ifBodyStmts ++ translatedLoopBody._1
         returnedVars = returnedVars ++ translatedLoopBody._2
 

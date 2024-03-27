@@ -32,6 +32,7 @@ object Main {
       Generator.existsFrame = true
       println("Warning: turning on existential framing might cause non-termination.")
     }
+    if (args.contains("--iterframe")) Generator.iterFrame = true
     if (args.contains("--inline")) Generator.inline = true
     if (args.contains("--auto")) Generator.autoSelectRules = true
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
