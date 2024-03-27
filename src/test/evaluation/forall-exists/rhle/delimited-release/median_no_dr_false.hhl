@@ -28,7 +28,6 @@ ensures forall <_s1> :: _s1[i] == 1 ==>
     var x2: Int
     var b3: Int
 
-    /*
     if (a1 <= b1) {
         x1 := 1
     } else {
@@ -58,6 +57,5 @@ ensures forall <_s1> :: _s1[i] == 1 ==>
     } else {
         m := b3
     }
-
-    res := m */
+    res := m
 }

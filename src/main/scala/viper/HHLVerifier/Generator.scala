@@ -240,6 +240,9 @@ object Generator {
       // Translation of S := S_temp
       val updateProgStates = vpr.LocalVarAssign(currStates, STmp)()
 
+      val forAllTriggers = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state, STmp), typVarMap)))())
+      val existsTriggers = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state, currStates), typVarMap, useForAll=false, useLimited=true)))())
+
       stmt match {
         case CompositeStmt(stmts) =>
           // Translate each statement in the sequence
@@ -277,7 +280,7 @@ object Generator {
             // Assume forall s: State :: in_set(s, S_tmp) ==> in_set(s, S) && exp
             val exp = vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
               translateExp(e, state, currStates, currFailureStates))()
-            forallNewStmts = Seq(translateAssumeWithViperExpr(state, STmp, exp, typVarMap))
+            forallNewStmts = Seq(translateAssumeWithViperExpr(state, STmp, exp, typVarMap, triggers=forAllTriggers))
           }
 
           if (verifierOption != 0) {
@@ -285,7 +288,7 @@ object Generator {
             // Assume forall s: State :: in_set(s, S) && expLeft ==> in_set(s, S_tmp)
             val expRight = getInSetApp(Seq(state, STmp), typVarMap, useForAll=false)
             val expLeft = translateExp(e, state, currStates, currFailureStates)
-            existsNewStmts = Seq(translateAssumeWithViperExpr(state, currStates, expRight, typVarMap, expLeft, useForAll=false))
+            existsNewStmts = Seq(translateAssumeWithViperExpr(state, currStates, expRight, typVarMap, expLeft, useForAll=false, triggers=existsTriggers))
           }
 
           newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
@@ -296,14 +299,16 @@ object Generator {
             val havocSFailTmp = havocSetMethodCall(tempFailedStates.localVar)
             val updateSFail = vpr.LocalVarAssign(currFailureStates,
                                 getSetUnionApp(Seq(currFailureStates, tempFailedStates.localVar), typVarMap))()
+
             if (verifierOption != 1) {
               // ForAll
               val exp1 = vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
                 translateExp(e, state, currStates, currFailureStates))()
               val exp2 = vpr.And(getInSetApp(Seq(state, currStates), typVarMap),
                 translateExp(UnaryExpr("!", e), state, currStates, currFailureStates))()
-              val stmt1 = translateAssumeWithViperExpr(state, STmp, exp1, typVarMap)
-              val stmt2 = translateAssumeWithViperExpr(state, tempFailedStates.localVar, exp2, typVarMap)
+              val stmt1 = translateAssumeWithViperExpr(state, STmp, exp1, typVarMap, triggers=forAllTriggers)
+              val forAllFailTriggers = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state, tempFailedStates.localVar), typVarMap)))())
+              val stmt2 = translateAssumeWithViperExpr(state, tempFailedStates.localVar, exp2, typVarMap, triggers=forAllFailTriggers)
               forallNewStmts = Seq(stmt1, stmt2)
             }
             if (verifierOption != 0) {
@@ -312,8 +317,9 @@ object Generator {
               val exp1Left = translateExp(e, state, currStates, currFailureStates)
               val exp2Right = getInSetApp(Seq(state, tempFailedStates.localVar), typVarMap, false)
               val exp2Left = translateExp(UnaryExpr("!", e), state, currStates, currFailureStates)
-              val stmt1 = translateAssumeWithViperExpr(state, currStates, exp1Right, typVarMap, exp1Left, useForAll=false)
-              val stmt2 = translateAssumeWithViperExpr(state, currStates, exp2Right, typVarMap, exp2Left, useForAll=false)
+              val stmt1 = translateAssumeWithViperExpr(state, currStates, exp1Right, typVarMap, exp1Left, useForAll=false, triggers=existsTriggers)
+              val existsFailTriggers = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state, currFailureStates), typVarMap, useForAll = false, useLimited = true)))())
+              val stmt2 = translateAssumeWithViperExpr(state, currStates, exp2Right, typVarMap, exp2Left, useForAll=false, triggers=existsFailTriggers)
               existsNewStmts = Seq(stmt1, stmt2)
             }
             newStmts = Seq(havocSTmp, havocSFailTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateSFail, updateProgStates)
@@ -334,13 +340,13 @@ object Generator {
             if (verifierOption != 1) {
               // ForAll
               val exp = vpr.EqCmp(translateExp(left, state, currStates, currFailureStates), translateExp(right, s0, STmp, currFailureStates))()
-              val stmt = translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap, exp)
+              val stmt = translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap, exp, triggers=forAllTriggers)
               forallNewStmts = Seq(stmt)
             }
             if (verifierOption != 0) {
               // Exists
               val exp = vpr.EqCmp(translateExp(left, s1, STmp, currFailureStates), translateExp(right, state, currStates, currFailureStates))()
-              val stmt = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap, exp, useForAll=false)
+              val stmt = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap, exp, useForAll=false, triggers=existsTriggers)
               existsNewStmts = Seq(stmt)
             }
             newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
@@ -401,11 +407,13 @@ object Generator {
             val s1 = vpr.LocalVar(s1VarName, state.typ)()
             val k = vpr.LocalVarDecl(kVarName, vpr.Int)()
             val triggers = if (hintDecl.isEmpty) Seq.empty
-            else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, k.localVar), getInSetApp(Seq(state, currStates), typVarMap, false)))())
+            else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, k.localVar),
+                      getInSetApp(Seq(state, currStates), typVarMap, useForAll=false, useLimited=true)))())
+
 
             if (verifierOption != 1) {
               // ForAll
-              forallNewStmts = Seq(translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap))
+              forallNewStmts = Seq(translateHavocVarHelper(STmp, currStates, state, s0, leftVar, typVarMap, triggers=forAllTriggers))
             }
             if (verifierOption != 0) {
               // Exits

@@ -36,10 +36,14 @@ ensures forall <_s1> :: _s1[i] == 1 ==>
 
     if (x1 == 1) {
         a3 := a2
-        b3 := b1
     } else {
         a3 := a1
-        b3 := b2
+    }
+
+    if (x1 == 1) {
+       b3 := b1
+    } else {
+       b3 := b2
     }
 
     if (a3 <= b3) {
@@ -53,7 +57,6 @@ ensures forall <_s1> :: _s1[i] == 1 ==>
     } else {
         m := b3
     }
+
     res := m
-
-
 }
