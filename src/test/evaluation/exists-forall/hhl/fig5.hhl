@@ -1,0 +1,11 @@
+method GNI_bad(h: Int, i: Int) returns (l_out: Int)
+   requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 && _s1[h] < _s2[h]
+   ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 &&
+        (forall <_s> :: (_s[h] == _s1[h]) ==> _s[l_out] < _s2[l_out])
+{
+        var y: Int
+        havoc y {hint2}
+        use hint2(9)
+        assume y <= 9
+        l_out := h + y
+}
