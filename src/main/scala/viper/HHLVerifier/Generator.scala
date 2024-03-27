@@ -101,6 +101,8 @@ object Generator {
   var currParamsToArgsMap: Map[String, String] = Map.empty
 
   var currMethod: Method = null
+  var needsSyncTot = false
+  var syncTotWarningPrinted = false
 
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
@@ -167,6 +169,11 @@ object Generator {
     // Forming the postconditions
     val posts = method.post.map {
       p =>
+        if (!needsSyncTot) {
+          val normalizedPost = Normalizer.normalize(p, false)
+          Normalizer.detQuantifier(normalizedPost, false)
+          needsSyncTot = normalizedPost.asInstanceOf[Assertion].topExists
+        }
         val res = translatePostcondition(p, null, outputStates.localVar, outputFailureStates.localVar)
         if (res.length == 2) vpr.InhaleExhaleExp(res(0), res(1))()
         else res(0)
@@ -203,6 +210,7 @@ object Generator {
     val methodBody = Seq(currStatesAssignment, inSetEq, inSetFailEq, assumeSFailEmpty) ++ assignToVars ++ translatedContent._1
     val thisMethod = vpr.Method(method.mName, translatedArgs, ret ++ Seq(outputStates, outputFailureStates), pres, posts, Some(vpr.Seqn(methodBody, localVars)()))()
     allMethods = allMethods :+ thisMethod
+    needsSyncTot = false
   }
 
   def translatePostcondition(e: Expr, s: vpr.LocalVar, currStates: vpr.LocalVar, currFailureStates: vpr.LocalVar): Seq[vpr.Exp] = {
@@ -615,6 +623,15 @@ object Generator {
               newStmts = newStmts :+ applyRule
               newVars = newVars ++ useSyncRule._2 ++ useForAllExistsRule._2
             } else {
+
+              if (!isAutoSelected && !syncTotWarningPrinted && needsSyncTot && rule != "syncTotRule") {
+                println("Warning: method " + currMethod.mName + " has a postcondition " +
+                  "which has a top-level existential quantifier over states, \n " +
+                  "        but syncTotRule is not chosen for at least one of the loops in the method. \n " +
+                  "        Please make sure that every non-nested loop uses syncTotRule. \n" +
+                  "         Ignore this warning if you have already done so. ")
+                syncTotWarningPrinted = true
+              }
 
               if (rule=="forAllExistsRule") {
                 normalizedInv.foreach(i => {
