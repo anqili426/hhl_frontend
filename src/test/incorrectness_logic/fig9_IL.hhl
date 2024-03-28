@@ -1,0 +1,49 @@
+method inc_1(x_in: Int) returns (x: Int)
+	requires exists <_s>:: _s[x_in] >= 0
+	ensures exists <_s>:: _s[x] > 0
+{
+	x := x_in
+	assert x >= 0
+	x := x + 1
+}
+
+method inc_2(x_in: Int) returns (x: Int)
+	requires exists <_s> :: _s[x_in] >= 0
+	//ensures exists <_s>:: _s[x] == _s[x_in] + 1
+	ensures exists <_s>:: true
+	ensures forall <_s>:: _s[x] == _s[x_in] + 1
+{
+	x := x_in
+	assert x >= 0
+	x := x + 1
+}
+
+method client_2(x_in: Int) returns (x: Int)
+	requires exists <_s> :: true //_s[x_in] >= 0
+	requires forall <_s> :: _s[x_in] >= 0
+	ensures exists <_s> :: true
+	ensures forall <_s> :: _s[x] == _s[x_in] + 2
+{
+	x := x_in
+	var tmp: Int
+
+	tmp := inc_2(x)
+	x := tmp
+
+	tmp := inc_2(x)
+	x := tmp
+}
+
+method test() returns (x: Int)
+	requires exists <_s> :: true
+{
+	var tmp: Int
+
+	x := 0
+
+	tmp := client_2(x)
+	x := tmp
+
+	assert x >= 2
+}
+

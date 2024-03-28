@@ -1,0 +1,17 @@
+method inc(x:Int) returns (y:Int)
+    requires forall <_s> :: _s[x] >= 0
+    ensures forall <<_s>> :: false
+    ensures forall <_s> :: _s[y] >= 1
+{
+    y := x + 1
+    assert y >= 1
+}
+
+method inc2(x:Int) returns (y:Int)
+    ensures forall <<_s>> :: _s[y] < 1
+    ensures forall <_s> :: _s[y] >= 1
+{
+    y := x + 1
+    assert y >= 1
+}
+
