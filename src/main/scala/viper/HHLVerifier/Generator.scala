@@ -864,7 +864,8 @@ object Generator {
           )()
         )()
       }
-      translateAssumeWithViperExpr(state, S1, rightExpr, typVarMap, useForAll=useForAll)
+      val trigger = vpr.Trigger(Seq(getInSetApp(Seq(state, S1), typVarMap, useForAll = useForAll, useLimited = (!useForAll))))()
+      translateAssumeWithViperExpr(state, S1, rightExpr, typVarMap, triggers = Seq(trigger), useForAll = useForAll)
     }
 
     // Returns true if e satisfies the condition that there are no forall quantifiers over states after an exists quantifier
