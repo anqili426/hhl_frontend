@@ -1,0 +1,6 @@
+method used (p: Int, i: Int) returns (res: Int)
+requires forall <_s1> :: _s1[i] == 1 ==> (exists <_s2> :: _s2[i] == 2 && _s1[p] != _s2[p])
+ensures forall <_s1> :: _s1[i] == 1 ==> (exists <_s2> :: _s2[i] == 2 && _s1[res] == _s2[res])
+{
+    res := p % 2
+}
