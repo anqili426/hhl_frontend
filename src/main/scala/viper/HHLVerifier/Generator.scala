@@ -103,6 +103,7 @@ object Generator {
   var currMethod: Method = null
   var needsSyncTot = false
   var syncTotWarningPrinted = false
+  var isPostcondition = false
 
   def generate(input: HHLProgram): vpr.Program = {
     var fields: Seq[vpr.Field] = Seq.empty
@@ -167,17 +168,14 @@ object Generator {
     normalizedPres.foreach(p => Normalizer.detQuantifier(p, false))
     val pres = normalizedPres.map(p => getAssertionWithTriggers(p, inputStates.localVar, null)) ++ preAboutArgs
     // Forming the postconditions
+    isPostcondition = true
     val posts = method.post.map {
       p =>
-        if (!needsSyncTot) {
-          val normalizedPost = Normalizer.normalize(p, false)
-          Normalizer.detQuantifier(normalizedPost, false)
-          needsSyncTot = normalizedPost.asInstanceOf[Assertion].topExists
-        }
         val res = translatePostcondition(p, null, outputStates.localVar, outputFailureStates.localVar)
         if (res.length == 2) vpr.InhaleExhaleExp(res(0), res(1))()
         else res(0)
     }
+    isPostcondition = false
 
     /* Method body contains the following
     *  Local variable declaration (program variables + auxiliary variables of type SetState + isIfBlock)
@@ -207,7 +205,7 @@ object Generator {
     val nonIntAuxVars = Seq(tempStates, tempFailedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
     val localVars = progVarDecls ++ auxiliaryVarDecls ++ nonIntAuxVars
 
-    val methodBody = Seq(currStatesAssignment, inSetEq, inSetFailEq, assumeSFailEmpty) ++ assignToVars ++ translatedContent._1
+    val methodBody = Seq(currStatesAssignment, assumeSFailEmpty) ++ inSetEq ++ inSetFailEq ++ assignToVars ++ translatedContent._1
     val thisMethod = vpr.Method(method.mName, translatedArgs, ret ++ Seq(outputStates, outputFailureStates), pres, posts, Some(vpr.Seqn(methodBody, localVars)()))()
     allMethods = allMethods :+ thisMethod
     needsSyncTot = false
@@ -215,11 +213,13 @@ object Generator {
 
   def translatePostcondition(e: Expr, s: vpr.LocalVar, currStates: vpr.LocalVar, currFailureStates: vpr.LocalVar): Seq[vpr.Exp] = {
     containsHints = false
-    val post1 = translateExp(e, s, currStates, currFailureStates)
+    val normalizedPost = Normalizer.normalize(e, false)
+    Normalizer.detQuantifier(normalizedPost, false)
+    val post1 = translateExp(normalizedPost, s, currStates, currFailureStates)
     if (containsHints) {
       removeHints = true
       // If post1 contains hints, then remove the hints in post1 to form post2
-      val post2 = translateExp(e, s, currStates, currFailureStates)
+      val post2 = translateExp(normalizedPost, s, currStates, currFailureStates)
       removeHints = false
       // The order here cannot be changed
       Seq(post2, post1)
@@ -376,7 +376,7 @@ object Generator {
           val tempFailedStates = vpr.LocalVar(tempFailedStatesVarName, currFailureStates.typ)()
           val havocSFailTmp = havocSetMethodCall(tempFailedStates)
           val inSetEq = inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
-          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp, inSetEq)
+          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp) ++ inSetEq
 
           if (!callee.post.isEmpty) {
             val normalizedPosts = callee.post.map(p => Normalizer.normalize(p, false))
@@ -597,7 +597,7 @@ object Generator {
               )())()
               val assignToCondVar = vpr.LocalVarAssign(checkRuleCond, sameGuardValue)()
 
-              newStmts = newStmts ++ Seq(havocCurrStates, havocFailureStates, inSetEq, inSetEqFail, inhaleI, assignToCondVar)
+              newStmts = newStmts ++ Seq(havocCurrStates, havocFailureStates) ++ inSetEq ++ inSetEqFail ++ Seq(inhaleI, assignToCondVar)
               newVars = newVars ++ Seq(loopStates, checkRuleCond)
 
               val normalizedInvWithHints = normalizedInv.map(i => (Option.empty, i))
@@ -670,7 +670,7 @@ object Generator {
               if (forAllFrame) {
                 if (verifierOption != 1) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, STmp, currStates, typVarMap, true)
                 if (verifierOption != 0 && loop.isTotal && existsFrame) newStmts = newStmts :+ frameUnmodifiedVars(body.modifiedProgVars, state, currStates, STmp, typVarMap, false)
-                newStmts = newStmts :+ inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
+                newStmts = newStmts ++ inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
               }
 
               // Update S after the loop
@@ -767,7 +767,7 @@ object Generator {
           val tempFailedStates = vpr.LocalVar(tempFailedStatesVarName, currFailureStates.typ)()
           val havocSFailTmp = havocSetMethodCall(tempFailedStates)
           val inSetEq = inhaleInSetEqStmt(stateDecl, STmp, typVarMap)
-          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp, inSetEq)
+          newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp) ++ inSetEq
 
           // Assume the callee's postcondition
           if (!call.method.post.isEmpty) {
@@ -962,7 +962,7 @@ object Generator {
       // Assume loop guard
       val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), outputStates.localVar, null)
 
-      val methodBody = Seq(inSetEq, inSetEqFail, assignToOutputStates, assignToOutputFailureStates) ++ assumeLoopGuard._1 ++ loopBody._1
+      val methodBody = inSetEq ++ inSetEqFail ++ Seq(assignToOutputStates, assignToOutputFailureStates) ++ assumeLoopGuard._1 ++ loopBody._1
 
       val thisMethod = vpr.Method(methodName,
           Seq(currLoopIndexDecl, inputStates, inputFailureStates) ++ allProgVarsInBodyDecl ++ nonAtomicProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)()),  // args
@@ -1003,7 +1003,7 @@ object Generator {
         val inSetEqFail = inhaleInSetEqStmt(state, currFailureStates, typVarMap)
         // Assume I(n)
         val inhaleIn = vpr.Inhale(getAllInvariantsWithTriggers(inv, currStates, currFailureStates))()
-        ifBodyStmts = ifBodyStmts ++ Seq(havocStates, havocFailureStates, inSetEq, inSetEqFail, inhaleIn)
+        ifBodyStmts = ifBodyStmts ++ Seq(havocStates, havocFailureStates, inhaleIn) ++ inSetEq ++ inSetEqFail
 
         if (!decrExpr.isEmpty) {
           // Inhale t == decrExpr for all states
@@ -1103,8 +1103,8 @@ object Generator {
       vpr.LocalVarDecl("$" + v.name, translateType(v.typ, typVarMap))()
     }
 
-    def inhaleInSetEqStmt(state: vpr.LocalVarDecl, currStates: vpr.LocalVar, typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Inhale = {
-      vpr.Inhale(vpr.Forall(
+    def inhaleInSetEqStmt(state: vpr.LocalVarDecl, currStates: vpr.LocalVar, typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Inhale] = {
+      val unlimited = vpr.Inhale(vpr.Forall(
         Seq(state),
         Seq.empty,
         vpr.EqCmp(getInSetApp(Seq(state.localVar, currStates), typVarMap),
@@ -1112,6 +1112,16 @@ object Generator {
         )()
       )()
       )()
+
+      val limited = vpr.Inhale(vpr.Forall(
+        Seq(state),
+        Seq.empty,
+        vpr.EqCmp(getInSetApp(Seq(state.localVar, currStates), typVarMap,useLimited=true),
+          getInSetApp(Seq(state.localVar, currStates), typVarMap, false, useLimited=true)
+        )()
+      )()
+      )()
+      Seq(unlimited, limited)
     }
 
     // Note that second argument, state, is only used to translate id
@@ -1160,7 +1170,10 @@ object Generator {
               })
             } else Seq.empty
             vpr.Forall(variables, triggers, translateExp(body, state, currStates, failureStates))()
-          } else if (quantifier == "exists") vpr.Exists(variables, Seq.empty, translateExp(body, state, currStates, failureStates))()
+          } else if (quantifier == "exists") {
+            if (isPostcondition && !needsSyncTot) needsSyncTot = a.topExists
+            vpr.Exists(variables, Seq.empty, translateExp(body, state, currStates, failureStates))()
+          }
           else throw UnknownException("Unexpected quantifier " + quantifier)
         case ImpliesExpr(left, right) =>
           vpr.Implies(translateExp(left, state, currStates, failureStates), translateExp(right, state, currStates, failureStates))()

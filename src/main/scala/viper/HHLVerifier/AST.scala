@@ -77,7 +77,7 @@ case class MethodCallStmt(methodName: String, args: Seq[Id]) extends Stmt {
 }
 
 sealed trait TopLevelDecl
-case class Method(mName: String, params: Seq[Id], res: Seq[Id], pre: Seq[Assertion], post: Seq[Assertion], body: CompositeStmt) extends TopLevelDecl {
+case class Method(mName: String, params: Seq[Id], res: Seq[Id], pre: Seq[Expr], post: Seq[Expr], body: CompositeStmt) extends TopLevelDecl {
   val paramsMap: Map[String, Type] = params.map(arg => (arg.name -> arg.typ)).toMap
   val resMap: Map[String, Type] = res.map(res => (res.name -> res.typ)).toMap
   var allVars: Map[String, Type] = Map.empty

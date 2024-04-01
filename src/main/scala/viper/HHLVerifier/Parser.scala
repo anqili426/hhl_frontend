@@ -18,17 +18,8 @@ object Parser {
       Method(items._1, args, res, pre, post, items._6)
   }
 
-  def precondition[$: P]: P[Assertion] = P("requires" ~~ spaces ~ expr).map(
-    item =>
-      if (item.isInstanceOf[Assertion]) item.asInstanceOf[Assertion]
-      else throw UnknownException("Method preconditions must be assertions starting with quantifiers")
-  )
-
-  def postcondition[$: P]: P[Assertion] = P("ensures" ~~ spaces ~ expr).map(
-    item =>
-      if (item.isInstanceOf[Assertion]) item.asInstanceOf[Assertion]
-      else throw UnknownException("Method postconditions must be assertions starting with quantifiers")
-  )
+  def precondition[$: P]: P[Expr] = P("requires" ~~ spaces ~ expr)
+  def postcondition[$: P]: P[Expr] = P("ensures" ~~ spaces ~ expr)
 
   def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ notStateTypeName).map{
     items => items._1.typ = items._2

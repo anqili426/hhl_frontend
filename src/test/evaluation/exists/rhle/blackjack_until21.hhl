@@ -6,7 +6,7 @@ ensures exists <_s> :: _s[handValue_out] == 21
 
     let <$s> :: $s[handValue_out] >= 2 && $s[handValue_out] <= 20
     while desugaredRule (handValue_out < 21)
-    {hint2} invariant $n <= (21 - $s[handValue_out]) ==> 
+    {hint2} invariant $n <= (21 - $s[handValue_out]) ==>
             exists <_s> :: _s[handValue_out] <= 21 &&
                 $n == _s[handValue_out] - $s[handValue_out]
     {

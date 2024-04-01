@@ -59,7 +59,6 @@ ensures forall <_s1>: State, <_s2>: State :: (_s1[t] == 1 && _s2[t] == 2) ==> (_
        y := y + 1
     }
 }
-*/
 
 method test_forall2(h: Int) returns (l: Int)
 ensures forall <_s1>: State, <_s2>: State :: (exists <_s3>: State :: _s1[h] == _s3[h] && _s2[l] == _s3[l])
@@ -76,3 +75,19 @@ ensures forall <_s1>: State, <_s2>: State :: (exists <_s3>: State :: _s1[h] == _
         i := i + 1
     }
 }
+*/
+
+method test(h: Int) returns (l: Int)
+ensures (forall <_s> :: true) || (forall <_s> :: true)
+{
+    while forAllExistsRule (true)
+    decreases 8
+    {
+        while forAllExistsRule (true)
+        decreases 9
+        {
+
+        }
+    }
+}
+

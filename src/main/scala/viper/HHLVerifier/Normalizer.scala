@@ -13,7 +13,7 @@ object Normalizer {
       case Hint(_, _) => if (negate) UnaryExpr("!", e) else e
       case UnaryExpr(op, body) =>
         if (op == "-") throw UnknownException("Normalizer: expression " + e + " is not expected")
-        else normalize(body, negate)
+        else normalize(body, !negate)
       case be@BinaryExpr(e1, op, e2) =>
         if (e1.typ.isInstanceOf[BoolType]) {
           val normalizedE1 = normalize(e1, negate)
