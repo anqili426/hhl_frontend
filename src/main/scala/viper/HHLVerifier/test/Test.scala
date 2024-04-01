@@ -11,6 +11,7 @@ object Test {
 
   var failedForAll: List[String] = List.empty
   var failedExists: List[String] = List.empty
+  var failedOther: List[String] = List.empty
   var totalNum = 0
   var totalRuntime = 0.0
 
@@ -85,17 +86,18 @@ object Test {
       val LOCData = getDataForTestCase(f.getPath)
       // Test Parser
       print(f)
-      val argsForMain = Array(f.getPath, "--" + option)
+      val argsForMain = Array(f.getPath, option)
 
       Main.test = true
       Main.main(argsForMain)
       totalRuntime = totalRuntime + Main.runtime
 
       var res = "Failed"
-      if ((!f.getName.endsWith("false.txt") && Main.verified != 2) || (f.getName.endsWith("false.txt") && Main.verified != 1)) {
+      if ((!f.getName.endsWith("false.hhl") && Main.verified != 2) || (f.getName.endsWith("false.hhl") && Main.verified != 1)) {
         println(" Failed")
-        if (option == "forall") failedForAll = failedForAll :+ f.getPath
-        else if (option == "exists") failedExists = failedExists :+ f.getPath
+        if (option == "--forall") failedForAll = failedForAll :+ f.getPath
+        else if (option == "--exists") failedExists = failedExists :+ f.getPath
+        else failedOther = failedOther :+ f.getPath
       } else {
         println(" OK")
         res = "Passed"
@@ -110,16 +112,22 @@ object Test {
   def main(args: Array[String]): Unit = {
     val pathOfForAllTests = "src/test/evaluation/forall"
     val pathOfExistsTests = "src/test/evaluation/exists"
+    val pathOfForAllExistsTests = "src/test/evaluation/forall-exists"
+    val pathOfExistsForAllTests = "src/test/evaluation/exists-forall"
 
     val forAllTests = getListOfFiles(pathOfForAllTests)
     val existsTests = getListOfFiles(pathOfExistsTests)
+    val forAllExistsTests = getListOfFiles(pathOfForAllExistsTests)
+    val existsForAllTests = getListOfFiles(pathOfExistsForAllTests)
 
     println("Evaluation starts")
 
     var allTestData: List[Array[String]] = List.empty
-    allTestData = allTestData ++ runTests(forAllTests, "forall")
-    // allTestData = allTestData ++ runTests(existsTests, "exists")
-    val failedNum = failedForAll.length + failedExists.length
+    //allTestData = allTestData ++ runTests(forAllTests, "--forall")
+    //allTestData = allTestData ++ runTests(existsTests, "--exists")
+    allTestData = allTestData ++ runTests(forAllExistsTests, "--auto")
+    allTestData = allTestData ++ runTests(existsForAllTests, "--auto")
+    val failedNum = failedForAll.length + failedExists.length + failedOther.length
     println("---------------------")
     println("Total: " + totalNum)
     println("Failed: " + failedNum)
@@ -128,6 +136,8 @@ object Test {
       failedForAll.foreach(t => println(t))
       println("Failed exists tests: " + failedExists.length)
       failedExists.foreach(t => println(t))
+      println("Failed forall-exists and exists-forall tests: " + failedOther.length)
+      failedOther.foreach(t => println(t))
     }
     println("Runtime: " + totalRuntime + " s")
 
