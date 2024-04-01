@@ -1,5 +1,5 @@
 method test() returns (success: Int)
-requires exists _s1: State, _s2: State :: <_s1> && <_s2>
+requires exists <_s1>, <_s2> :: true
 ensures exists <_s1>, <_s2> :: _s1[success] != _s2[success]
 {
     var currTime: Int
@@ -42,7 +42,7 @@ ensures exists <_s1>, <_s2> :: _s1[success] != _s2[success]
     var counter : Int
     counter := 0
 
-    while (counter < 5)
+    while desugaredRule (counter < 5)
     {hint4} invariant $n <= 5 ==> exists <_s1>, <_s2> :: 
                                 _s1[counter] == $n && _s2[counter] == $n &&
                                 _s1[currTime] - _s1[lastTime] == 100 &&

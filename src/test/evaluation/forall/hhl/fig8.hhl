@@ -7,7 +7,7 @@ ensures forall <_s1>, <_s2> :: (_s1[t] == 1 && _s2[t] == 2) ==> _s1[n] >= _s2[n]
     a := 0
     b := 1
     i := 0
-    while (i < n)
+    while forAllExistsRule (i < n)
     invariant forall <_s1>, <_s2> :: (_s1[t] == 1 && _s2[t] == 2) ==>
                                 (_s1[n] - _s1[i]) >= (_s2[n] - _s2[i]) &&
                                 _s1[a] >= _s2[a] && _s1[b] >= _s2[b]

@@ -9,7 +9,7 @@ ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
     v := 0
     y := 0
 
-    while (h > i) 
+    while desugaredRule (h > i)
     invariant forall <_s> :: _s[h] >= _s[i] && 
                                             _s[y] == (_s[i] * (_s[i] + 1)) / 2
     {
@@ -19,7 +19,7 @@ ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
 
     v := 1
 
-    while (low > i) 
+    while desugaredRule (low > i)
     invariant forall <_s> :: _s[low] >= _s[i] &&
                                             _s[y] == (_s[i] * (_s[i] + 1)) / 2
     {

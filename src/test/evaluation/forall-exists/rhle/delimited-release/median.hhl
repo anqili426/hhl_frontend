@@ -20,7 +20,7 @@ requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
                   _s2[b1] != _s2[b2]
                  )
 ensures forall <_s1> :: _s1[i] == 1 ==>
-            (exists <_s2> :: (_s2[i] == 2 && _s1[m] == _s2[m] && _s1[res] == _s2[res]))
+            (exists <_s2> :: _s2[i] == 2 && (_s1[m] == _s2[m] ==> _s1[res] == _s2[res]))
 
 {
     var x1: Int

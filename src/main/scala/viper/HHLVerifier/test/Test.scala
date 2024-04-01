@@ -124,9 +124,9 @@ object Test {
 
     var allTestData: List[Array[String]] = List.empty
     //allTestData = allTestData ++ runTests(forAllTests, "--forall")
-    //allTestData = allTestData ++ runTests(existsTests, "--exists")
-    allTestData = allTestData ++ runTests(forAllExistsTests, "--auto")
-    allTestData = allTestData ++ runTests(existsForAllTests, "--auto")
+    allTestData = allTestData ++ runTests(existsTests, "--exists")
+    //allTestData = allTestData ++ runTests(forAllExistsTests, "--auto")
+    //allTestData = allTestData ++ runTests(existsForAllTests, "--auto")
     val failedNum = failedForAll.length + failedExists.length + failedOther.length
     println("---------------------")
     println("Total: " + totalNum)
