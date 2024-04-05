@@ -1,0 +1,10 @@
+method simpleTS_GNI1(low: Int, high: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: _s1[low] == _s2[low]
+ensures forall <_s1>, <_s2> :: (exists <_s3> :: _s3[high] == _s1[high] && _s3[res] == _s2[res])
+{
+     var x: Int
+     havoc x {hint}
+     assume x >= 0
+     use forall <_s1>, <_s2> :: hint(_s2[high] + _s2[x] - _s1[high])
+     res := high + x
+}

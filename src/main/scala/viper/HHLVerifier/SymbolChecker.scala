@@ -325,6 +325,7 @@ object SymbolChecker {
         e match {
           case Hint(_, _) => true
           case BinaryExpr(e1, _, e2) => checkIfHintOnly(e1) && checkIfHintOnly(e2)
+          case ImpliesExpr(left, right) => checkIfHintOnly(right) // TODO: need to improve this
           case _ => false
         }
       }
