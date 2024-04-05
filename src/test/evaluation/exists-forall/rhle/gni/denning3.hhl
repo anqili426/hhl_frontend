@@ -1,6 +1,7 @@
 method denning3(e_in: Int, i_in: Int, f_in: Int, x_in: Int, sum_in: Int, t: Int)
 returns (e_out: Int, i_out: Int, f_out: Int, x_out: Int, sum_out: Int, res: Int)
 requires forall <_s1>, <_s2> :: (_s1[t] == 1 && _s2[t] == 2) ==> (_s1[e_in] == _s2[e_in] && _s1[i_in] == _s2[i_in])
+//requires exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==> _s1[x_in]
 // TODO: strengthen the precondition
 ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==>
                                             (_s1[e_out] != _s2[e_out] ||
@@ -17,7 +18,9 @@ ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==>
     f_out := f_in
     x_out := x_in
 
-    while forAllExistsRule (e_out == 1 && err == 0)
+    while existsRule (e_out == 1 && err == 0)
+		invariant exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==> _s1[
+		decreases
     {
         sum_out := sum_out + x_out
         i_out := i_out + 1
