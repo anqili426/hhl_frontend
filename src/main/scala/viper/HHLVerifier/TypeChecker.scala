@@ -60,7 +60,7 @@ object TypeChecker {
       case AssumeStmt(e) =>
         typeCheckExpr(e, false)
         res = checkIfTypeMatch(e.typ, boolType)
-        isTotal = !isInLoop
+        //isTotal = !isInLoop
       case AssertStmt(e) =>
         typeCheckExpr(e, false)
         res = checkIfTypeMatch(e.typ, boolType)
