@@ -56,7 +56,7 @@ case class AssertStmt(e: Expr) extends Stmt
 case class HyperAssumeStmt(e: Expr) extends Stmt
 case class HyperAssertStmt(e: Expr) extends Stmt
 case class IfElseStmt(cond: Expr, ifStmt: CompositeStmt, elseStmt: CompositeStmt) extends Stmt
-case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)], decr: Option[Expr], rule: String = "default") extends Stmt {
+case class WhileLoopStmt(cond: Expr, body: CompositeStmt, inv: Seq[(Option[HintDecl], Expr)], decr: Option[Expr], rule: String = "unspecified") extends Stmt {
   // This is true if
   // 1. The loop body contains no assume statements
   // 2. The loop itself has a decreases clause
