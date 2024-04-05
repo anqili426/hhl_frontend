@@ -6,7 +6,7 @@ ensures exists <_s> :: _s[handValue_out] == 21
 
     while existsRule (handValue_out < 21)
 		invariant exists <_s> :: _s[handValue_out] <= 21
-		decreases 21 - handValue_out
+		decreases 31 - handValue_out
     {
         var card: Int
         havoc card {hint1}

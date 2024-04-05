@@ -18,6 +18,8 @@ ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==>
     f_out := f_in
     x_out := x_in
 
+	// assuming x_1 != x_2
+
     while existsRule (e_out == 1 && err == 0)
 		invariant exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==> _s1[
 		decreases
