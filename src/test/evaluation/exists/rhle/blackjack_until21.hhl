@@ -4,11 +4,9 @@ ensures exists <_s> :: _s[handValue_out] == 21
 {
     handValue_out := handValue_in
 
-    let <$s> :: $s[handValue_out] >= 2 && $s[handValue_out] <= 20
-    while desugaredRule (handValue_out < 21)
-    {hint2} invariant $n <= (21 - $s[handValue_out]) ==>
-            exists <_s> :: _s[handValue_out] <= 21 &&
-                $n == _s[handValue_out] - $s[handValue_out]
+    while existsRule (handValue_out < 21)
+		exists <_s> :: _s[handValue_out] <= 21
+		decreases 21 - handValue_out
     {
         var card: Int
         havoc card {hint1}
@@ -16,6 +14,4 @@ ensures exists <_s> :: _s[handValue_out] == 21
         use hint1(1)
         handValue_out := handValue_out + card
     }
-
-    use hint2(21 - $s[handValue_out])
 }
