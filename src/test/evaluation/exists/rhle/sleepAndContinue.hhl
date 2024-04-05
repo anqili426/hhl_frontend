@@ -42,14 +42,17 @@ ensures exists <_s1>, <_s2> :: _s1[success] != _s2[success]
     var counter : Int
     counter := 0
 
-    while desugaredRule (counter < 5)
-    {hint4} invariant $n <= 5 ==> exists <_s1>, <_s2> :: 
-                                _s1[counter] == $n && _s2[counter] == $n &&
+    while syncTotRule (counter < 5)
+		invariant forall <_s1>, <_s2> :: _s1[counter] == _s2[counter]
+		invariant forall <_s> :: _s[counter] <= 5
+		invariant exists <_s1>, <_s2> :: 
+                                //_s1[counter] == $n && _s2[counter] == $n &&
                                 _s1[currTime] - _s1[lastTime] == 100 &&
                                 _s2[currTime] - _s2[lastTime] == 101 &&
                                 _s1[currTotal] == 100 * _s1[counter] &&
                                 _s2[currTotal] == 101 * _s2[counter] &&
                                 _s1[lastTime] >= 0 && _s2[lastTime] >= 0
+		decreases 5 - counter
     {
         // recordTimeStamp
         if (lastTime >= 0) {
@@ -79,5 +82,6 @@ ensures exists <_s1>, <_s2> :: _s1[success] != _s2[success]
     } else {
         success := 0
     }
-    use hint4(5)
+    //use hint4(5)
+
 }
