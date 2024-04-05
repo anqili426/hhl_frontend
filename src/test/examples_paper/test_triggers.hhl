@@ -1,0 +1,6 @@
+method test1(x: Int, y: Int)
+	requires exists <_s> :: forall <_ss> :: _s[x] == _ss[y]
+	ensures exists <_s> :: _s[x] == _s[y]
+{
+	assume true
+}

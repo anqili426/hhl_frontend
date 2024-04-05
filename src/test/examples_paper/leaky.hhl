@@ -1,0 +1,10 @@
+method leaky(h: Int) returns (o: Int)
+	requires exists <_s1>, <_s2> :: _s1[h] < _s2[h]
+	ensures exists <_s1>, <_s2> :: forall <_s> :: _s[o] == _s1[o] ==> _s[h] != _s2[h]
+{
+	var y: Int
+	havoc y {hint}
+	assume 0 <= y && y <= 10
+	use hint(10)
+	o := h + y
+}
