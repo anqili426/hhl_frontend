@@ -620,16 +620,24 @@ object Generator {
               }
 
               // Else branch
-              val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "forAllExistsRule")
-              dupLoop.isTotal = loop.isTotal
-              val useForAllExistsRule = translateStmt(dupLoop, currStates, currFailureStates, true)
+              val invHasTopExists = !normalizedInvWithHints.filter(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists).isEmpty
+              val useNotSyncRule = if (invHasTopExists) {
+                // exists rule
+                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "existsRule")
+                dupLoop.isTotal = loop.isTotal
+                translateStmt(dupLoop, currStates, currFailureStates, true)
+              } else {
+                // forall-exists rule
+                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "forAllExistsRule")
+                dupLoop.isTotal = loop.isTotal
+                translateStmt(dupLoop, currStates, currFailureStates, true)
+              }
 
-              val applyRule = vpr.If(checkRuleCond, vpr.Seqn(useSyncRule._1, Seq.empty)(), vpr.Seqn(useForAllExistsRule._1, Seq.empty)())()
+              val applyRule = vpr.If(checkRuleCond, vpr.Seqn(useSyncRule._1, Seq.empty)(), vpr.Seqn(useNotSyncRule._1, Seq.empty)())()
 
               newStmts = newStmts :+ applyRule
-              newVars = newVars ++ useSyncRule._2 ++ useForAllExistsRule._2
+              newVars = newVars ++ useSyncRule._2 ++ useNotSyncRule._2
             } else {
-
               if (!isAutoSelected && !syncTotWarningPrinted && postIsTopExists && rule != "syncTotRule" && rule != "existsRule") {
                 println("Warning: method " + currMethod.mName + " has a postcondition " +
                   "which has a top-level existential quantifier over states, \n " +
