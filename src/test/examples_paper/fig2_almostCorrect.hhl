@@ -1,0 +1,10 @@
+method almostCorrect(x: Int) returns (o: Int)
+requires forall <_s> :: _s[x] >= 0
+ensures forall <<_s>> :: _s[x] == 0 && _s[o] == 0
+{
+    havoc o
+    assume o >= 0
+    var y: Int
+    y := x + o
+    assert y > 0
+}

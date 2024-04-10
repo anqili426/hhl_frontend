@@ -1,0 +1,7 @@
+method simple(x: Int, y: Int) returns (z: Int)
+requires forall <_s1> :: (exists <_s2> :: _s2[x] > _s1[x])
+requires forall <_s1>, <_s2> :: _s1[y] == _s2[y]
+ensures forall <_s1> :: (exists <_s2> :: _s2[z] > _s1[z])
+{
+    z := x + y
+}
