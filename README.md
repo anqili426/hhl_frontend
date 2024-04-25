@@ -22,7 +22,7 @@ Import the project into IntelliJ and edit the configurations as follows:
 You may provide the following options as program arguments to customize the verifier:
 - `--forall` Only generates overapproximation encodings
 - `--exists` Only generates underapproximation encodings
-- `--output <path_to_file>` Saves the generated Viper program in the specified file
+- `--output <path_to_file>` Saves the generated Viper program to the specified file
 - `--noframe` Turns off forall framing after loops and method calls
 - `--existsframe` Turns on exists framing after loops
 - `--inline` Verifies the loop invariants in an inline fashion when using the whileDesugard rule
@@ -85,13 +85,13 @@ while <ruleToUse> (<loop_guard>)
   <stmt>
 }
 ```
-`<ruleToUse>` has 4 possible values: `syncRule`, `syncTotRule`, `forAllExistsRule`, `desugaredRule`.\
-When `<ruleToUse>` is unspecified, the verifier will automatically select one from the first 3 above when it is run with the option `--auto`.
+`<ruleToUse>` has 5 possible values: `syncRule`, `syncTotRule`, `forAllExistsRule`, `existsRule`, `desugaredRule`.\
+When `<ruleToUse>` is unspecified, the verifier will automatically select one from the first 4 above when it is run with the option `--auto`.
 
 ## Assertions
 ```
 forall/exists _n: Int :: <expression>
-forall/exists <_s>: State :: <expression>
+forall/exists '<'_s'>': State :: <expression>
 ```
 Note that the assertion variables must have an identifier starting with "_"
 

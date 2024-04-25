@@ -417,10 +417,6 @@ object Generator {
             val s0 = vpr.LocalVar(s0VarName, state.typ)()
             val s1 = vpr.LocalVar(s1VarName, state.typ)()
             val k = vpr.LocalVarDecl(kVarName, vpr.Int)()
-            val triggers = if (hintDecl.isEmpty) Seq.empty
-            else Seq(vpr.Trigger(Seq(translateHintDecl(hintDecl.get, k.localVar),
-                      getInSetApp(Seq(state, currStates), typVarMap, useForAll=false, useLimited=true)))())
-
 
             if (verifierOption != 1) {
               // ForAll
@@ -428,9 +424,13 @@ object Generator {
             }
             if (verifierOption != 0) {
               // Exits
-              val stmt1 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap, useForAll=false)
+              val inSetTriggerExpr = Seq(getInSetApp(Seq(state, currStates), typVarMap, useForAll = false, useLimited = true))
+              val hintTriggerExpr = if (hintDecl.isEmpty) Seq.empty else Seq(translateHintDecl(hintDecl.get, k.localVar))
+              val triggers1 = Seq(vpr.Trigger(inSetTriggerExpr)())
+              val triggers2 = Seq(vpr.Trigger(inSetTriggerExpr ++ hintTriggerExpr)())
+              val stmt1 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap, triggers=triggers1, useForAll=false)
               val stmt2 = translateHavocVarHelper(currStates, STmp, state, s1, leftVar, typVarMap,
-                vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), k.localVar)(), k, triggers = triggers, false)
+                vpr.EqCmp(getGetApp(Seq(s1, leftVar.localVar), typVarMap), k.localVar)(), k, triggers = triggers2, false)
               existsNewStmts = Seq(stmt1, stmt2)
             }
             newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
