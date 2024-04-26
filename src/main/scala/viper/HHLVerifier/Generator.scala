@@ -1,5 +1,5 @@
 package viper.HHLVerifier
-import org.checkerframework.checker.units.qual.Current
+
 import viper.silver.{ast => vpr}
 
 object Generator {

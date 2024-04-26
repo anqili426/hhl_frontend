@@ -7,12 +7,10 @@ ThisBuild / scalaVersion := "2.13.10"
 
 val fastParse = "com.lihaoyi" %% "fastparse" % "2.2.2"
 val csvWriter = "au.com.bytecode" % "opencsv" % "2.4"
-lazy val silicon = project in file("silicon")
-//lazy val carbon = project in file("carbon")
+lazy val server = project in file("viperserver")
 
 lazy val impcon_frontend = (project in file("."))
-  //.dependsOn(carbon % "compile->compile;test->test")
-  .dependsOn(silicon % "compile->compile;test->test")
+  .dependsOn(server % "compile->compile;test->test")
     .settings(
         // General settings
         name := "hhl_verifier",

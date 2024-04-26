@@ -15,6 +15,7 @@ ensures exists <_s> :: _s[sum] == 0
 		invariant exists <_s> :: ((_s[i] <= 5) ==> ((_s[j] == 0) && (_s[p] == 0))) &&
                                     ((_s[i] > 5) ==> ((_s[j] == 1) && (_s[p] == 1))) &&        
                                     _s[sum] == 0 && 0 <= _s[i] && _s[i] <= 10
+        invariant forall <_s> :: _s[i] <= 10
 	    decreases 10 - i
     {
        var increment: Int
@@ -42,5 +43,4 @@ ensures exists <_s> :: _s[sum] == 0
         use hint2(0)
         use hint2(1)
     }
-    //use hint1(10)
 }

@@ -1,11 +1,19 @@
 package viper.HHLVerifier
 
 import fastparse.Parsed
-import viper.silicon.Silicon
-import viper.silver.reporter.NoopReporter
-import viper.silver.verifier.{Failure, Success}
 
 import java.io.FileWriter
+import viper.silicon.Silicon
+import viper.silver.reporter.NoopReporter
+import viper.silver.verifier.VerificationResult
+import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
+import viper.carbon.CarbonVerifier
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future, Promise}
+import scala.util.{Failure, Success}
+
 
 object Main {
 
@@ -74,23 +82,80 @@ object Main {
           consistencyErrors.foreach(err => printMsg(err.readableMessage))
         } else {
           printMsg("Translated program is being verified by Viper. ")
+          val carbon = CarbonVerifier(NoopReporter)
           val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
+          carbon.start()
           silicon.start()
-          val verifyRes = silicon.verify(viperProgram)
-          silicon.stop()
-          val t1 = System.nanoTime()
-          runtime = (t1 - t0) / 1E9
 
-          verifyRes match {
-            case Success =>
+          val carbonRes = Future[VerificationResult]{
+            println("Carbon has been started. ")
+            carbon.verify(viperProgram)
+          }
+
+          val siliconRes = Future[VerificationResult] {
+            println("Silicon has been started. ")
+            silicon.verify(viperProgram)
+          }
+
+          val resPromise = Promise[VerificationResult]()
+
+          var carbonVerified = 0  // 0: unknown 1: failure 2: success
+          var siliconVerified = 0 // 0: unknown 1: failure 2: success
+
+          carbonRes.onComplete {
+            case Success(result) =>
+              result match {
+                case ResSuccess =>
+                  carbonVerified = 2
+                  resPromise.trySuccess(result)
+                case ResFailure(err) =>
+                  if (!resPromise.isCompleted) {
+                    carbonVerified = 1
+                    println("Carbon: ")
+                    err.foreach(e => printMsg(e.readableMessage))
+                    while (siliconVerified == 0) {} // Wait for silicon to terminate
+                    if (siliconVerified == 1) resPromise.trySuccess(result)
+                    // if siliconVerified == 2, it would have returned
+                  }
+              }
+              resPromise.trySuccess(result)
+            case Failure(_) =>
+          }
+
+          siliconRes.onComplete {
+            case Success(result) =>
+              result match {
+                case ResSuccess =>
+                  siliconVerified = 2
+                  resPromise.trySuccess(result)
+                case ResFailure(err) =>
+                  if (!resPromise.isCompleted) {
+                    siliconVerified = 1
+                    println("Silicon: ")
+                    err.foreach(e => printMsg(e.readableMessage))
+                    while (carbonVerified == 0) {} // Wait for carbon to terminate
+                    if (carbonVerified == 1) resPromise.trySuccess(result)
+                    // if carbonVerified == 2, it would have returned
+                  }
+              }
+            case Failure(_) =>
+          }
+
+          val resultFuture = resPromise.future
+          val result = Await.result(resultFuture, Duration.Inf)
+          val t1 = System.nanoTime()
+          carbon.stop()
+          silicon.stop()
+          result match {
+            case ResSuccess =>
               verified = 2
               printMsg("Verification succeeded")
-            case Failure(err) =>
+            case ResFailure(err) =>
               verified = 1
               printMsg("Verification failed")
               err.foreach(e => printMsg(e.readableMessage))
-
           }
+          runtime = (t1 - t0) / 1E9
           printMsg("Runtime: " + runtime)
         }
       } else {
