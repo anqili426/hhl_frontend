@@ -1,6 +1,9 @@
 package viper.HHLVerifier
 
+import ch.qos.logback.classic.{Level, Logger}
+import org.slf4j.LoggerFactory
 import fastparse.Parsed
+import org.slf4j.LoggerFactory.getLogger
 
 import java.io.FileWriter
 import viper.silicon.Silicon
@@ -13,7 +16,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
-
 
 object Main {
 
