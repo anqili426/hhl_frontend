@@ -107,7 +107,7 @@ object Generator {
 
   // var useAliasForState = false
   var stateAliasPrefix = "_"
-  // var stateAliasMap: Map[String, String] = Map.empty
+  val checkSyncCondMethodName = "check_sync_cond"
   val checkExistsRuleCond1MethodName = "check_exists_cond1"
   val checkExistsRuleCond2MethodName = "check_exists_cond2"
   var stateRemoved = ""
@@ -125,6 +125,13 @@ object Generator {
     val p = vpr.Program(allDomains, fields, allFuncs, predicates, allMethods, extensions)()
     p
   }
+
+  // Generate a viper program with the following
+  // 1. A method that checks if I implies low(b)
+  //    pre: I
+  //    post: low(b)
+  //    body: empty
+  // 2. The method should contains domain declarations
 
   def reset(): Unit = {
     allDomains = Seq.empty
@@ -608,36 +615,66 @@ object Generator {
               newVars = newVars ++ Seq(loopStates, checkRuleCond)
 
               val normalizedInvWithHints = normalizedInv.map(i => (Option.empty, i))
-
-              // If branch
-              val useSyncRule = if (loop.isTotal) {
-                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncTotRule")
-                dupLoop.isTotal = true
-                translateStmt(dupLoop, currStates, currFailureStates, true)
+              val canUseSyncRule = checkSyncCondModular(normalizedInv, body, cond, typVarMap)
+              Main.printMsg("Can use sync rule? " + canUseSyncRule)
+              if (canUseSyncRule) {
+                val useSyncRule = if (loop.isTotal) {
+                  val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncTotRule")
+                  dupLoop.isTotal = true
+                  translateStmt(dupLoop, currStates, currFailureStates, true)
+                } else {
+                  val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncRule")
+                  dupLoop.isTotal = false
+                  translateStmt(dupLoop, currStates, currFailureStates, true)
+                }
+                newStmts = newStmts ++ useSyncRule._1
+                newVars = newVars ++ useSyncRule._2
               } else {
-                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncRule")
-                dupLoop.isTotal = false
-                translateStmt(dupLoop, currStates, currFailureStates, true)
+                val invHasTopExists = !normalizedInvWithHints.filter(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists).isEmpty
+                val useNotSyncRule = if (invHasTopExists) {
+                  // exists rule
+                  val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "existsRule")
+                  dupLoop.isTotal = loop.isTotal
+                  translateStmt(dupLoop, currStates, currFailureStates, true)
+                } else {
+                  // forall-exists rule
+                  val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "forAllExistsRule")
+                  dupLoop.isTotal = loop.isTotal
+                  translateStmt(dupLoop, currStates, currFailureStates, true)
+                }
+                newStmts = newStmts ++ useNotSyncRule._1
+                newVars = newVars ++ useNotSyncRule._2
               }
-
-              // Else branch
-              val invHasTopExists = !normalizedInvWithHints.filter(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists).isEmpty
-              val useNotSyncRule = if (invHasTopExists) {
-                // exists rule
-                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "existsRule")
-                dupLoop.isTotal = loop.isTotal
-                translateStmt(dupLoop, currStates, currFailureStates, true)
-              } else {
-                // forall-exists rule
-                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "forAllExistsRule")
-                dupLoop.isTotal = loop.isTotal
-                translateStmt(dupLoop, currStates, currFailureStates, true)
-              }
-
-              val applyRule = vpr.If(checkRuleCond, vpr.Seqn(useSyncRule._1, Seq.empty)(), vpr.Seqn(useNotSyncRule._1, Seq.empty)())()
-
-              newStmts = newStmts :+ applyRule
-              newVars = newVars ++ useSyncRule._2 ++ useNotSyncRule._2
+                // TODO: keep the following under an option
+//              // If branch
+//              val useSyncRule = if (loop.isTotal) {
+//                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncTotRule")
+//                dupLoop.isTotal = true
+//                translateStmt(dupLoop, currStates, currFailureStates, true)
+//              } else {
+//                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncRule")
+//                dupLoop.isTotal = false
+//                translateStmt(dupLoop, currStates, currFailureStates, true)
+//              }
+//
+//              // Else branch
+//              val invHasTopExists = !normalizedInvWithHints.filter(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists).isEmpty
+//              val useNotSyncRule = if (invHasTopExists) {
+//                // exists rule
+//                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "existsRule")
+//                dupLoop.isTotal = loop.isTotal
+//                translateStmt(dupLoop, currStates, currFailureStates, true)
+//              } else {
+//                // forall-exists rule
+//                val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "forAllExistsRule")
+//                dupLoop.isTotal = loop.isTotal
+//                translateStmt(dupLoop, currStates, currFailureStates, true)
+//              }
+//
+//              val applyRule = vpr.If(checkRuleCond, vpr.Seqn(useSyncRule._1, Seq.empty)(), vpr.Seqn(useNotSyncRule._1, Seq.empty)())()
+//
+//              newStmts = newStmts :+ applyRule
+//              newVars = newVars ++ useSyncRule._2 ++ useNotSyncRule._2
             } else {
               if (!isAutoSelected && !syncTotWarningPrinted && postIsTopExists && rule != "syncTotRule" && rule != "existsRule") {
                 println("Warning: method " + currMethod.mName + " has a postcondition " +
@@ -887,6 +924,49 @@ object Generator {
       }
       val trigger = vpr.Trigger(Seq(getInSetApp(Seq(state, S1), typVarMap, useForAll = useForAll, useLimited = (!useForAll))))()
       translateAssumeWithViperExpr(state, S1, rightExpr, typVarMap, triggers = Seq(trigger), useForAll = useForAll)
+    }
+
+//    def createViperMethod(methodName: String, args:, res, pres:, posts, body: ): Unit = {
+//
+//    }
+
+    def checkSyncCondModular(normalizedInv: Seq[Expr], body: CompositeStmt, loopGuard: Expr, typVarMap: Map[vpr.TypeVar, vpr.Type]): Boolean = {
+      val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
+      val inputFailureStates = vpr.LocalVarDecl("S0_fail", getConcreteSetStateType(typVarMap))()
+      val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+      val s1 = vpr.LocalVarDecl(s1VarName, getConcreteStateType(typVarMap))()
+      val s2 = vpr.LocalVarDecl(s2VarName, getConcreteStateType(typVarMap))()
+
+      // I
+      val pre1 = getAllInvariantsWithTriggers(normalizedInv, inputStates.localVar, inputFailureStates.localVar)
+      // All program variables are different
+      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))())
+      val allAtomicProgVarsInBody = allProgVarsInBody.filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList
+      val allProgVarsInBodyDecl = allAtomicProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)())
+      val allProgVarsWithValues = allAtomicProgVarsInBody.map(v => vpr.EqCmp(v, vpr.IntLit(allAtomicProgVarsInBody.indexOf(v))())())
+      val pre2: Seq[vpr.Exp] = if (allProgVarsWithValues.isEmpty) Seq.empty else Seq(allProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
+
+      // post
+      val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
+        vpr.And(getInSetApp(Seq(s1.localVar, inputStates.localVar), typVarMap), getInSetApp(Seq(s2.localVar, inputStates.localVar), typVarMap))(),
+        vpr.EqCmp(translateExp(loopGuard, s1.localVar, inputStates.localVar, inputFailureStates.localVar), translateExp(loopGuard, s2.localVar, inputStates.localVar, inputFailureStates.localVar))()
+      )())()
+
+      // method body
+      val inSetEq = inhaleInSetEqStmt(state, inputStates.localVar, typVarMap)
+      val inSetEqFail = inhaleInSetEqStmt(state, inputStates.localVar, typVarMap)
+
+      val method = vpr.Method(checkSyncCondMethodName,
+        Seq(inputStates, inputFailureStates) ++ allProgVarsInBodyDecl,
+        Seq.empty,
+        Seq(pre1) ++ pre2,
+        Seq(sameGuardValue),
+        Option(vpr.Seqn(inSetEq ++ inSetEqFail, Seq.empty)()))()
+
+      val preamble = generatePreamble(typVarMap)
+      val program = vpr.Program(preamble._1, Seq.empty, Seq.empty, Seq.empty, preamble._2 ++ Seq(method), Seq.empty)()
+      val res = ViperRunner.runSiliconAndCarbon(program, 3, 5, true)
+      ViperRunner.interpretResult(res)
     }
 
     // Returns true if e satisfies the condition that there are no forall quantifiers over states after an exists quantifier
