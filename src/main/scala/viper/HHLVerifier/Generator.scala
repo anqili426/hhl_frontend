@@ -2,6 +2,8 @@ package viper.HHLVerifier
 
 import viper.silver.{ast => vpr}
 
+import scala.collection.immutable.Seq
+
 object Generator {
   // State domain
   val stateDomainName = "State"
@@ -717,10 +719,14 @@ object Generator {
                 allMethods = allMethods ++ newMethods
               }
               else  {
-                  val invVerification = translateInvariantVerificationInline(normalizedInv, cond, body, decr, currStates, loopFailureStates, rule, typVarMap, isAutoSelected)
-                  newStmts = newStmts ++ invVerification._1
-                  newVars = newVars ++ invVerification._2
-                }
+                  if (inline) {
+                    val invVerification = translateInvariantVerificationInline(normalizedInv, cond, body, decr, currStates, loopFailureStates, rule, typVarMap, isAutoSelected)
+                    newStmts = newStmts ++ invVerification._1
+                    newVars = newVars ++ invVerification._2
+                  } else {
+                    allMethods = allMethods ++ translateInvariantVerificationModular(normalizedInv, cond, body, decr, rule, typVarMap, isAutoSelected)
+                  }
+              }
 
               val havocFailureStates = havocSetMethodCall(loopFailureStates)
               newStmts = newStmts ++ Seq(havocSTmp, havocFailureStates)
@@ -996,6 +1002,18 @@ object Generator {
       getAndOfExps(translatedInvs)
     }
 
+    /*  This creates a Viper method as shown below:
+    *   method methodName(S0: SetState[Int], S0_fail: SetState[Int], ...) returns (SS: SetState[Int], SS_fail: SetState[Int], ...)
+    *   requires methodPres
+    *   ensures methodPosts
+    *   {
+    *       methodLocalVars
+    *       in_set_forall == in_set_exists and in_set_forall_limited == in_set_exists_limited in S0
+    *       SS := S0
+    *       SS_fail := S0_fail
+    *       methodBody
+    *   }
+    * */
     def createViperMethod(methodName: String, args: Seq[vpr.LocalVarDecl], res: Seq[vpr.LocalVarDecl], methodPres: Seq[vpr.Exp], methodPosts: Seq[vpr.Exp], body: Seq[vpr.Stmt], methodLocalVars: Seq[vpr.LocalVarDecl], typVarMap: Map[vpr.TypeVar, vpr.Type]) : vpr.Method = {
       val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
       val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
@@ -1055,6 +1073,8 @@ object Generator {
       createViperMethod(methodName, args, Seq.empty, methodPres, methodPosts, methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()), typVarMap)
     }
 
+    // This returns a sequence of int variables and a sequence of non-int variables
+    // And an expression that ensures that all int variables are unique
     def separateIntFromOthers(progVars: Seq[vpr.LocalVar], auxiliaryVars: Seq[vpr.LocalVar]): (Seq[vpr.LocalVar], Seq[vpr.LocalVar], Seq[vpr.Exp]) = {
       val intAuxVars = auxiliaryVars.filter(v => v.typ == vpr.Int)
       val otherAuxVars = auxiliaryVars.diff(intAuxVars)
@@ -1267,6 +1287,128 @@ object Generator {
     })
     val stmt = WhileLoopStmt(loopGuard, body, pres.map(i => (Option.empty, i)), Option(decrExpr))
     verifyStmtModular(methodName, stmt, varsInStmt, pres, posts, typVarMap)
+  }
+
+  // This generates a method to verify the invariant when using sync, syncTot or forAllExists loop rule
+  def translateInvariantVerificationModular(normalizedInv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, decrExpr: Option[Expr], rule: String, typVarMap: Map[vpr.TypeVar, vpr.Type], isAutoSelected: Boolean): Seq[vpr.Method] = {
+    val methodName = if (!isAutoSelected) checkInvMethodName + "_" + rule + loopCounter
+                    else checkInvMethodName + "_" + rule + "_auto" + loopCounter
+    val inputStates = vpr.LocalVar("S0", getConcreteSetStateType(typVarMap))()
+    val outputStates = vpr.LocalVar("SS", getConcreteSetStateType(typVarMap))()
+    val inputFailureStates = vpr.LocalVar("S0_fail", getConcreteSetStateType(typVarMap))()
+    val outputFailureStates = vpr.LocalVar("SS_fail", getConcreteSetStateType(typVarMap))()
+    val STmp = vpr.LocalVar(tempStatesVarName, outputStates.typ)()
+    val SFailTmp = vpr.LocalVar(tempFailedStatesVarName, outputFailureStates.typ)()
+
+    val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+    val s1 = vpr.LocalVarDecl(s1VarName, getConcreteStateType(typVarMap))()
+    val s2 = vpr.LocalVarDecl(s2VarName, getConcreteStateType(typVarMap))()
+    // A logical variable that holds the value of the expression in the decreases clause
+    val t = vpr.LocalVar(tVarName + loopCounter, vpr.Int)()
+    val tDecl = vpr.LocalVarDecl(t.name, t.typ)()
+
+    var methodPres: Seq[vpr.Exp] = Seq.empty
+    var methodPosts: Seq[vpr.Exp] = Seq.empty
+    var methodArgs: Seq[vpr.LocalVarDecl] = Seq(tDecl)
+    var methodBody: Seq[vpr.Stmt] = Seq.empty
+    var methodLocalVars: Seq[vpr.LocalVar] = Seq(STmp, SFailTmp)
+
+    val pre1 = getAllInvariantsWithTriggers(normalizedInv, inputStates, inputFailureStates)
+    val post1 = getAllInvariants(normalizedInv, outputStates, outputFailureStates)
+    methodPres = methodPres :+ pre1
+    methodPosts = methodPosts :+ post1
+
+    if (!decrExpr.isEmpty) {
+      //  t == decrExpr for all states
+      val translatedDecr = translateExp(decrExpr.get, state.localVar, inputStates, inputFailureStates)
+      val trigger = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state.localVar, inputStates), typVarMap)))())
+      val decrPre = vpr.Forall(Seq(state), trigger,
+                      vpr.Implies(getInSetApp(Seq(state.localVar, inputStates), typVarMap),
+                      vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
+                    )())()
+      methodPres = methodPres :+ decrPre
+    }
+
+    val allVars = loopBody.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toSeq
+    val (_, otherVars, pre2) = separateIntFromOthers(allVars, Seq(t))
+    methodArgs = methodArgs ++ allVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
+    methodLocalVars = methodLocalVars ++ otherVars
+    methodPres = methodPres ++ pre2
+
+    val trigger = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state.localVar, outputStates), typVarMap, useLimited=true)))())
+    val loopGuardHoldsForAll = vpr.Forall(Seq(state), trigger, vpr.Implies(
+      getInSetApp(Seq(state.localVar, outputStates), typVarMap),
+      translateExp(loopGuard, state.localVar, outputStates, outputFailureStates)
+    )())()
+
+    val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
+      vpr.And(getInSetApp(Seq(s1.localVar, outputStates), typVarMap), getInSetApp(Seq(s2.localVar, outputStates), typVarMap))(),
+      vpr.EqCmp(translateExp(loopGuard, s1.localVar, outputStates, outputFailureStates), translateExp(loopGuard, s2.localVar, outputStates, outputFailureStates))()
+    )())()
+
+    if (rule == "syncRule" || rule == "syncTotRule") {
+      // Assert that all states have the same loop guard value
+      if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)()
+      // Assume that the loop guard holds in all states
+      methodBody = methodBody :+ vpr.Inhale(loopGuardHoldsForAll)()
+    }
+
+    val methodBodyAndVars = {
+      if (rule == "forAllExistsRule") {
+        // Cannot reuse the code that translates an ifElseStmt because we might need to assert decrExpr in the end
+        var bodyStmts: Seq[vpr.Stmt] = Seq.empty
+        var bodyVars: Seq[vpr.LocalVar] = Seq.empty
+        ifCounter = ifCounter + 1
+        val ifBlockStates = vpr.LocalVar(currStatesVarName + ifCounter, outputStates.typ)()
+        ifCounter = ifCounter + 1
+        val elseBlockStates = vpr.LocalVar(currStatesVarName + ifCounter, outputStates.typ)()
+
+        val assign1 = vpr.LocalVarAssign(ifBlockStates, outputStates)()
+        val assumeCond = translateStmt(AssumeStmt(loopGuard), ifBlockStates, outputFailureStates)
+        val assign2 = vpr.LocalVarAssign(elseBlockStates, outputStates)()
+        val assumeNotCond = translateStmt(AssumeStmt(UnaryExpr("!", loopGuard)), elseBlockStates, outputFailureStates)
+
+        val ifBlock = translateStmt(loopBody, ifBlockStates, outputFailureStates)
+        val elseBlock = translateStmt(CompositeStmt(Seq.empty), elseBlockStates, outputFailureStates)
+
+        bodyStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1
+        bodyVars = Seq(ifBlockStates, elseBlockStates) ++ ifBlock._2 ++ elseBlock._2
+
+        if (!decrExpr.isEmpty) {
+          val translatedDecr = translateExp(decrExpr.get, state.localVar, ifBlockStates, outputFailureStates)
+          // Assert that the current value of decrExpr is in the range of [0, t)
+          bodyStmts = bodyStmts :+ vpr.Assert(vpr.Forall(Seq(state), Seq.empty,
+            vpr.Implies(getInSetApp(Seq(state.localVar, ifBlockStates), typVarMap),
+              vpr.And(vpr.GeCmp(translatedDecr, zero)(),
+                vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
+              )())())())()
+        }
+        val updateSTmp = vpr.LocalVarAssign(STmp, getSetUnionApp(Seq(ifBlockStates, elseBlockStates), typVarMap))()
+        val updateProgStates = vpr.LocalVarAssign(outputStates, STmp)()
+        bodyStmts = bodyStmts ++ Seq(updateSTmp, updateProgStates)
+        (bodyStmts, bodyVars)
+      } else translateStmt(loopBody, outputStates, outputFailureStates)
+    }
+
+    methodBody = methodBody ++ methodBodyAndVars._1
+    methodLocalVars = methodLocalVars ++ methodBodyAndVars._2
+
+    // This is different when the rule is forAllExists
+    if (!decrExpr.isEmpty && rule != "forAllExistsRule") {
+      val translatedDecr = translateExp(decrExpr.get, state.localVar, outputStates, outputFailureStates)
+      // Assert that the current value of decrExpr is in the range of [0, t)
+      val decrPost = vpr.Forall(Seq(state), Seq.empty,
+                        vpr.Implies(getInSetApp(Seq(state.localVar, outputStates), typVarMap),
+                            vpr.And(vpr.GeCmp(translatedDecr, zero)(),
+                            vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
+                            )()
+                        )()
+                      )()
+      methodPosts = methodPosts :+ decrPost
+    }
+
+    val method = createViperMethod(methodName, methodArgs, Seq.empty, methodPres, methodPosts, methodBody, methodLocalVars.map(v => vpr.LocalVarDecl(v.name, v.typ)()), typVarMap)
+    Seq(method)
   }
 
   def translateInvariantVerificationInline(inv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, decrExpr: Option[Expr], currStates: vpr.LocalVar, currFailureStates: vpr.LocalVar, rule: String, typVarMap: Map[vpr.TypeVar, vpr.Type], isAutoSelected: Boolean): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
