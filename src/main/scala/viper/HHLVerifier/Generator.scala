@@ -707,7 +707,7 @@ object Generator {
 
               // Use the rule specified by the user
               if (rule == "desugaredRule" && !inline) {
-                newMethods = translateInvariantVerificationModular(normalizedInv, cond, body, decr, typVarMap)
+                newMethods = translateDesugaredInvariantVerificationModular(normalizedInv, cond, body, decr, typVarMap)
                 allMethods = allMethods ++ newMethods
               } else if (rule == "existsRule") {
                 // TODO: If existsRule is used but decr is empty, throw an exception!
@@ -926,42 +926,33 @@ object Generator {
       translateAssumeWithViperExpr(state, S1, rightExpr, typVarMap, triggers = Seq(trigger), useForAll = useForAll)
     }
 
-//    def createViperMethod(methodName: String, args:, res, pres:, posts, body: ): Unit = {
-//
-//    }
-
     def checkSyncCondModular(normalizedInv: Seq[Expr], body: CompositeStmt, loopGuard: Expr, typVarMap: Map[vpr.TypeVar, vpr.Type]): Boolean = {
       val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
+      val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
       val inputFailureStates = vpr.LocalVarDecl("S0_fail", getConcreteSetStateType(typVarMap))()
-      val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
+      val outputFailureStates = vpr.LocalVarDecl("SS_fail", getConcreteSetStateType(typVarMap))()
+
       val s1 = vpr.LocalVarDecl(s1VarName, getConcreteStateType(typVarMap))()
       val s2 = vpr.LocalVarDecl(s2VarName, getConcreteStateType(typVarMap))()
 
       // I
       val pre1 = getAllInvariantsWithTriggers(normalizedInv, inputStates.localVar, inputFailureStates.localVar)
       // All program variables are different
-      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))())
-      val allAtomicProgVarsInBody = allProgVarsInBody.filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList
-      val allProgVarsInBodyDecl = allAtomicProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)())
-      val allProgVarsWithValues = allAtomicProgVarsInBody.map(v => vpr.EqCmp(v, vpr.IntLit(allAtomicProgVarsInBody.indexOf(v))())())
-      val pre2: Seq[vpr.Exp] = if (allProgVarsWithValues.isEmpty) Seq.empty else Seq(allProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
+      val allProgVarsInLoopBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toSeq
+      val (allIntVars, _, pre2) = separateIntFromOthers(allProgVarsInLoopBody, Seq.empty)
 
       // post
       val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
-        vpr.And(getInSetApp(Seq(s1.localVar, inputStates.localVar), typVarMap), getInSetApp(Seq(s2.localVar, inputStates.localVar), typVarMap))(),
-        vpr.EqCmp(translateExp(loopGuard, s1.localVar, inputStates.localVar, inputFailureStates.localVar), translateExp(loopGuard, s2.localVar, inputStates.localVar, inputFailureStates.localVar))()
+        vpr.And(getInSetApp(Seq(s1.localVar, outputStates.localVar), typVarMap), getInSetApp(Seq(s2.localVar, outputStates.localVar), typVarMap))(),
+        vpr.EqCmp(translateExp(loopGuard, s1.localVar, outputStates.localVar, outputFailureStates.localVar), translateExp(loopGuard, s2.localVar, outputStates.localVar, outputFailureStates.localVar))()
       )())()
 
-      // method body
-      val inSetEq = inhaleInSetEqStmt(state, inputStates.localVar, typVarMap)
-      val inSetEqFail = inhaleInSetEqStmt(state, inputStates.localVar, typVarMap)
-
-      val method = vpr.Method(checkSyncCondMethodName,
-        Seq(inputStates, inputFailureStates) ++ allProgVarsInBodyDecl,
-        Seq.empty,
-        Seq(pre1) ++ pre2,
-        Seq(sameGuardValue),
-        Option(vpr.Seqn(inSetEq ++ inSetEqFail, Seq.empty)()))()
+      val method = createViperMethod(checkSyncCondMethodName,
+                      allIntVars.map(v => vpr.LocalVarDecl(v.name, v.typ)()), // Args
+                      Seq.empty,
+                      Seq(pre1) ++ pre2,  // Pres
+                      Seq(sameGuardValue),  // Posts
+                      Seq.empty, Seq.empty, typVarMap)
 
       val preamble = generatePreamble(typVarMap)
       val program = vpr.Program(preamble._1, Seq.empty, Seq.empty, Seq.empty, preamble._2 ++ Seq(method), Seq.empty)()
@@ -1005,35 +996,48 @@ object Generator {
       getAndOfExps(translatedInvs)
     }
 
-    def verifyStmtModular(methodName: String, stmt: Stmt, allProgVarsInStmt: Seq[vpr.LocalVar], pres: Seq[Expr], posts: Seq[Expr], typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Method = {
+    def createViperMethod(methodName: String, args: Seq[vpr.LocalVarDecl], res: Seq[vpr.LocalVarDecl], methodPres: Seq[vpr.Exp], methodPosts: Seq[vpr.Exp], body: Seq[vpr.Stmt], methodLocalVars: Seq[vpr.LocalVarDecl], typVarMap: Map[vpr.TypeVar, vpr.Type]) : vpr.Method = {
       val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
       val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
       val inputFailureStates = vpr.LocalVarDecl("S0_fail", getConcreteSetStateType(typVarMap))()
       val outputFailureStates = vpr.LocalVarDecl("SS_fail", getConcreteSetStateType(typVarMap))()
 
       val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
-      val tmpStates = vpr.LocalVar(tempStatesVarName, getConcreteSetStateType(typVarMap))()
-      val tmpFailureStates = vpr.LocalVar(tempFailedStatesVarName, getConcreteSetStateType(typVarMap))()
 
-      var args = Seq(inputStates, inputFailureStates)
-      var res = Seq(outputStates, outputFailureStates)
+      val methodArgs = Seq(inputStates, inputFailureStates) ++ args
+      val methodRes = Seq(outputStates, outputFailureStates) ++ res
       var methodBody: Seq[vpr.Stmt] = Seq.empty
-      var methodLocalVars: Seq[vpr.LocalVar] = Seq.empty
-      var methodPres = pres.map(i => getAssertionWithTriggers(i, inputStates.localVar, inputFailureStates.localVar))
-      var methodPosts = posts.map(i => translateExp(i, null, outputStates.localVar, outputFailureStates.localVar))
 
-      // The following statement assumes in_set_forall == in_set_exists for all states in S
+      // The following statement assumes in_set_forall == in_set_exists for all states in S0 and S0_fail
       val inSetEq = inhaleInSetEqStmt(state, inputStates.localVar, typVarMap)
       val inSetEqFail = inhaleInSetEqStmt(state, inputFailureStates.localVar, typVarMap)
       // SS := S0
       val assignToOutputStates = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
       // SS_fail := S0_fail
       val assignToOutputFailureStates = vpr.LocalVarAssign(outputFailureStates.localVar, inputFailureStates.localVar)()
-      methodLocalVars = methodLocalVars ++ Seq(tmpStates, tmpFailureStates)
       methodBody = methodBody ++ inSetEq ++ inSetEqFail ++ Seq(assignToOutputStates, assignToOutputFailureStates)
+      methodBody = methodBody ++ body
+
+      vpr.Method(methodName, methodArgs, methodRes, methodPres, methodPosts,
+        Option(vpr.Seqn(methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()))()))()
+    }
+
+    // TODO: refactor this
+    def verifyStmtModular(methodName: String, stmt: Stmt, allProgVarsInStmt: Seq[vpr.LocalVar], pres: Seq[Expr], posts: Seq[Expr], typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Method = {
+      val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
+      val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
+      val inputFailureStates = vpr.LocalVarDecl("S0_fail", getConcreteSetStateType(typVarMap))()
+      val outputFailureStates = vpr.LocalVarDecl("SS_fail", getConcreteSetStateType(typVarMap))()
+
+      val tmpStates = vpr.LocalVar(tempStatesVarName, getConcreteSetStateType(typVarMap))()
+      val tmpFailureStates = vpr.LocalVar(tempFailedStatesVarName, getConcreteSetStateType(typVarMap))()
+
+      var methodLocalVars = Seq(tmpStates, tmpFailureStates)
+      var methodPres = pres.map(i => getAssertionWithTriggers(i, inputStates.localVar, inputFailureStates.localVar))
+      val methodPosts = posts.map(i => translateExp(i, null, outputStates.localVar, outputFailureStates.localVar))
 
       val translatedStmt = translateStmt(stmt, outputStates.localVar, outputFailureStates.localVar)
-      methodBody = methodBody ++ translatedStmt._1
+      val methodBody = translatedStmt._1
 
       // Auxiliary Int variables produced when the encoding of stmt is generated
       val auxiliaryVars = translatedStmt._2.filter(v => v.typ == vpr.Int)
@@ -1045,14 +1049,29 @@ object Generator {
       val allIntProgVarsWithValues = allIntProgVarsInStmt.map(v => vpr.EqCmp(v, vpr.IntLit(allIntProgVarsInStmt.indexOf(v))())())
       val preVarsDiff: Seq[vpr.Exp] = if (allIntProgVarsWithValues.isEmpty) Seq.empty else Seq(allIntProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
       methodLocalVars = methodLocalVars ++ translatedStmt._2.diff(allIntProgVarsInStmt)
-      args = args ++ allAtomicProgVarsInStmtDecl ++ allNonAtomicProgVarsInStmtDecl
+      val args = allAtomicProgVarsInStmtDecl ++ allNonAtomicProgVarsInStmtDecl
       methodPres = methodPres ++ preVarsDiff
 
-      vpr.Method(methodName, args, res, methodPres, methodPosts,
-        Option(vpr.Seqn(methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()))()))()
+      createViperMethod(methodName, args, Seq.empty, methodPres, methodPosts, methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()), typVarMap)
     }
 
-    def translateInvariantVerificationModular(inv: Seq[Expr], loopGuard: Expr, body: CompositeStmt, decrExpr: Option[Expr], typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
+    def separateIntFromOthers(progVars: Seq[vpr.LocalVar], auxiliaryVars: Seq[vpr.LocalVar]): (Seq[vpr.LocalVar], Seq[vpr.LocalVar], Seq[vpr.Exp]) = {
+      val intAuxVars = auxiliaryVars.filter(v => v.typ == vpr.Int)
+      val otherAuxVars = auxiliaryVars.diff(intAuxVars)
+
+      val intProgVars = progVars.filter(v => v.typ == vpr.Int)
+      val otherProgVars = progVars.diff(intProgVars)
+
+      val allIntVars = intProgVars ++ intAuxVars
+      val allOtherVars = otherProgVars ++ otherAuxVars
+      val allIntVarsWithValues = allIntVars.map(v => vpr.EqCmp(v, vpr.IntLit(allIntVars.indexOf(v))())())
+      val exp: Seq[vpr.Exp] = if (allIntVarsWithValues.isEmpty) Seq.empty else Seq(allIntVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
+
+      (allIntVars, allOtherVars, exp)
+    }
+
+    // TODO: The following method is not tested after being refactored
+    def translateDesugaredInvariantVerificationModular(inv: Seq[Expr], loopGuard: Expr, body: CompositeStmt, decrExpr: Option[Expr], typVarMap: Map[vpr.TypeVar, vpr.Type]): Seq[vpr.Method] = {
       val methodName = checkInvMethodName + "_" + loopCounter
       val currLoopIndexDecl = vpr.LocalVarDecl(currLoopIndexName + loopCounter, vpr.Int)()
       val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
@@ -1085,11 +1104,6 @@ object Generator {
 
       val tmpStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
       val tmpFailureStates = vpr.LocalVarDecl(tempFailedStatesVarName, getConcreteSetStateType(typVarMap))()
-      // The following statement assumes in_set_forall == in_set_exists for all states in S
-      val inSetEq = inhaleInSetEqStmt(state, inputStates.localVar, typVarMap)
-      val inSetEqFail = inhaleInSetEqStmt(state, inputFailureStates.localVar, typVarMap)
-      val assignToOutputStates = vpr.LocalVarAssign(outputStates.localVar, inputStates.localVar)()
-      val assignToOutputFailureStates = vpr.LocalVarAssign(outputFailureStates.localVar, inputFailureStates.localVar)()
 
       // Translation of the loop body
       // val loopBodyFailureStates = vpr.LocalVarDecl(failedStatesVarName)
@@ -1099,26 +1113,22 @@ object Generator {
       val pre1 = vpr.GeCmp(currLoopIndexDecl.localVar, zero)()
       // Precondition 2: All program variables + auxiliary variables are different
       // (do so by assigning a distinct integer value to each of them)
-      val auxiliaryVars = loopBody._2.filter(v => v.typ.isInstanceOf[vpr.AtomicType])
-      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))())
-      val allAtomicProgVarsInBody = allProgVarsInBody.filter(v => v.typ.isInstanceOf[vpr.AtomicType]).toList ++ auxiliaryVars
-      val nonAtomicProgVarsInBody = allProgVarsInBody.filter(v => !v.typ.isInstanceOf[vpr.AtomicType])
-      val allProgVarsInBodyDecl = allAtomicProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)())
-      val allProgVarsWithValues = allAtomicProgVarsInBody.map(v => vpr.EqCmp(v, vpr.IntLit(allAtomicProgVarsInBody.indexOf(v))())())
-      val pre2: Seq[vpr.Exp] = if (allProgVarsWithValues.isEmpty) Seq.empty else Seq(allProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
+      val auxiliaryVars = loopBody._2
+      val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toSeq
+      val (allIntVars, otherVars, pre2) = separateIntFromOthers(allProgVarsInBody, auxiliaryVars)
+      val args = currLoopIndexDecl +: allIntVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
+      val methodLocalVars = Seq(tmpStates, tmpFailureStates) ++ otherVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
 
       // Assume loop guard
       val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), outputStates.localVar, null)
+      val methodBody = assumeLoopGuard._1 ++ loopBody._1
 
-      val methodBody = inSetEq ++ inSetEqFail ++ Seq(assignToOutputStates, assignToOutputFailureStates) ++ assumeLoopGuard._1 ++ loopBody._1
+      val thisMethod = createViperMethod(methodName,
+        args, Seq.empty,
+        Seq(pre1, In) ++ pre2 ++ decrExprPre,
+        Seq(InPlus1) ++ decrExprPost,
+        methodBody, methodLocalVars, typVarMap)
 
-      val thisMethod = vpr.Method(methodName,
-          Seq(currLoopIndexDecl, inputStates, inputFailureStates) ++ allProgVarsInBodyDecl ++ nonAtomicProgVarsInBody.map(v => vpr.LocalVarDecl(v.name, v.typ)()),  // args
-          Seq(outputStates, outputFailureStates),  // return values
-          Seq(pre1, In) ++ pre2 ++ decrExprPre,  // pre
-          Seq(InPlus1) ++ decrExprPost,  // post
-          Some(vpr.Seqn(methodBody, Seq(tmpStates, tmpFailureStates) ++ loopBody._2.diff(allAtomicProgVarsInBody).map(v => vpr.LocalVarDecl(v.name, v.typ)()))())    // body
-        )()
       Seq(thisMethod)
     }
 
