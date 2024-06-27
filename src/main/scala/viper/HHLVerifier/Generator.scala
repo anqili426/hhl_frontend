@@ -724,7 +724,8 @@ object Generator {
                     newStmts = newStmts ++ invVerification._1
                     newVars = newVars ++ invVerification._2
                   } else {
-                    allMethods = allMethods ++ translateInvariantVerificationModular(normalizedInv, cond, body, decr, rule, typVarMap, isAutoSelected)
+                    val newMethod = translateInvariantVerificationModular(normalizedInv, cond, body, decr, rule, typVarMap, isAutoSelected)
+                    allMethods = allMethods ++ newMethod
                   }
               }
 
@@ -1321,9 +1322,9 @@ object Generator {
     if (!decrExpr.isEmpty) {
       //  t == decrExpr for all states
       val translatedDecr = translateExp(decrExpr.get, state.localVar, inputStates, inputFailureStates)
-      val trigger = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state.localVar, inputStates), typVarMap)))())
+      val trigger = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited=true)))())
       val decrPre = vpr.Forall(Seq(state), trigger,
-                      vpr.Implies(getInSetApp(Seq(state.localVar, inputStates), typVarMap),
+                      vpr.Implies(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited=true),
                       vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
                     )())()
       methodPres = methodPres :+ decrPre
@@ -1335,7 +1336,7 @@ object Generator {
     methodLocalVars = methodLocalVars ++ otherVars
     methodPres = methodPres ++ pre2
 
-    val trigger = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state.localVar, outputStates), typVarMap, useLimited=true)))())
+    val trigger = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state.localVar, outputStates), typVarMap)))())
     val loopGuardHoldsForAll = vpr.Forall(Seq(state), trigger, vpr.Implies(
       getInSetApp(Seq(state.localVar, outputStates), typVarMap),
       translateExp(loopGuard, state.localVar, outputStates, outputFailureStates)
