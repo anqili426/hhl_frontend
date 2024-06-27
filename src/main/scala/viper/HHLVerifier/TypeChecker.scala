@@ -93,6 +93,8 @@ object TypeChecker {
           res = res && checkIfTypeMatch(i.typ, boolType)
         })
         if (!isHyperAssertion) throw TypeException("At least one loop invariant is not a hyper assertion")
+        if (rule == "existsRule" && decr.isEmpty) throw UnknownException("To use the exists rule, the loop itself must have a decreases clause")
+        if (rule == "existsRule" && !Generator.autoSelectRules) throw UnknownException("To use the exists rule, users must enable auto-selection of loop rules")
         if (!decr.isEmpty) {
           typeCheckExpr(decr.get, false)
           res = res && checkIfTypeMatch(decr.get.typ, intType)

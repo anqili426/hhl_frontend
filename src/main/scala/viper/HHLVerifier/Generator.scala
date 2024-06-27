@@ -596,6 +596,7 @@ object Generator {
             if (!isAutoSelected) normalizedInv.foreach(i => Normalizer.detQuantifier(i, false))
 
             if (autoSelectRules && rule == "unspecified") {
+              // Automatic selection of loop rules
               val loopStates = vpr.LocalVar("S_loop" + loopCounter, currStates.typ)()
               val havocCurrStates = havocSetMethodCall(loopStates)
               val havocFailureStates = havocSetMethodCall(loopFailureStates)
@@ -617,6 +618,8 @@ object Generator {
               newVars = newVars ++ Seq(loopStates, checkRuleCond)
 
               val normalizedInvWithHints = normalizedInv.map(i => (Option.empty, i))
+
+              // Check whether sync(Tot) rule can be applied with a separate Viper program
               val canUseSyncRule = checkSyncCondModular(normalizedInv, body, cond, typVarMap)
               Main.printMsg("Can use sync rule? " + canUseSyncRule)
               if (canUseSyncRule) {
@@ -632,6 +635,7 @@ object Generator {
                 newStmts = newStmts ++ useSyncRule._1
                 newVars = newVars ++ useSyncRule._2
               } else {
+                // Sync(Tot) rule cannot be applied, then check if the invariants have a top-level existential quantifier over states
                 val invHasTopExists = !normalizedInvWithHints.filter(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists).isEmpty
                 val useNotSyncRule = if (invHasTopExists) {
                   // exists rule
@@ -678,6 +682,8 @@ object Generator {
 //              newStmts = newStmts :+ applyRule
 //              newVars = newVars ++ useSyncRule._2 ++ useNotSyncRule._2
             } else {
+              // A rule has been determined, either automatically or by the user
+
               if (!isAutoSelected && !syncTotWarningPrinted && postIsTopExists && rule != "syncTotRule" && rule != "existsRule") {
                 println("Warning: method " + currMethod.mName + " has a postcondition " +
                   "which has a top-level existential quantifier over states, \n " +
@@ -708,17 +714,16 @@ object Generator {
               newStmts = newStmts ++ Seq(assumeEmptyFailureStates, assertI0)
 
               // Use the rule specified by the user
+              // DesugaredRule should be deprecated at some point
               if (rule == "desugaredRule" && !inline) {
                 newMethods = translateDesugaredInvariantVerificationModular(normalizedInv, cond, body, decr, typVarMap)
                 allMethods = allMethods ++ newMethods
               } else if (rule == "existsRule") {
-                // TODO: If existsRule is used but decr is empty, throw an exception!
-                // TODO: If existsRule is used but autoSelect is turned off, throw an exception!
-                newMethods = Seq(translateExistsRuleCond1(normalizedInv, cond, body, decr.get, typVarMap))
-                newMethods = newMethods :+ translateExistsRuleCond2(normalizedInv, cond, body, decr.get, typVarMap)
+                val newMethod1 = translateExistsRuleCond1(normalizedInv, cond, body, decr.get, typVarMap)
+                val newMethod2 = translateExistsRuleCond2(normalizedInv, cond, body, decr.get, typVarMap)
+                val newMethods = Seq(newMethod1, newMethod2)
                 allMethods = allMethods ++ newMethods
-              }
-              else  {
+              } else  {
                   if (inline) {
                     val invVerification = translateInvariantVerificationInline(normalizedInv, cond, body, decr, currStates, loopFailureStates, rule, typVarMap, isAutoSelected)
                     newStmts = newStmts ++ invVerification._1
