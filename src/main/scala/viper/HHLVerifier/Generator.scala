@@ -624,10 +624,12 @@ object Generator {
               Main.printMsg("Can use sync rule? " + canUseSyncRule)
               if (canUseSyncRule) {
                 val useSyncRule = if (loop.isTotal) {
+                  Main.printMsg("Applying syncTotRule")
                   val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncTotRule")
                   dupLoop.isTotal = true
                   translateStmt(dupLoop, currStates, currFailureStates, true)
                 } else {
+                  Main.printMsg("Applying syncRule")
                   val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncRule")
                   dupLoop.isTotal = false
                   translateStmt(dupLoop, currStates, currFailureStates, true)
@@ -639,11 +641,13 @@ object Generator {
                 val invHasTopExists = !normalizedInvWithHints.filter(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists).isEmpty
                 val useNotSyncRule = if (invHasTopExists) {
                   // exists rule
+                  Main.printMsg("Applying existsRule")
                   val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "existsRule")
                   dupLoop.isTotal = loop.isTotal
                   translateStmt(dupLoop, currStates, currFailureStates, true)
                 } else {
                   // forall-exists rule
+                  Main.printMsg("Applying forAllExistsRule")
                   val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "forAllExistsRule")
                   dupLoop.isTotal = loop.isTotal
                   translateStmt(dupLoop, currStates, currFailureStates, true)
@@ -696,13 +700,12 @@ object Generator {
               if (rule=="forAllExistsRule") {
                 normalizedInv.foreach(i => {
                   val canUseForAllExistsRule = checkForAllExistsRuleSideCondition(i, false)
-                  if (!canUseForAllExistsRule){
+                  if (!canUseForAllExistsRule) {
                     if (!isAutoSelected) throw UnknownException("When using forAllExistsRule, the invariant must satisfy the condition " +
                       "that there are no forall quantifiers over states after an exists quantifier. ")
                     else {
-                      println("Warning: the verifier will not automatically apply forAllExistsRule because at least one of the invariants does not satisfy the condition " +
-                        "that there are no forall quantifiers over states after an exists quantifier. Only syncRule or syncTotRule might be applied. ")
-                      return (newStmts, newVars)
+                      throw UnknownException("The forAllExistsRule automatically selected cannot be applied, because at least one of the invariants does not satisfy the condition " +
+                        "that there are no forall quantifiers over states after an exists quantifier. Please revise the loop invariants. ")
                     }
                   }
                 })
