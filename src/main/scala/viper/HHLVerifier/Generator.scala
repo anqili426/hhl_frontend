@@ -1,5 +1,6 @@
 package viper.HHLVerifier
 
+import viper.HHLVerifier
 import viper.silver.{ast => vpr}
 
 import scala.collection.immutable.Seq
@@ -35,8 +36,10 @@ object Generator {
 
   val typeVar = vpr.TypeVar("T")
   val defaultTypeVarMap = Map(typeVar -> typeVar)
+  val TtoIntMap = Map(typeVar -> vpr.Int)
   val stateType = getConcreteStateType(defaultTypeVarMap)   // Type State[T]
   val setStateType = getConcreteSetStateType(defaultTypeVarMap) // Type SetState[T]
+  val intStateType = getConcreteStateType(TtoIntMap)
 
   val sVarName = "s"
   val s0VarName = "s0"
@@ -119,7 +122,6 @@ object Generator {
     var predicates: Seq[vpr.Predicate] = Seq.empty
     var extensions: Seq[vpr.ExtensionMember] = Seq.empty
 
-    val TtoIntMap = Map(typeVar -> vpr.Int)
     val preamble = generatePreamble(Map(typeVar -> vpr.Int))
     allDomains = allDomains ++ preamble._1
     allMethods = allMethods ++ preamble._2
@@ -638,7 +640,7 @@ object Generator {
                 newVars = newVars ++ useSyncRule._2
               } else {
                 // Sync(Tot) rule cannot be applied, then check if the invariants have a top-level existential quantifier over states
-                val invHasTopExists = !normalizedInvWithHints.filter(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists).isEmpty
+                val invHasTopExists = normalizedInvWithHints.map(i => checkHasTopExists(i._2)).contains(true)
                 val useNotSyncRule = if (invHasTopExists) {
                   // exists rule
                   Main.printMsg("Applying existsRule")
@@ -687,7 +689,6 @@ object Generator {
 //              newVars = newVars ++ useSyncRule._2 ++ useNotSyncRule._2
             } else {
               // A rule has been determined, either automatically or by the user
-
               if (!isAutoSelected && !syncTotWarningPrinted && postIsTopExists && rule != "syncTotRule" && rule != "existsRule") {
                 println("Warning: method " + currMethod.mName + " has a postcondition " +
                   "which has a top-level existential quantifier over states, \n " +
@@ -709,6 +710,12 @@ object Generator {
                     }
                   }
                 })
+              }
+
+              if (!isAutoSelected && rule == "existsRule") {
+                val invHasTopExists = normalizedInv.map(i => checkHasTopExists(i)).contains(true)
+                if (!invHasTopExists) throw UnknownException("To use the existsRule, at least one of the invariants must contain a top-level " +
+                                                              "existential quantifier that quantifies over states")
               }
 
               // Assert I(0)
@@ -760,6 +767,7 @@ object Generator {
                 val translatedInv = getAllInvariantsWithTriggers(normalizedInv, STmp, loopFailureStates)
                 newStmts = newStmts :+ vpr.Inhale(translatedInv)()
               } else {
+                // Desugared rule
                 // Let currStates be a union of Sk's
                 // TODO: this needs to be updated to handle S_fail
                 val k = vpr.LocalVarDecl(kVarName, vpr.Int)()
@@ -954,7 +962,9 @@ object Generator {
       val pre1 = getAllInvariantsWithTriggers(normalizedInv, inputStates.localVar, inputFailureStates.localVar)
       // All program variables are different
       val allProgVarsInLoopBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toSeq
-      val (allIntVars, _, pre2) = separateIntFromOthers(allProgVarsInLoopBody, Seq.empty)
+      val (allIntVars, stateVars, allOtherVars, pre2) = separateVarsByType(allProgVarsInLoopBody)
+
+      val args = (allIntVars ++ stateVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
 
       // post
       val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
@@ -963,7 +973,7 @@ object Generator {
       )())()
 
       val method = createViperMethod(checkSyncCondMethodName,
-                      allIntVars.map(v => vpr.LocalVarDecl(v.name, v.typ)()), // Args
+                      args, // Args
                       Seq.empty,
                       Seq(pre1) ++ pre2,  // Pres
                       Seq(sameGuardValue),  // Posts
@@ -1049,7 +1059,6 @@ object Generator {
         Option(vpr.Seqn(methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()))()))()
     }
 
-    // TODO: refactor this
     def verifyStmtModular(methodName: String, stmt: Stmt, allProgVarsInStmt: Seq[vpr.LocalVar], pres: Seq[Expr], posts: Seq[Expr], typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Method = {
       val inputStates = vpr.LocalVarDecl("S0", getConcreteSetStateType(typVarMap))()
       val outputStates = vpr.LocalVarDecl("SS", getConcreteSetStateType(typVarMap))()
@@ -1065,18 +1074,12 @@ object Generator {
 
       val translatedStmt = translateStmt(stmt, outputStates.localVar, outputFailureStates.localVar)
       val methodBody = translatedStmt._1
+      val auxiliaryVars = translatedStmt._2
 
-      // Auxiliary Int variables produced when the encoding of stmt is generated
-      val auxiliaryVars = translatedStmt._2.filter(v => v.typ == vpr.Int)
-      // All the program variables that occur in stmt
-      val allIntProgVarsInStmt = allProgVarsInStmt.filter(v => v.typ == vpr.Int).toList ++ auxiliaryVars
-      val allNonIntProgVarsInStmt = allProgVarsInStmt.filter(v => v.typ != vpr.Int)
-      val allAtomicProgVarsInStmtDecl = allIntProgVarsInStmt.map(v => vpr.LocalVarDecl(v.name, v.typ)())
-      val allNonAtomicProgVarsInStmtDecl = allNonIntProgVarsInStmt.map(v => vpr.LocalVarDecl(v.name, v.typ)())
-      val allIntProgVarsWithValues = allIntProgVarsInStmt.map(v => vpr.EqCmp(v, vpr.IntLit(allIntProgVarsInStmt.indexOf(v))())())
-      val preVarsDiff: Seq[vpr.Exp] = if (allIntProgVarsWithValues.isEmpty) Seq.empty else Seq(allIntProgVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
-      methodLocalVars = methodLocalVars ++ translatedStmt._2.diff(allIntProgVarsInStmt)
-      val args = allAtomicProgVarsInStmtDecl ++ allNonAtomicProgVarsInStmtDecl
+      val (allIntProgVars, stateVars, _, _) = separateVarsByType(allProgVarsInStmt)
+      val (allIntVars, _, allOtherVars, preVarsDiff) = separateVarsByType(allIntProgVars ++ auxiliaryVars)
+      methodLocalVars = methodLocalVars ++ allOtherVars
+      val args = (allIntVars ++ stateVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
       methodPres = methodPres ++ preVarsDiff
 
       createViperMethod(methodName, args, Seq.empty, methodPres, methodPosts, methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()), typVarMap)
@@ -1084,19 +1087,14 @@ object Generator {
 
     // This returns a sequence of int variables and a sequence of non-int variables
     // And an expression that ensures that all int variables are unique
-    def separateIntFromOthers(progVars: Seq[vpr.LocalVar], auxiliaryVars: Seq[vpr.LocalVar]): (Seq[vpr.LocalVar], Seq[vpr.LocalVar], Seq[vpr.Exp]) = {
-      val intAuxVars = auxiliaryVars.filter(v => v.typ == vpr.Int)
-      val otherAuxVars = auxiliaryVars.diff(intAuxVars)
-
-      val intProgVars = progVars.filter(v => v.typ == vpr.Int)
-      val otherProgVars = progVars.diff(intProgVars)
-
-      val allIntVars = intProgVars ++ intAuxVars
-      val allOtherVars = otherProgVars ++ otherAuxVars
+    def separateVarsByType(vars: Seq[vpr.LocalVar]): (Seq[vpr.LocalVar], Seq[vpr.LocalVar], Seq[vpr.LocalVar], Seq[vpr.Exp]) = {
+      val allIntVars = vars.filter(v => v.typ == vpr.Int)
+      val stateVars = vars.filter(v => v.typ.toString() == intStateType.toString())
+      val allOtherVars = vars.diff(allIntVars ++ stateVars)
       val allIntVarsWithValues = allIntVars.map(v => vpr.EqCmp(v, vpr.IntLit(allIntVars.indexOf(v))())())
       val exp: Seq[vpr.Exp] = if (allIntVarsWithValues.isEmpty) Seq.empty else Seq(allIntVarsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
 
-      (allIntVars, allOtherVars, exp)
+      (allIntVars, stateVars, allOtherVars, exp)
     }
 
     // TODO: The following method is not tested after being refactored
@@ -1144,8 +1142,8 @@ object Generator {
       // (do so by assigning a distinct integer value to each of them)
       val auxiliaryVars = loopBody._2
       val allProgVarsInBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toSeq
-      val (allIntVars, otherVars, pre2) = separateIntFromOthers(allProgVarsInBody, auxiliaryVars)
-      val args = currLoopIndexDecl +: allIntVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
+      val (allIntVars, stateVars, otherVars, pre2) = separateVarsByType(allProgVarsInBody ++ auxiliaryVars)
+      val args = currLoopIndexDecl +: (allIntVars ++ stateVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
       val methodLocalVars = Seq(tmpStates, tmpFailureStates) ++ otherVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
 
       // Assume loop guard
@@ -1262,17 +1260,17 @@ object Generator {
     var pres: Seq[Expr] = Seq.empty
     var posts: Seq[Expr] = Seq.empty
 
-    normalizedInvs.foreach(i => {
-      if (checkHasTopExists(i)) {
-        val exprAddedToPre = BinaryExpr(loopGuard, "&&", BinaryExpr(tProgVar, "==", decrExpr))
-        pres = pres :+ addToTopExists(i, exprAddedToPre)
-        val exprAddedToPost = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
-        posts = posts :+ addToTopExists(i, exprAddedToPost)
-      } else {
-        pres = pres :+ i
-        posts = posts :+ i
-      }
-    })
+    // Find the first invariant that contains a top-level existential quantifier
+    val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i) == true).get
+    pres = normalizedInvs.diff(Seq(firstExistsInv))
+    posts = pres
+
+    val exprAddedToPre = BinaryExpr(loopGuard, "&&", BinaryExpr(tProgVar, "==", decrExpr))
+    pres = pres :+ addToTopExists(firstExistsInv, exprAddedToPre)
+
+    val exprAddedToPost = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
+    posts = posts :+ addToTopExists(firstExistsInv, exprAddedToPost)
+
     verifyStmtModular(methodName, stmt, varsInStmt, pres, posts, typVarMap)
   }
 
@@ -1282,18 +1280,18 @@ object Generator {
     var pres: Seq[Expr] = Seq.empty
     var posts: Seq[Expr] = Seq.empty
 
-    normalizedInvs.foreach(i => {
-      if (checkHasTopExists(i)) {
-        val newInv = removeTopExistsState(i, "")
-        pres = pres :+ newInv
-        posts = posts :+ newInv
-        val newState = vpr.LocalVar(stateAliasPrefix + stateRemoved, getConcreteStateType(typVarMap))()
-        varsInStmt = varsInStmt :+ newState
-      } else {
-        pres = pres :+ i
-        posts = posts :+ i
-      }
-    })
+    // Find the first invariant that contains a top-level existential quantifier
+    val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i) == true).get
+    pres = normalizedInvs.diff(Seq(firstExistsInv))
+    posts = pres
+
+    val newInv = removeTopExistsState(firstExistsInv, "")
+    val newState = vpr.LocalVar(stateAliasPrefix + stateRemoved, getConcreteStateType(typVarMap))()
+    varsInStmt = varsInStmt :+ newState
+    body.allProgVars +=  (newState.name -> StateType())
+    pres = pres :+ newInv
+    posts = posts :+ newInv
+
     val stmt = WhileLoopStmt(loopGuard, body, pres.map(i => (Option.empty, i)), Option(decrExpr))
     verifyStmtModular(methodName, stmt, varsInStmt, pres, posts, typVarMap)
   }
@@ -1339,7 +1337,7 @@ object Generator {
     }
 
     val allVars = loopBody.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toSeq
-    val (_, otherVars, pre2) = separateIntFromOthers(allVars, Seq(t))
+    val (_, _, otherVars, pre2) = separateVarsByType(allVars :+ t)
     methodArgs = methodArgs ++ allVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
     methodLocalVars = methodLocalVars ++ otherVars
     methodPres = methodPres ++ pre2
