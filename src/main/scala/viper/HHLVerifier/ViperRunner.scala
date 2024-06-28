@@ -78,6 +78,7 @@ object ViperRunner {
               case ResSuccess =>
                 // If carbon verifies successfully, can terminate with success
                 carbonVerified = 2
+                printMsg("Carbon succeeded")
                 resPromise.trySuccess(result)
               case ResFailure(err) =>
                 // If carbon fails to verify, then
@@ -89,7 +90,7 @@ object ViperRunner {
                 if (!resPromise.isCompleted) {
                   carbonVerified = 1
                   if (!checkSideCondition) {
-                    printMsg("Carbon: ")
+                    printMsg("Carbon failed: ")
                     err.foreach(e => printMsg(e.readableMessage))
                   }
                   if (!siliconRes.isCompleted) Await.result(siliconRes, singleTimeout.seconds) // Wait for silicon to terminate
@@ -104,12 +105,13 @@ object ViperRunner {
             result match {
               case ResSuccess =>
                 siliconVerified = 2
+                printMsg("Silicon succeeded")
                 resPromise.trySuccess(result)
               case ResFailure(err) =>
                 if (!resPromise.isCompleted) {
                   siliconVerified = 1
                   if (!checkSideCondition) {
-                    printMsg("Silicon: ")
+                    printMsg("Silicon failed: ")
                     err.foreach(e => printMsg(e.readableMessage))
                   }
                   if (!carbonRes.isCompleted) Await.result(carbonRes, singleTimeout.seconds) // Wait for carbon to terminate
