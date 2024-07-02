@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at:
+
 method smith(secret: Int, i: Int) returns (res: Int)
 requires exists <_s1> :: _s1[i] == 1 && (forall <_s2> :: _s2[i] == 2 ==> _s1[secret] == _s2[secret] + 1)
 ensures exists <_s1> :: _s1[i] == 1 && (forall <_s2> :: _s2[i] == 2 ==> _s2[res] != _s1[res])

@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at: https://github.com/rcdickerson/orhle/blob/6f699e0809cc59e89ca2dd47a735fe1a6dc7a100/experiments/param-usage/nondet-unused.imp
+
 method unused(p1: Int, p2: Int, i: Int) returns (res: Int)
 requires forall <_s1a>, <_s2a> :: _s1a[i] == 1 && _s2a[i] == 2 ==>
                     (exists <_s1b>, <_s2b> :: _s1b[i] == 3 && _s2b[i] == 4 &&

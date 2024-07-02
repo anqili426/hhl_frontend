@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at: https://github.com/rcdickerson/orhle/blob/6f699e0809cc59e89ca2dd47a735fe1a6dc7a100/experiments/gni/denning3.imp
+
 method denning3(e_in: Int, i_in: Int, f_in: Int, x_in: Int, sum_in: Int, t: Int)
 returns (e_out: Int, i_out: Int, f_out: Int, x_out: Int, sum_out: Int, res: Int)
 requires forall <_s1>, <_s2> :: (_s1[t] == 1 && _s2[t] == 2) ==> (_s1[e_in] == _s2[e_in] && _s1[i_in] == _s2[i_in])

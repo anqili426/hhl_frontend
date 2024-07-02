@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at: https://zenodo.org/records/7086340 (File: orhle-aplas2022/orhle/experiments/param-usage/even-odd.imp)
+
 method used (p: Int, i: Int) returns (res: Int)
 requires forall <_s1> :: _s1[i] == 1 ==> (exists <_s2> :: _s2[i] == 2 && _s1[p] != _s2[p])
 requires exists <_s1> :: _s1[i] == 1 && _s1[p] % 2 == 0 && (forall <_s2> :: _s2[i] == 2 ==> _s2[p] % 2 == 1)

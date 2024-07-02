@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at: https://github.com/rcdickerson/orhle/blob/6f699e0809cc59e89ca2dd47a735fe1a6dc7a100/experiments/delimited-release/parity.imp
+
 method parity(h_in: Int, l_in: Int, i: Int) returns (h_out: Int, l_out: Int)
 requires exists <_s> :: _s[i] == 2
 requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>

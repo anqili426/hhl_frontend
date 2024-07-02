@@ -1,4 +1,8 @@
-method test() returns (sum: Int) 
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at: https://github.com/rcdickerson/orhle/blob/6f699e0809cc59e89ca2dd47a735fe1a6dc7a100/experiments/sandbox/alternate.imp
+
+method test() returns (sum: Int)
 requires exists <_s> :: true
 ensures exists <_s> :: _s[sum] == 0
 {

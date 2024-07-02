@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at: https://github.com/rcdickerson/orhle/blob/6f699e0809cc59e89ca2dd47a735fe1a6dc7a100/experiments/gni/nondet-leak2.imp
+
 method leak2(high: Int, low: Int, i: Int) returns (res: Int)
 requires exists <_s> :: _s[i] == 2
 requires forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==> (_s1[low] == _s2[low])
