@@ -31,6 +31,7 @@ object Main {
       println("Warning: turning on existential framing might cause non-termination.")
     }
     if (args.contains("--inline")) Generator.inline = true
+    if (args.contains("--modularCheckSyncCond")) Generator.modularCheckSyncCond = true
     if (args.contains("--auto")) Generator.autoSelectRules = true
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1

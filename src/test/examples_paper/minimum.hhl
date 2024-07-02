@@ -13,7 +13,7 @@ ensures exists <_s> :: (forall <_s1> :: _s[x] <= _s1[x] && _s[y] <= _s1[y])
     invariant forall <_s1>, <_s2> :: _s1[n] == _s2[n] && _s1[i] == _s2[i]
     decreases n - i
     {
-        havoc i {hint}
+        havoc r {hint}
         assume r >= 5
         use hint(5)
         x := x + y + 2 * i + 3 * r
