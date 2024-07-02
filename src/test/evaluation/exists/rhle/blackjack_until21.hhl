@@ -4,7 +4,7 @@ ensures exists <_s> :: _s[handValue_out] == 21
 {
     handValue_out := handValue_in
 
-    while existsRule (handValue_out < 21)
+    while (handValue_out < 21)
 		invariant exists <_s> :: _s[handValue_out] <= 21
 		decreases 31 - handValue_out
     {

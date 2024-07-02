@@ -599,25 +599,25 @@ object Generator {
 
             if (autoSelectRules && rule == "unspecified") {
               // Automatic selection of loop rules
-              val loopStates = vpr.LocalVar("S_loop" + loopCounter, currStates.typ)()
-              val havocCurrStates = havocSetMethodCall(loopStates)
-              val havocFailureStates = havocSetMethodCall(loopFailureStates)
-
-              val inSetEq = inhaleInSetEqStmt(stateDecl, loopStates, typVarMap)
-              val inSetEqFail = inhaleInSetEqStmt(stateDecl, loopFailureStates, typVarMap)
-              val inhaleI = vpr.Inhale(getAllInvariantsWithTriggers(normalizedInv, loopStates, loopFailureStates))()
-
-              val checkRuleCond = vpr.LocalVar(checkSyncCondName + loopCounter, vpr.Bool)()
-              val s1 = vpr.LocalVarDecl(s1VarName, getConcreteStateType(typVarMap))()
-              val s2 = vpr.LocalVarDecl(s2VarName, getConcreteStateType(typVarMap))()
-              val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
-                vpr.And(getInSetApp(Seq(s1.localVar, loopStates), typVarMap), getInSetApp(Seq(s2.localVar, loopStates), typVarMap))(),
-                vpr.EqCmp(translateExp(cond, s1.localVar, loopStates, loopFailureStates), translateExp(cond, s2.localVar, loopStates, loopFailureStates))()
-              )())()
-              val assignToCondVar = vpr.LocalVarAssign(checkRuleCond, sameGuardValue)()
-
-              newStmts = newStmts ++ Seq(havocCurrStates, havocFailureStates) ++ inSetEq ++ inSetEqFail ++ Seq(inhaleI, assignToCondVar)
-              newVars = newVars ++ Seq(loopStates, checkRuleCond)
+//              val loopStates = vpr.LocalVar("S_loop" + loopCounter, currStates.typ)()
+//              val havocCurrStates = havocSetMethodCall(loopStates)
+//              val havocFailureStates = havocSetMethodCall(loopFailureStates)
+//
+//              val inSetEq = inhaleInSetEqStmt(stateDecl, loopStates, typVarMap)
+//              val inSetEqFail = inhaleInSetEqStmt(stateDecl, loopFailureStates, typVarMap)
+//              val inhaleI = vpr.Inhale(getAllInvariantsWithTriggers(normalizedInv, loopStates, loopFailureStates))()
+//
+//              val checkRuleCond = vpr.LocalVar(checkSyncCondName + loopCounter, vpr.Bool)()
+//              val s1 = vpr.LocalVarDecl(s1VarName, getConcreteStateType(typVarMap))()
+//              val s2 = vpr.LocalVarDecl(s2VarName, getConcreteStateType(typVarMap))()
+//              val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
+//                vpr.And(getInSetApp(Seq(s1.localVar, loopStates), typVarMap), getInSetApp(Seq(s2.localVar, loopStates), typVarMap))(),
+//                vpr.EqCmp(translateExp(cond, s1.localVar, loopStates, loopFailureStates), translateExp(cond, s2.localVar, loopStates, loopFailureStates))()
+//              )())()
+//              val assignToCondVar = vpr.LocalVarAssign(checkRuleCond, sameGuardValue)()
+//
+//              newStmts = newStmts ++ Seq(havocCurrStates, havocFailureStates) ++ inSetEq ++ inSetEqFail ++ Seq(inhaleI, assignToCondVar)
+//              newVars = newVars ++ Seq(loopStates, checkRuleCond)
 
               val normalizedInvWithHints = normalizedInv.map(i => (Option.empty, i))
 
@@ -1355,6 +1355,7 @@ object Generator {
 
     if (rule == "syncRule" || rule == "syncTotRule") {
       // Assert that all states have the same loop guard value
+      // TODO: with the following assertion, verification is faster than without
       if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)()
       // Assume that the loop guard holds in all states
       methodBody = methodBody :+ vpr.Inhale(loopGuardHoldsForAll)()

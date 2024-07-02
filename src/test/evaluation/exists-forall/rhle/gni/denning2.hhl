@@ -16,7 +16,7 @@ ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==>
     f1_out := f1_in
     f2_out := f2_in
 
-    while syncTotRule (i <= 100)
+    while (i <= 100)
     invariant forall <_s1>, <_s2> :: _s1[i] == _s2[i]
     invariant exists <_s1> :: _s1[t] == 1 && _s1[f1_out] != 0 && _s1[f3_in] > 0 &&
                         (forall <_s2> :: _s2[t] == 2 ==> _s1[f1_out] == _s2[f1_out] &&
