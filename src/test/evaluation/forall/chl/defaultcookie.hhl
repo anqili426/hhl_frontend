@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Marcelo Sousa and Isil Dillig. 2016. Cartesian hoare logic for verifying k-safety properties.
+// Available at: https://github.com/marcelosousa/descartes/blob/5eb0eea96200d04073d4b9edcbe333036391e66a/benchmarks/pldi-16/industrial/equals/DefaultCookie.java
+
 // Symmetric
 method compare1(name1: Int, domain1: Int, path1: Int, name2: Int, domain2: Int, path2: Int, i: Int) returns (res: Int)
 requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>

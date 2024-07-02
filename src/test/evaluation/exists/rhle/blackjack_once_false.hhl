@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at:
+
 method test(handValue_in: Int) returns (handValue_out: Int)
 requires exists <_s> :: _s[handValue_in] >= 2 && _s[handValue_in] <= 20
 ensures exists <_s> :: _s[handValue_out] == 21

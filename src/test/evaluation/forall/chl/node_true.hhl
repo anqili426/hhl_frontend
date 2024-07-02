@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Marcelo Sousa and Isil Dillig. 2016. Cartesian hoare logic for verifying k-safety properties.
+// Available at: https://github.com/marcelosousa/descartes/blob/5eb0eea96200d04073d4b9edcbe333036391e66a/benchmarks/pldi-16/stackoverflow/Node-true.java
+
 // P1
 method compare1(containsKey1: Int, order1: Int, containsKey2: Int, order2: Int, i: Int) returns (res: Int)
 requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>

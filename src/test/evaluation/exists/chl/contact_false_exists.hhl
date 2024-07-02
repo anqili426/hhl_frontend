@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Marcelo Sousa and Isil Dillig. 2016. Cartesian hoare logic for verifying k-safety properties.
+// Available at: https://github.com/marcelosousa/descartes/blob/5eb0eea96200d04073d4b9edcbe333036391e66a/benchmarks/pldi-16/stackoverflow/Contact-false.java
+
 // P2
 method compare2(firstName1: Int, lastName1: Int, emails1: Int, firstName2: Int, lastName2: Int, emails2: Int, i: Int) returns (res: Int)
 requires exists <_s1>, <_s2>, <_s3> :: _s1[i] == 1 && _s2[i] == 2 && _s3[i] == 3 &&
