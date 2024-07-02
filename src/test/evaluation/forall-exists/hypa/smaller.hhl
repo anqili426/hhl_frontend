@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Raven Beutner and Bernd Finkbeiner. 2022. Software Verification of Hyperproperties Beyond k-Safety.
+// Available at: https://github.com/hypa-tool/hypa/tree/30fae4f17fbdb03a0acbf837ccbf2d16e9abebbe/benchmarks/beyond/smaller
+
 method smaller() returns (x: Int)
 ensures forall <_s1> :: (exists <_s2> :: _s2[x] <= _s1[x])
 {

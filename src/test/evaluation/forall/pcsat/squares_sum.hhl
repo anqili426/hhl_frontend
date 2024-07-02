@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Hiroshi Unno, Tachio Terauchi and Eric Koskinen. 2021. Constraint-Based Relational Verification.
+// Available at: https://github.com/hiroshi-unno/coar/blob/299e979bfce7d9b0532586bfc42b449fd0451531/benchmarks/pfwnCSP/cav2021rel/SquareSum.clp
+
 method test(a: Int, b: Int, i: Int) returns (c: Int)
 requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
         _s1[a] < _s2[a] && _s1[b] > _s2[b]

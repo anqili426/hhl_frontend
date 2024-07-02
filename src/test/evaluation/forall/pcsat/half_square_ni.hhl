@@ -1,3 +1,7 @@
+// Original benchmark:
+// Source: Hiroshi Unno, Tachio Terauchi and Eric Koskinen. 2021. Constraint-Based Relational Verification.
+// Available at: https://github.com/hiroshi-unno/coar/blob/299e979bfce7d9b0532586bfc42b449fd0451531/benchmarks/pfwnCSP/cav2021rel/HalfSquareNI.clp
+
 method test(h: Int, low: Int) returns (y: Int)
 requires forall <_s1>, <_s2> :: _s1[low] == _s2[low]
 ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y] 
