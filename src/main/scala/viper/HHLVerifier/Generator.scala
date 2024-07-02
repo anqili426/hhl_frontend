@@ -77,7 +77,6 @@ object Generator {
   var forAllFrame = true // true: forall automatic framing is enabled
   var existsFrame = false // true: forall automatic framing is enabled
   var autoSelectRules = false // true: selection of loop rules is automatic
-  var modularCheckSyncCond = false // true: a Viper program will be generated if sync rule can be used
 
   // This variable is used when translating declarations of proof variables
   // When set to true, use an alias for the proof variable referred to by currProofVar
@@ -601,7 +600,7 @@ object Generator {
             if (autoSelectRules && rule == "unspecified") {
               val normalizedInvWithHints = normalizedInv.map(i => (Option.empty, i))
 
-              if (modularCheckSyncCond) {
+              if (inline) {
                 // Check whether sync(Tot) rule can be applied with a separate Viper program
                 val canUseSyncRule = checkSyncCondModular(normalizedInv, body, cond, typVarMap)
                 Main.printMsg("Can use sync rule? " + canUseSyncRule)
