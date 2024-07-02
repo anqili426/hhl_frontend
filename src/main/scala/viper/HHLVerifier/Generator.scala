@@ -1218,7 +1218,7 @@ object Generator {
              newAssertion
            }
          } else {
-           val newBody = removeTopExistsState(body)
+           val newBody = removeTopExistsState(body, stateToRemove)
            val newAssertion = Assertion(quantifier, assertVarDecls, newBody)
            newAssertion.topExists = a.topExists
            newAssertion.proForAll = a.proForAll
