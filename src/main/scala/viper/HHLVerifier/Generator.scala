@@ -600,7 +600,7 @@ object Generator {
             if (autoSelectRules && rule == "unspecified") {
               val normalizedInvWithHints = normalizedInv.map(i => (Option.empty, i))
 
-              if (inline) {
+              if (!inline) {
                 // Check whether sync(Tot) rule can be applied with a separate Viper program
                 val canUseSyncRule = checkSyncCondModular(normalizedInv, body, cond, typVarMap)
                 Main.printMsg("Can use sync rule? " + canUseSyncRule)
@@ -693,7 +693,7 @@ object Generator {
             } else {
               // A rule has been determined, either automatically or by the user
               if (!isAutoSelected && !syncTotWarningPrinted && postIsTopExists && rule != "syncTotRule" && rule != "existsRule") {
-                println("Warning: method " + currMethod.mName + " has a postcondition " +
+                Main.printMsg("Warning: method " + currMethod.mName + " has a postcondition " +
                   "which has a top-level existential quantifier over states, \n " +
                   "        but syncTotRule or existsRule is not chosen for at least one of the loops in the method. \n " +
                   "        Please make sure that every non-nested loop uses syncTotRule. \n" +
@@ -1329,14 +1329,18 @@ object Generator {
     methodPosts = methodPosts :+ post1
 
     if (!decrExpr.isEmpty) {
-      //  t == decrExpr for all states
-      val translatedDecr = translateExp(decrExpr.get, state.localVar, inputStates, inputFailureStates)
-      val trigger = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited=true)))())
-      val decrPre = vpr.Forall(Seq(state), trigger,
-                      vpr.Implies(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited=true),
-                      vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-                    )())()
-      methodPres = methodPres :+ decrPre
+      if (rule == "syncRule" || rule == "forAllExistsRule") {
+        if (!isAutoSelected) Main.printMsg("Warning: the decreases clause is disgarded by the verifier when syncRule or forAllExistsRule is used")
+      } else {
+        //  t == decrExpr for all states
+        val translatedDecr = translateExp(decrExpr.get, state.localVar, inputStates, inputFailureStates)
+        val trigger = Seq(vpr.Trigger(Seq(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited = true)))())
+        val decrPre = vpr.Forall(Seq(state), trigger,
+          vpr.Implies(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited = true),
+            vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
+          )())()
+        methodPres = methodPres :+ decrPre
+      }
     }
 
     val allVars = loopBody.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2, typVarMap))()).toSeq
@@ -1357,55 +1361,21 @@ object Generator {
     )())()
 
     if (rule == "syncRule" || rule == "syncTotRule") {
-      // Assert that all states have the same loop guard value
-      // TODO: with the following assertion, verification is faster than without
       if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)()
-      // Assume that the loop guard holds in all states
       methodBody = methodBody :+ vpr.Inhale(loopGuardHoldsForAll)()
     }
 
     val methodBodyAndVars = {
       if (rule == "forAllExistsRule") {
-        // Cannot reuse the code that translates an ifElseStmt because we might need to assert decrExpr in the end
-        var bodyStmts: Seq[vpr.Stmt] = Seq.empty
-        var bodyVars: Seq[vpr.LocalVar] = Seq.empty
-        ifCounter = ifCounter + 1
-        val ifBlockStates = vpr.LocalVar(currStatesVarName + ifCounter, outputStates.typ)()
-        ifCounter = ifCounter + 1
-        val elseBlockStates = vpr.LocalVar(currStatesVarName + ifCounter, outputStates.typ)()
-
-        val assign1 = vpr.LocalVarAssign(ifBlockStates, outputStates)()
-        val assumeCond = translateStmt(AssumeStmt(loopGuard), ifBlockStates, outputFailureStates)
-        val assign2 = vpr.LocalVarAssign(elseBlockStates, outputStates)()
-        val assumeNotCond = translateStmt(AssumeStmt(UnaryExpr("!", loopGuard)), elseBlockStates, outputFailureStates)
-
-        val ifBlock = translateStmt(loopBody, ifBlockStates, outputFailureStates)
-        val elseBlock = translateStmt(CompositeStmt(Seq.empty), elseBlockStates, outputFailureStates)
-
-        bodyStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1
-        bodyVars = Seq(ifBlockStates, elseBlockStates) ++ ifBlock._2 ++ elseBlock._2
-
-        if (!decrExpr.isEmpty) {
-          val translatedDecr = translateExp(decrExpr.get, state.localVar, ifBlockStates, outputFailureStates)
-          // Assert that the current value of decrExpr is in the range of [0, t)
-          bodyStmts = bodyStmts :+ vpr.Assert(vpr.Forall(Seq(state), Seq.empty,
-            vpr.Implies(getInSetApp(Seq(state.localVar, ifBlockStates), typVarMap),
-              vpr.And(vpr.GeCmp(translatedDecr, zero)(),
-                vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-              )())())())()
-        }
-        val updateSTmp = vpr.LocalVarAssign(STmp, getSetUnionApp(Seq(ifBlockStates, elseBlockStates), typVarMap))()
-        val updateProgStates = vpr.LocalVarAssign(outputStates, STmp)()
-        bodyStmts = bodyStmts ++ Seq(updateSTmp, updateProgStates)
-        (bodyStmts, bodyVars)
+        val stmtToTranslate = IfElseStmt(loopGuard, loopBody, CompositeStmt(Seq.empty))
+        translateStmt(stmtToTranslate, outputStates, outputFailureStates)
       } else translateStmt(loopBody, outputStates, outputFailureStates)
     }
 
     methodBody = methodBody ++ methodBodyAndVars._1
     methodLocalVars = methodLocalVars ++ methodBodyAndVars._2
 
-    // This is different when the rule is forAllExists
-    if (!decrExpr.isEmpty && rule != "forAllExistsRule") {
+    if (!decrExpr.isEmpty && rule != "syncRule" && rule != "forAllExistsRule") {
       val translatedDecr = translateExp(decrExpr.get, state.localVar, outputStates, outputFailureStates)
       // Assert that the current value of decrExpr is in the range of [0, t)
       val decrPost = vpr.Forall(Seq(state), Seq.empty,
@@ -1454,13 +1424,17 @@ object Generator {
         ifBodyStmts = ifBodyStmts ++ Seq(havocStates, havocFailureStates, inhaleIn) ++ inSetEq ++ inSetEqFail
 
         if (!decrExpr.isEmpty) {
-          // Inhale t == decrExpr for all states
-          val translatedDecr = translateExp(decrExpr.get, state.localVar, currStates, currFailureStates)
-          ifBodyStmts = ifBodyStmts :+ vpr.Inhale(vpr.Forall(Seq(state), Seq.empty,
-                                                    vpr.Implies(getInSetApp(Seq(state.localVar, currStates), typVarMap),
-                                                      vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-                                                  )())())()
-          returnedVars = returnedVars :+ t
+          if (rule == "syncRule" || rule == "forAllExistsRule") {
+            if (!isAutoSelected) Main.printMsg("Warning: the decreases clause is disgarded by the verifier when syncRule or forAllExistsRule is used")
+          } else {
+            // Inhale t == decrExpr for all states
+            val translatedDecr = translateExp(decrExpr.get, state.localVar, currStates, currFailureStates)
+            ifBodyStmts = ifBodyStmts :+ vpr.Inhale(vpr.Forall(Seq(state), Seq.empty,
+              vpr.Implies(getInSetApp(Seq(state.localVar, currStates), typVarMap),
+                vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
+              )())())()
+            returnedVars = returnedVars :+ t
+          }
         }
 
         val loopGuardHoldsForAll = vpr.Forall(Seq(state), Seq.empty, vpr.Implies(
@@ -1473,7 +1447,6 @@ object Generator {
                                             )())()
         if (rule == "syncRule" || rule == "syncTotRule") {
           if (!isAutoSelected) ifBodyStmts = ifBodyStmts :+ vpr.Assert(sameGuardValue)()
-          // Assume that the loop guard holds in all states
           ifBodyStmts = ifBodyStmts :+ vpr.Inhale(loopGuardHoldsForAll)()
         } else if (rule == "desugaredRule") {
           val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates, currFailureStates)._1
@@ -1482,39 +1455,8 @@ object Generator {
 
         val translatedLoopBody = {
           if (rule == "forAllExistsRule") {
-            // Cannot reuse the code that translates an ifElseStmt because we might need to assert decrExpr in the end
-            var bodyStmts: Seq[vpr.Stmt] = Seq.empty
-            var bodyVars: Seq[vpr.LocalVar] = Seq.empty
-            ifCounter = ifCounter + 1
-            val ifBlockStates = vpr.LocalVar(currStatesVarName + ifCounter, currStates.typ)()
-            ifCounter = ifCounter + 1
-            val elseBlockStates = vpr.LocalVar(currStatesVarName + ifCounter, currStates.typ)()
-
-            val assign1 = vpr.LocalVarAssign(ifBlockStates, currStates)()
-            val assumeCond = translateStmt(AssumeStmt(loopGuard), ifBlockStates, currFailureStates)
-            val assign2 = vpr.LocalVarAssign(elseBlockStates, currStates)()
-            val assumeNotCond = translateStmt(AssumeStmt(UnaryExpr("!", loopGuard)), elseBlockStates, currFailureStates)
-
-            val STmp = vpr.LocalVar(tempStatesVarName, currStates.typ)()
-            val ifBlock = translateStmt(loopBody, ifBlockStates, currFailureStates)
-            val elseBlock = translateStmt(CompositeStmt(Seq.empty), elseBlockStates, currFailureStates)
-
-            bodyStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1
-            bodyVars = Seq(ifBlockStates, elseBlockStates) ++ ifBlock._2 ++ elseBlock._2
-
-            if (!decrExpr.isEmpty) {
-              val translatedDecr = translateExp(decrExpr.get, state.localVar, ifBlockStates, currFailureStates)
-              // Assert that the current value of decrExpr is in the range of [0, t)
-              bodyStmts = bodyStmts :+ vpr.Assert(vpr.Forall(Seq(state), Seq.empty,
-                vpr.Implies(getInSetApp(Seq(state.localVar, ifBlockStates), typVarMap),
-                  vpr.And(vpr.GeCmp(translatedDecr, zero)(),
-                    vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-                  )())())())()
-            }
-            val updateSTmp = vpr.LocalVarAssign(STmp, getSetUnionApp(Seq(ifBlockStates, elseBlockStates), typVarMap))()
-            val updateProgStates = vpr.LocalVarAssign(currStates, STmp)()
-            bodyStmts = bodyStmts ++ Seq(updateSTmp, updateProgStates)
-            (bodyStmts, bodyVars)
+              val stmtToTranslate = IfElseStmt(loopGuard, loopBody, CompositeStmt(Seq.empty))
+              translateStmt(stmtToTranslate, currStates, currFailureStates)
           } else translateStmt(loopBody, currStates, currFailureStates)
         }
         ifBodyStmts = ifBodyStmts ++ translatedLoopBody._1
@@ -1525,8 +1467,7 @@ object Generator {
         val assertI = vpr.Assert(getAllInvariants(inv, currStates, currFailureStates))()
         ifBodyStmts = ifBodyStmts :+ assertI
 
-        // This is different when the rule is forAllExists
-        if (!decrExpr.isEmpty && rule != "forAllExistsRule") {
+        if (!decrExpr.isEmpty && rule != "syncRule" && rule != "forAllExistsRule") {
           val translatedDecr = translateExp(decrExpr.get, state.localVar, currStates, currFailureStates)
           // Assert that the current value of decrExpr is in the range of [0, t)
           ifBodyStmts = ifBodyStmts :+ vpr.Assert(vpr.Forall(Seq(state), Seq.empty,

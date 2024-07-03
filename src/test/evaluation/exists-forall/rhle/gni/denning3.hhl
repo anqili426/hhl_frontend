@@ -22,9 +22,7 @@ ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==> (_s1[e_o
     f_out := f_in
     x_out := x_in
 
-	// assuming x_1 != x_2
-
-    while existsRule (e_out == 1 && err == 0)
+    while (e_out == 1 && err == 0)
 		invariant exists <_s1> :: (_s1[t] == 1 && _s1[x_out] == 150 && _s1[e_out] == 1 && _s1[max_sum] == 100 &&
 								  (_s1[err] == 0 ==> (_s1[sum_out] == 0 && _s1[i_out] == 0)) &&
 								  (_s1[err] != 0 ==> (_s1[sum_out] == 150 && _s1[i_out] == 1)) &&
@@ -34,6 +32,8 @@ ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==> (_s1[e_o
 							(_s2[i_out] <= 1 ==> _s2[err] == 0) &&
 							(_s2[err] == 0 ==> (_s2[sum_out] == 0 && _s2[i_out] == 0) || (_s2[sum_out] == 60 && _s2[i_out] == 1))
 						)))
+	    invariant forall <_s> :: (_s[err] == 1 ==> _s[sum_out] > _s[max_sum]) &&
+	                             (_s[err] == 0 ==> _s[sum_out] <= _s[max_sum]) && _s[x_out] >= 1
 		decreases max_sum + x_out - sum_out
     {
         sum_out := sum_out + x_out
