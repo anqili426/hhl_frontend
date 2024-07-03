@@ -1,7 +1,6 @@
 package viper.HHLVerifier.test
 
-import viper.HHLVerifier.Main
-import viper.HHLVerifier.Parser
+import viper.HHLVerifier.{Main, Parser, ViperRunner}
 import au.com.bytecode.opencsv.CSVWriter
 
 import java.io.{BufferedWriter, File, FileWriter}
@@ -84,10 +83,8 @@ object Test {
     for (f <- tests) {
       totalNum = totalNum + 1
       val LOCData = getDataForTestCase(f.getPath)
-      // Test Parser
       print(f)
-      val argsForMain = Array(f.getPath, option)
-
+      val argsForMain = Array(f.getPath, option, "--auto")
       Main.test = true
       Main.main(argsForMain)
       totalRuntime = totalRuntime + Main.runtime
@@ -105,6 +102,7 @@ object Test {
 
       val data = Array(f.getPath, option, Main.runtime.toString, res) ++ LOCData.map(i => i.toString)
       allData = allData :+ data
+      Thread.sleep(5000)
     }
     allData
   }
@@ -123,11 +121,12 @@ object Test {
     println("Evaluation starts")
 
     var allTestData: List[Array[String]] = List.empty
-    allTestData = allTestData ++ runTests(forAllTests, "--forall")
-    allTestData = allTestData ++ runTests(existsTests, "--exists")
-    allTestData = allTestData ++ runTests(forAllExistsTests, "--auto")
-    allTestData = allTestData ++ runTests(existsForAllTests, "--auto")
+    // allTestData = allTestData ++ runTests(forAllTests, "--forall")
+    allTestData = allTestData ++ runTests(existsTests, "")
+    allTestData = allTestData ++ runTests(forAllExistsTests, "")
+    allTestData = allTestData ++ runTests(existsForAllTests, "")
     val failedNum = failedForAll.length + failedExists.length + failedOther.length
+
     println("---------------------")
     println("Total: " + totalNum)
     println("Failed: " + failedNum)

@@ -10,6 +10,7 @@ object Main {
   var verified = 0  // 0: unknown, 1: failure, 2: success
   var runtime = 0.0
   var test = false
+  var testWithLogs = false
 
   def main(args: Array[String]): Unit = {
 
@@ -72,10 +73,8 @@ object Main {
           consistencyErrors.foreach(err => printMsg(err.readableMessage))
         } else {
           printMsg("Translated program is being verified by Viper. ")
-          ViperRunner.start()
           val result = ViperRunner.runSiliconAndCarbon(viperProgram)
           val t1 = System.nanoTime()
-          ViperRunner.stop()
           result match {
             case ResSuccess =>
               verified = 2
@@ -100,7 +99,7 @@ object Main {
   }
 
   def printMsg(msg: String): Unit = {
-    if (!test) println(msg)
+    if (!test || testWithLogs) println(msg)
   }
 
 }
