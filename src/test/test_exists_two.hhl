@@ -1,0 +1,15 @@
+method test(x0: Int, n: Int) returns (x: Int)
+	requires exists <_s1>, <_s2> :: _s1[x0] > _s2[x0] && _s1[n] > _s2[n] && _s2[n] >= 0
+	ensures exists <_s1>, <_s2> :: _s1[x] > _s2[x]
+{
+	x := x0
+	var i: Int
+	i := 0
+    while (i < n)
+		invariant exists <_s1>, <_s2> :: _s1[x] > _s2[x] && _s1[n] - _s1[i] >= _s2[n] - _s1[i] && _s1[n] >= _s1[i]
+		decreases n - i
+    {
+		i := i + 1
+    }
+}
+

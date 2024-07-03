@@ -53,6 +53,7 @@ object Generator {
   var ifCounter = 0
   var loopCounter = 0
   var alignCounter = 0
+  var stateVarCounter = 0
   var currLoopIndex: vpr.Exp = null
   var currLoopIndexName = "$n"
 
@@ -1242,7 +1243,7 @@ object Generator {
       case GetValExpr(state, id) =>
         if (state.idName != stateToRemove) e
         else {
-          val newStateVar = AssertVar(stateAliasPrefix + stateToRemove)
+          val newStateVar = AssertVar(stateAliasPrefix + stateToRemove + "_" + stateVarCounter)
           newStateVar.typ = state.typ
           GetValExpr(newStateVar, id)
         }
@@ -1289,7 +1290,8 @@ object Generator {
     posts = pres
 
     val newInv = removeTopExistsState(firstExistsInv, "")
-    val newState = vpr.LocalVar(stateAliasPrefix + stateRemoved, getConcreteStateType(typVarMap))()
+    val newState = vpr.LocalVar(stateAliasPrefix + stateRemoved + "_" + stateVarCounter, getConcreteStateType(typVarMap))()
+    stateVarCounter = stateVarCounter + 1
     varsInStmt = varsInStmt :+ newState
     body.allProgVars +=  (newState.name -> StateType())
     pres = pres :+ newInv
