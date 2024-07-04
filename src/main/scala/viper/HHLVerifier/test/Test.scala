@@ -18,6 +18,7 @@ object Test {
   val proofKeyword = List("use", "hyperAssert", "hyperAssume", "declare", "reuse", "let", "invariant", "frame")
   val otherKeyword = List("assume", "assert", "while", "if", "else", "}", "{", "havoc")
   val commentKeyword = List("//", "/*") // The current implementation doesn't support the counting of block comments
+  val defaultNumOfRep = 1
 
   def partOfCurrStmt(lineInd: Int, allNonemptyLines: Array[String]): Boolean = {
 
@@ -108,6 +109,15 @@ object Test {
   }
 
   def main(args: Array[String]): Unit = {
+    val numOfRep = if (args.length == 0) {
+      println("Number of repetitions is not specified. Evaluation will be run for "+  defaultNumOfRep  + " time(s) by default. ")
+      defaultNumOfRep
+    } else {
+      val rep = args(0).toInt
+      println("Number of repetitions: " + rep)
+      rep
+    }
+
     val pathOfForAllTests = "src/test/evaluation/forall"
     val pathOfExistsTests = "src/test/evaluation/exists"
     val pathOfForAllExistsTests = "src/test/evaluation/forall-exists"
@@ -118,36 +128,46 @@ object Test {
     val forAllExistsTests = getListOfFiles(pathOfForAllExistsTests)
     val existsForAllTests = getListOfFiles(pathOfExistsForAllTests)
 
-    println("Evaluation starts")
+    var i = 0
+    for (i <- 0 to numOfRep - 1) {
+      println("Evaluation No. " + i + " starts")
 
-    var allTestData: List[Array[String]] = List.empty
-    // allTestData = allTestData ++ runTests(forAllTests, "--forall")
-    allTestData = allTestData ++ runTests(existsTests, "")
-    allTestData = allTestData ++ runTests(forAllExistsTests, "")
-    allTestData = allTestData ++ runTests(existsForAllTests, "")
-    val failedNum = failedForAll.length + failedExists.length + failedOther.length
+      var allTestData: List[Array[String]] = List.empty
+      allTestData = allTestData ++ runTests(forAllTests, "--forall")
+      allTestData = allTestData ++ runTests(existsTests, "")
+      allTestData = allTestData ++ runTests(forAllExistsTests, "")
+      allTestData = allTestData ++ runTests(existsForAllTests, "")
+      val failedNum = failedForAll.length + failedExists.length + failedOther.length
 
-    println("---------------------")
-    println("Total: " + totalNum)
-    println("Failed: " + failedNum)
-    if (failedNum > 0) {
-      println("Failed forall tests: " + failedForAll.length)
-      failedForAll.foreach(t => println(t))
-      println("Failed exists tests: " + failedExists.length)
-      failedExists.foreach(t => println(t))
-      println("Failed forall-exists and exists-forall tests: " + failedOther.length)
-      failedOther.foreach(t => println(t))
+      println("---------------------")
+      println("Total: " + totalNum)
+      println("Failed: " + failedNum)
+      if (failedNum > 0) {
+        println("Failed forall tests: " + failedForAll.length)
+        failedForAll.foreach(t => println(t))
+        println("Failed exists tests: " + failedExists.length)
+        failedExists.foreach(t => println(t))
+        println("Failed forall-exists and exists-forall tests: " + failedOther.length)
+        failedOther.foreach(t => println(t))
+      }
+      println("Runtime: " + totalRuntime + " s")
+
+      val outputFilePath = "src/test/evaluation/output" + i + ".csv"
+      val outputFile = new BufferedWriter(new FileWriter(outputFilePath))
+      val csvWriter = new CSVWriter(outputFile)
+      val schema = Array("Test case name", "Option", "Runtime (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC")
+      val dataToWrite = List(schema) ++ allTestData
+      csvWriter.writeAll(dataToWrite.map(_.toArray).asJava)
+      outputFile.close()
+      println("Test data is saved to: " + outputFilePath)
+
+      // Reset
+      failedForAll = List.empty
+      failedExists = List.empty
+      failedOther = List.empty
+      totalNum = 0
     }
-    println("Runtime: " + totalRuntime + " s")
-
-    val outputFilePath  = "src/test/evaluation/output.csv"
-    val outputFile = new BufferedWriter(new FileWriter(outputFilePath))
-    val csvWriter = new CSVWriter(outputFile)
-    val schema = Array("Test case name", "Option", "Runtime (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC")
-    val dataToWrite = List(schema) ++ allTestData
-    csvWriter.writeAll(dataToWrite.map(_.toArray).asJava)
-    outputFile.close()
-    println("Test data is saved to: " + outputFilePath)
+    println("Evaluation has ended. ")
   }
 
   def getListOfFiles(dir: String): List[File] = {
