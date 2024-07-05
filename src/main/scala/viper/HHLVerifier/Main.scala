@@ -11,9 +11,10 @@ object Main {
   var runtime = 0.0
   var test = false
   var testWithLogs = false
+  var errMessages = Seq("")
 
   def main(args: Array[String]): Unit = {
-
+    errMessages = Seq.empty
     verified = 0
     if (args.length == 0) {
       println("Please provide the program to verify. ")
@@ -82,6 +83,7 @@ object Main {
             case ResFailure(err) =>
               verified = 1
               printMsg("Verification failed")
+              errMessages = err.map(e => e.readableMessage)
               err.foreach(e => printMsg(e.readableMessage))
           }
           runtime = (t1 - t0) / 1E9
@@ -94,7 +96,12 @@ object Main {
     } catch {
       case e: VerifierException =>
         verified = 1
+        errMessages = Seq(e.errMsg)
         printMsg(e.errMsg)
+      case e: Exception =>
+        verified = 1
+        errMessages = Seq(e.getMessage)
+        printMsg(e.getMessage)
     }
   }
 

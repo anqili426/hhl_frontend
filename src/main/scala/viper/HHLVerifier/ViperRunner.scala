@@ -73,15 +73,11 @@ object ViperRunner {
 
         val resPromise = Promise[VerificationResult]()
 
-        var carbonVerified = 0 // 0: unknown 1: failure 2: success
-        var siliconVerified = 0 // 0: unknown 1: failure 2: success
-
         carbonRes.onComplete {
           case Success(result) =>
             result match {
               case ResSuccess =>
                 // If carbon verifies successfully, can terminate with success
-                carbonVerified = 2
                 if (!resPromise.isCompleted) {
                   if (checkSideCondition) printMsg("Carbon succeeded in verifying the side condition")
                   else printMsg("Carbon succeeded in verifying the program")
@@ -95,13 +91,17 @@ object ViperRunner {
                 //   2.2  If silicon fails to verify eventually, or if silicon still has no result after timeout,
                 //        then we complete resPromise with a verification failure
                 if (!resPromise.isCompleted) {
-                  carbonVerified = 1
                   if (!checkSideCondition) {
                     printMsg("Carbon failed to verify the program: ")
                     err.foreach(e => printMsg(e.readableMessage))
                   }
                   if (!siliconRes.isCompleted) Await.result(siliconRes, singleTimeout.seconds) // Wait for silicon to terminate
-                  if (siliconVerified != 2) resPromise.trySuccess(result)
+                  siliconRes.onComplete {
+                    case Success(siliconResult) =>
+                      val siliconVerified = interpretResult(siliconResult)
+                      if (!siliconVerified) resPromise.trySuccess(result)
+                    case Failure(_) => resPromise.trySuccess(result)
+                  }
                 }
             }
           case Failure(_) =>
@@ -111,7 +111,6 @@ object ViperRunner {
           case Success(result) =>
             result match {
               case ResSuccess =>
-                siliconVerified = 2
                 if (!resPromise.isCompleted) {
                   if (checkSideCondition) printMsg("Silicon succeeded in verifying the side condition")
                   else printMsg("Silicon succeeded in verifying the program")
@@ -119,13 +118,17 @@ object ViperRunner {
                 }
               case ResFailure(err) =>
                 if (!resPromise.isCompleted) {
-                  siliconVerified = 1
                   if (!checkSideCondition) {
                     printMsg("Silicon failed to verify the program: ")
                     err.foreach(e => printMsg(e.readableMessage))
                   }
                   if (!carbonRes.isCompleted) Await.result(carbonRes, singleTimeout.seconds) // Wait for carbon to terminate
-                  if (carbonVerified != 2) resPromise.trySuccess(result)
+                  carbonRes.onComplete {
+                    case Success(carbonResult) =>
+                      val carbonVerified = interpretResult(carbonResult)
+                      if (!carbonVerified) resPromise.trySuccess(result)
+                    case Failure(_) => resPromise.trySuccess(result)
+                  }
                 }
             }
           case Failure(_) =>

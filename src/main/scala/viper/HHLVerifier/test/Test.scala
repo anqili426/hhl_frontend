@@ -93,6 +93,7 @@ object Test {
       var res = "Failed"
       if ((!f.getName.endsWith("false.hhl") && Main.verified != 2) || (f.getName.endsWith("false.hhl") && Main.verified != 1)) {
         println(" Failed")
+        println(Main.errMessages)
         if (option == "--forall") failedForAll = failedForAll :+ f.getPath
         else if (option == "--exists") failedExists = failedExists :+ f.getPath
         else failedOther = failedOther :+ f.getPath
@@ -166,6 +167,8 @@ object Test {
       failedExists = List.empty
       failedOther = List.empty
       totalNum = 0
+      totalRuntime = 0.0
+      if (numOfRep > 1) println("*********************")
     }
     println("Evaluation has ended. ")
   }
