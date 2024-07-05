@@ -985,7 +985,7 @@ object Generator {
 
       val preamble = generatePreamble(typVarMap)
       val program = vpr.Program(preamble._1, Seq.empty, Seq.empty, Seq.empty, preamble._2 ++ Seq(method), Seq.empty)()
-      val res = ViperRunner.runSiliconAndCarbon(program, 30, 50, true)
+      val res = ViperRunner.runSiliconAndCarbon(program, 5, 10, true)
       ViperRunner.interpretResult(res)
     }
 
