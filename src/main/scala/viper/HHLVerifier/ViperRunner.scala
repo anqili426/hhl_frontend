@@ -43,7 +43,7 @@ object ViperRunner {
     }
   }
 
-  def runSiliconAndCarbon(program: Program, singleTimeout: Int = 180, overallTimeout: Int = 200, checkSideCondition: Boolean = false) = {
+  def runSiliconAndCarbon(program: Program, singleTimeout: Int = 500, overallTimeout: Int = 800, checkSideCondition: Boolean = false) = {
     val consistencyErrors = program.checkTransitively
     if (consistencyErrors.nonEmpty) {
       consistencyErrors.foreach(err => printMsg(err.readableMessage))
