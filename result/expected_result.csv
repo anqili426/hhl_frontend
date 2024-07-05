@@ -1,0 +1,24 @@
+Type of hyperproperties: forall
+Source,No. of benchmarks,Mean runtime(s),Median runtime(s)
+descartes,15,2.254454048711111,1.6195729263333334
+pcsat,3,1.0873658263333335,1.0983414386666668
+Overall,18,2.0599393449814816,1.5412182001666666
+
+Type of hyperproperties: exists
+Source,No. of benchmarks,Mean runtime(s),Median runtime(s)
+orhle,6,2.8935554703333333,2.5392211638333335
+descartes,8,12.965188919083333,5.092260820666667
+Overall,14,8.648774583904762,3.5096822511666668
+
+Type of hyperproperties: forall-exists
+Source,No. of benchmarks,Mean runtime(s),Median runtime(s)
+hypa,8,1.17705840975,1.1109496806666668
+orhle,28,2.794234221369048,2.0213859871666666
+pcsat,1,2.1428842506666665,2.1428842506666665
+Overall,37,2.4269705331621623,1.8690152496666668
+
+Type of hyperproperties: exists-forall
+Source,No. of benchmarks,Mean runtime(s),Median runtime(s)
+orhle,15,2.6582607633555555,1.9934866583333333
+Overall,15,2.6582607633555555,1.9934866583333333
+
