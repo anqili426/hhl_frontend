@@ -19,7 +19,7 @@ ensures forall <_s1> :: _s1[i] == 1 ==>
     f1_out := f1_in
     f2_out := f2_in
 
-    while syncRule (t <= 100)
+    while (t <= 100)
     invariant forall <_s1>, <_s2> :: _s1[t] == _s2[t]
     invariant forall <_s1> :: _s1[i] == 1 ==>
               (exists <_s2> :: (_s2[i] == 2 && _s1[f1_out] == _s2[f1_out] && _s1[f2_out] == _s2[f2_out]))
