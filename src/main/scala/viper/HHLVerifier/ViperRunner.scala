@@ -95,7 +95,13 @@ object ViperRunner {
                     printMsg("Carbon failed to verify the program: ")
                     err.foreach(e => printMsg(e.readableMessage))
                   }
-                  if (!siliconRes.isCompleted) Await.result(siliconRes, singleTimeout.seconds) // Wait for silicon to terminate
+                  if (!siliconRes.isCompleted) {
+                    try {
+                      Await.result(siliconRes, singleTimeout.seconds)
+                    } catch {
+                      case _: java.util.concurrent.TimeoutException => resPromise.trySuccess(result)
+                    }
+                  } // Wait for silicon to terminate
                   siliconRes.onComplete {
                     case Success(siliconResult) =>
                       val siliconVerified = interpretResult(siliconResult)
@@ -122,7 +128,13 @@ object ViperRunner {
                     printMsg("Silicon failed to verify the program: ")
                     err.foreach(e => printMsg(e.readableMessage))
                   }
-                  if (!carbonRes.isCompleted) Await.result(carbonRes, singleTimeout.seconds) // Wait for carbon to terminate
+                  if (!carbonRes.isCompleted) {
+                    try {
+                      Await.result(carbonRes, singleTimeout.seconds)
+                    } catch {
+                      case _: java.util.concurrent.TimeoutException => resPromise.trySuccess(result)
+                    }
+                  } // Wait for carbon to terminate
                   carbonRes.onComplete {
                     case Success(carbonResult) =>
                       val carbonVerified = interpretResult(carbonResult)
@@ -137,7 +149,7 @@ object ViperRunner {
         val result = Await.result(resultFuture, overallTimeout.seconds)
         result
       } catch {
-          case e: TimeoutException => ResFailure(Seq(TimeoutOccurred(overallTimeout, "seconds")))
+          case _: java.util.concurrent.TimeoutException => ResFailure(Seq(TimeoutOccurred(overallTimeout, "seconds")))
       }
     }
   }
