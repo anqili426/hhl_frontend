@@ -1,6 +1,7 @@
 package viper.HHLVerifier
 
 import viper.HHLVerifier
+import viper.silver.ast.SimpleInfo
 import viper.silver.{ast => vpr}
 
 import scala.collection.immutable.Seq
@@ -264,6 +265,8 @@ object Generator {
       var newMethods: Seq[vpr.Method] = Seq.empty
       var newVars: Seq[vpr.LocalVar] = Seq.empty
       // Translation of S_temp := havocSet()
+      // TODO: add comment to this method call, maybe put this var inside each case
+      // val havocSTmpWithInfo = havocSetMethodCall(STmp, stmt.toString)
       val havocSTmp = havocSetMethodCall(STmp)
       // Translation of S := S_temp
       val updateProgStates = vpr.LocalVarAssign(currStates, STmp)()
@@ -354,11 +357,11 @@ object Generator {
             (newStmts, Seq.empty)
 
         case HyperAssumeStmt(e) =>
-          newStmts = Seq(vpr.Inhale(translateExp(e, null, currStates, currFailureStates))())
+          newStmts = Seq(vpr.Inhale(translateExp(e, null, currStates, currFailureStates))(info=vpr.SimpleInfo(Seq(stmt.toString))))
           (newStmts, Seq.empty)
 
         case HyperAssertStmt(e) =>
-          newStmts = Seq(vpr.Assert(translateExp(e, null, currStates, currFailureStates))())
+          newStmts = Seq(vpr.Assert(translateExp(e, null, currStates, currFailureStates))(info=vpr.SimpleInfo(Seq(stmt.toString))))
           (newStmts, Seq.empty)
 
         case AssignStmt(left, right) =>
@@ -1831,8 +1834,9 @@ object Generator {
     vpr.DomainType(stateDomainName, typVarMap)(Seq(typeVar))
   }
 
-  def havocSetMethodCall(set: vpr.LocalVar): vpr.MethodCall = {
-    vpr.MethodCall(havocSetMethodName, Seq.empty, Seq(set))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
+  def havocSetMethodCall(set: vpr.LocalVar, info: String = ""): vpr.MethodCall = {
+    val viperInfo = if (info == "") vpr.NoInfo else SimpleInfo(Seq(info))
+    vpr.MethodCall(havocSetMethodName, Seq.empty, Seq(set))(pos = vpr.NoPosition, info = viperInfo, errT = vpr.NoTrafos)
   }
 
   def havocIntMethodCall(i: vpr.LocalVar): vpr.MethodCall = {
