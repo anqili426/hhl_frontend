@@ -7,7 +7,7 @@
 ## To run in terminal
 Enter the following commands: 
 - `cd hhl_frontend`
-- `sbt "run <path_to_program.txt> <verifier_options>"`
+- `sbt "run <path_to_program.hhl> <verifier_options>"`
 
 Note that you might need to specify the path to Z3 using the command `export Z3_EXE=<path_to_z3>`
 
