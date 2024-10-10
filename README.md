@@ -18,7 +18,6 @@ Import the project into IntelliJ and edit the configurations as follows:
 - Program arguments: `<path_to_program.hhl> <verifier_options>`
 - Environment variables: `Z3_EXE=<path_to_z3>;BOOGIE_EXE=<path_to_boogie>`
 
-
 ## Verifier options
 You may provide the following options as program arguments to customize the verifier:
 - `--forall` Only generates overapproximation encodings
@@ -31,6 +30,7 @@ You may provide the following options as program arguments to customize the veri
 
 # Program syntax
 Most of the syntax is the same as Viper syntax. 
+Detailed documentation is available at: https://zenodo.org/records/12671562.
 
 ## Methods
 ```
