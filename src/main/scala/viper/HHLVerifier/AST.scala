@@ -2,6 +2,10 @@ package viper.HHLVerifier
 
 class Expr(){
   var typ: Type = UnknownType()
+
+  override def toString: String = {
+    PrettyPrinter.printExpr(this)
+  }
 }
 
 // Identifiers that may have type State
@@ -39,7 +43,12 @@ case class MethodCallExpr(methodName: String, args: Seq[Id]) extends Expr {
   var paramsToArgs: Map[String, String] = Map.empty
 }
 
-sealed trait Stmt
+sealed trait Stmt {
+  override def toString: String = {
+    PrettyPrinter.printStmt(this)
+  }
+}
+
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
   // This map stores all the program variables used in this CompositeStmt object
   // It is filled in the SymbolChecker
@@ -87,7 +96,12 @@ case class HHLProgram(methods: Seq[Method]) {
   val content = methods
 }
 
-sealed trait Type
+sealed trait Type {
+  override def toString: String = {
+    PrettyPrinter.printType(this)
+  }
+}
+
 case class UnknownType() extends Type
 case class IntType() extends Type
 case class BoolType() extends Type
