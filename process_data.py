@@ -85,4 +85,5 @@ if __name__ == "__main__":
     else:
         csv_folder = sys.argv[1]
         average_dict = calculate_average(csv_folder)
+        print(average_dict)
         process_data(average_dict)
