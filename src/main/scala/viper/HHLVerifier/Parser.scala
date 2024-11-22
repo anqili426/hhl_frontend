@@ -119,7 +119,10 @@ object Parser {
   def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
-  def expr[$: P]: P[Expr] = P(assertion | otherExpr)
+  def expr[$: P]: P[Expr] = P(Index ~ (assertion | otherExpr)).map { case (pos, exp) =>
+    exp.pos = pos
+    exp
+  }
 
   // Syntax 1: assertVar is NOT of type State -- forall n: Int :: P(n)
   // Syntax 2: assertVar is of type State -- forall <s1>: State :: P(s1)

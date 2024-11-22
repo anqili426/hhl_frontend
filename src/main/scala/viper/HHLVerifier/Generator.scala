@@ -1,11 +1,14 @@
 package viper.HHLVerifier
 
-import viper.HHLVerifier
+import viper.silver.ast.AnnotationInfo
 import viper.silver.{ast => vpr}
 
 import scala.collection.immutable.Seq
 
 object Generator {
+  // source code
+  var program_source = ""
+
   // State domain
   val stateDomainName = "State"
   val equalFuncName = "equal_on_everything_except"
@@ -118,7 +121,9 @@ object Generator {
   val checkExistsRuleCond2MethodName = "check_exists_cond2"
   var stateRemoved = ""
 
-  def generate(input: HHLProgram): vpr.Program = {
+  def generate(input: HHLProgram, source: String): vpr.Program = {
+    program_source = source
+
     var fields: Seq[vpr.Field] = Seq.empty
     var predicates: Seq[vpr.Predicate] = Seq.empty
     var extensions: Seq[vpr.ExtensionMember] = Seq.empty
@@ -188,14 +193,18 @@ object Generator {
     val pres = normalizedPres.map(p => getAssertionWithTriggers(p, inputStates.localVar, null)) ++ preAboutArgs
     // Forming the postconditions
     isPostcondition = true
-    val posts = method.post.map {
+    // postconditions and debug info
+    val wrapped_posts = method.post.map {
       p =>
         val res = translatePostcondition(p, null, outputStates.localVar, outputFailureStates.localVar)
-        if (res.length == 2) vpr.InhaleExhaleExp(res(0), res(1))()
-        else res(0)
+        if (res.length == 2) (vpr.InhaleExhaleExp(res.head, res(1))(), PrettyPrinter.getErrorMessage(p, program_source))
+        else (res.head, PrettyPrinter.getErrorMessage(p, program_source))
     }
     isPostcondition = false
 
+    // Error Message Generation
+    // Mapping postconditions to Viper asserts with custom messages
+    val error_asserts = wrapped_posts.map { case (exp, str) => getAssertWithCustomMessage(exp, f"The following postcondition might not hold!\n$str")}
     /* Method body contains the following
     *  Local variable declaration (program variables + auxiliary variables of type SetState + isIfBlock)
     *  Assume all program variables used in the method are different
@@ -224,8 +233,12 @@ object Generator {
     val nonIntAuxVars = Seq(tempStates, tempFailedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
     val localVars = progVarDecls ++ auxiliaryVarDecls ++ nonIntAuxVars
 
-    val methodBody = Seq(currStatesAssignment, assumeSFailEmpty) ++ inSetEq ++ inSetFailEq ++ assignToVars ++ translatedContent._1
-    val thisMethod = vpr.Method(method.mName, translatedArgs, ret ++ Seq(outputStates, outputFailureStates), pres, posts, Some(vpr.Seqn(methodBody, localVars)()))()
+    val posts = wrapped_posts.map { case (exp, _) => exp }
+
+    val methodBody = Seq(currStatesAssignment, assumeSFailEmpty) ++ inSetEq ++ inSetFailEq ++ assignToVars ++ translatedContent._1 ++ error_asserts
+    val thisMethod = vpr.Method(method.mName, translatedArgs, ret ++ Seq(outputStates, outputFailureStates), pres, posts, Some(vpr.Seqn(methodBody, localVars)()))(info = AnnotationInfo(
+      Map("msg" -> Seq("The postcondition of this method might not hold")))
+    )
     allMethods = allMethods :+ thisMethod
     postIsTopExists = false
   }
@@ -293,9 +306,8 @@ object Generator {
         case ProofVarDecl(pv, p) =>
           useAliasForProofVar = true
           currProofVarName = pv.name
-          val assertVarExists = vpr.Assert(
-                                  vpr.Exists(Seq(getAliasForProofVar(pv, typVarMap)), Seq.empty,
-                                      translateExp(p, state, currStates, currFailureStates))())()
+          val assert_exp = vpr.Exists(Seq(getAliasForProofVar(pv, typVarMap)), Seq.empty, translateExp(p, state, currStates, currFailureStates))()
+          val assertVarExists = getAssertWithCustomMessage(assert_exp, s"[DEPRECATED] The following expression in the context of verifying a proof variable might not hold!\n${p.toString()}")
           useAliasForProofVar = false
           val assumeP = vpr.Inhale(translateExp(p, state, currStates, currFailureStates))()
           newStmts = Seq(assertVarExists, assumeP)
@@ -358,7 +370,11 @@ object Generator {
           (newStmts, Seq.empty)
 
         case HyperAssertStmt(e) =>
-          newStmts = Seq(vpr.Assert(translateExp(e, null, currStates, currFailureStates))())
+          val assert = getAssertWithCustomMessage(
+            translateExp(e, null, currStates, currFailureStates),
+            f"The following hyper assertion might not hold!\n${e.toString()}"
+          )
+          newStmts = Seq(assert)
           (newStmts, Seq.empty)
 
         case AssignStmt(left, right) =>
@@ -382,13 +398,15 @@ object Generator {
 
         case MultiAssignStmt(left, right) =>
           val callee = right.method
-          if (!callee.pre.isEmpty) {
+          if (callee.pre.nonEmpty) {
             useParamsToArgsMap = true
             currParamsToArgsMap = right.paramsToArgs
-            val pres = callee.pre.map(p => translateExp(p, state, currStates, currFailureStates))
+            val wrapper_pres = callee.pre.map(p => (translateExp(p, state, currStates, currFailureStates), p.toString()))
             useParamsToArgsMap = false
-            val assertPres = vpr.Assert(getAndOfExps(pres))()
-            newStmts = Seq(assertPres)
+            val assertPres = wrapper_pres.map { case (exp, str) =>
+              getAssertWithCustomMessage(exp, f"The following precondition of a custom method might not hold!\n$str")
+            }
+            newStmts = assertPres
           }
 
           // Havoc S_tmp and S_fail_tmp
@@ -575,7 +593,7 @@ object Generator {
             val getSkFuncName = "__get_Sk_" + loopCounter
             // Connect all invariants with && to form 1 invariant
             currLoopIndex = zero
-            val inv = invWithHints.map(i => i._2)
+            val inv = invWithHints.map(i => i._2) // TODO: Reuse this syntax above
 
             // Let currStates == S0 before the loop
             // TODO: redefine this!
@@ -724,8 +742,8 @@ object Generator {
 
               // Assert I(0)
               val I0 = getAllInvariants(normalizedInv, currStates, loopFailureStates)
-              val assertI0 = vpr.Assert(I0)()
-              newStmts = newStmts ++ Seq(assumeEmptyFailureStates, assertI0)
+              val assertI0Seq = inv.map{ inv => getAssertWithCustomMessage(I0, f"The following invariant might not hold at entry point!\n${inv.toString()}")}
+              newStmts = newStmts ++ Seq(assumeEmptyFailureStates) ++ assertI0Seq
 
               // Use the rule specified by the user
               // DesugaredRule should be deprecated at some point
@@ -828,7 +846,7 @@ object Generator {
 
         case FrameStmt(f, body) =>
           val framedExpr = translateExp(f, state, currStates, currFailureStates)
-          val assertFrame = vpr.Assert(framedExpr)()
+          val assertFrame = getAssertWithCustomMessage(framedExpr, f"The following hyper assertion used in a frame statement might not hold\n${f.toString}")
           val translatedBody = translateStmt(body, currStates, currFailureStates)
           val inhaleFrame = vpr.Inhale(framedExpr)()
           (Seq(assertFrame) ++ translatedBody._1 ++ Seq(inhaleFrame), translatedBody._2)
@@ -842,10 +860,12 @@ object Generator {
           if (!call.method.pre.isEmpty) {
             useParamsToArgsMap = true
             currParamsToArgsMap = call.paramsToArgs
-            val pres = call.method.pre.map(p => translateExp(p, state, currStates, currFailureStates))
+            val wrapped_pres = call.method.pre.map(p => (translateExp(p, state, currStates, currFailureStates), p.toString()))
             useParamsToArgsMap = false
-            val assertPres = vpr.Assert(getAndOfExps(pres))()
-            newStmts = Seq(assertPres)
+            val assertPres = wrapped_pres.map { case (exp, str) =>
+              getAssertWithCustomMessage(exp, s"The following precondition of a custom method might not hold!\n$str")
+            }
+            newStmts = assertPres
           }
 
           // Havoc S_tmp and S_fail_tmp
@@ -882,7 +902,6 @@ object Generator {
           (newStmts, Seq.empty)
       }
     }
-
 
     def transformExpr(e: Expr, loopGuard: Expr, transform: Boolean): Expr = {
       e match {
@@ -1330,7 +1349,7 @@ object Generator {
     methodPres = methodPres :+ pre1
     methodPosts = methodPosts :+ post1
 
-    if (!decrExpr.isEmpty) {
+    if (decrExpr.isDefined) {
       if (rule == "syncRule" || rule == "forAllExistsRule") {
         if (!isAutoSelected) Main.printMsg("Warning: the decreases clause is disgarded by the verifier when syncRule or forAllExistsRule is used")
       } else {
@@ -1363,7 +1382,10 @@ object Generator {
     )())()
 
     if (rule == "syncRule" || rule == "syncTotRule") {
-      if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)()
+      if (!isAutoSelected) {
+        val assert = getAssertWithCustomMessage(sameGuardValue, s"The following loop guard may be violated:\n${loopGuard}")
+        methodBody = methodBody :+ assert
+      }
       methodBody = methodBody :+ vpr.Inhale(loopGuardHoldsForAll)()
     }
 
@@ -1445,10 +1467,15 @@ object Generator {
                                             )())()
         val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
                                             vpr.And(getInSetApp(Seq(s1.localVar, currStates), typVarMap), getInSetApp(Seq(s2.localVar, currStates), typVarMap))(),
-                                            vpr.EqCmp(translateExp(loopGuard, s1.localVar, currStates, currFailureStates), translateExp(loopGuard, s2.localVar, currStates, currFailureStates))()
+                                            vpr.EqCmp(
+                                              translateExp(loopGuard, s1.localVar, currStates, currFailureStates),
+                                              translateExp(loopGuard, s2.localVar, currStates, currFailureStates))()
                                             )())()
         if (rule == "syncRule" || rule == "syncTotRule") {
-          if (!isAutoSelected) ifBodyStmts = ifBodyStmts :+ vpr.Assert(sameGuardValue)()
+          if (!isAutoSelected) {
+            val assert = getAssertWithCustomMessage(sameGuardValue, s"The following loop guard may be violated:\n${loopGuard}")
+            ifBodyStmts = ifBodyStmts :+ assert
+          }
           ifBodyStmts = ifBodyStmts :+ vpr.Inhale(loopGuardHoldsForAll)()
         } else if (rule == "desugaredRule") {
           val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates, currFailureStates)._1
@@ -1466,21 +1493,20 @@ object Generator {
 
         // Update loop index to be $n + 1 (Note that this only matters when the rule is default)
         currLoopIndex = vpr.Add(currLoopIndexDecl.localVar, one)()
-        val assertI = vpr.Assert(getAllInvariants(inv, currStates, currFailureStates))()
-        ifBodyStmts = ifBodyStmts :+ assertI
+        val assertIs = inv.map { i =>
+          getAssertWithCustomMessage(translateExp(i, null, currStates, currFailureStates), f"[DEPRECATED] The following invariant might not hold!\n${i.toString()}")
+        }
+        ifBodyStmts = ifBodyStmts ++ assertIs
 
-        if (!decrExpr.isEmpty && rule != "syncRule" && rule != "forAllExistsRule") {
+        if (decrExpr.isDefined && rule != "syncRule" && rule != "forAllExistsRule") {
           val translatedDecr = translateExp(decrExpr.get, state.localVar, currStates, currFailureStates)
           // Assert that the current value of decrExpr is in the range of [0, t)
-          ifBodyStmts = ifBodyStmts :+ vpr.Assert(vpr.Forall(Seq(state), Seq.empty,
-                                          vpr.Implies(getInSetApp(Seq(state.localVar, currStates), typVarMap),
-                                            vpr.And(vpr.GeCmp(translatedDecr, zero)(),
-                                                  vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-                                                )())())())()
+          val tf_decr_exp = vpr.Forall(Seq(state), Seq.empty, vpr.Implies(getInSetApp(Seq(state.localVar, currStates), typVarMap), vpr.And(vpr.GeCmp(translatedDecr, zero)(), vpr.LtCmp(translatedDecr, getGetApp(             Seq(state.localVar, t), typVarMap))())())())()
+          val assert_variant = getAssertWithCustomMessage(tf_decr_exp, s"The following variant might not strictly decrease:\n${decrExpr.get.toString()}")
+          ifBodyStmts = ifBodyStmts :+ assert_variant
         }
 
         ifBodyStmts = ifBodyStmts :+ vpr.Inhale(falseLit)()
-
 
         val ifStmt = vpr.If(nonDetBool, vpr.Seqn(ifBodyStmts, Seq.empty)(), vpr.Seqn(Seq.empty, Seq.empty)())()
         returnedStmts = returnedStmts :+ ifStmt
@@ -1868,5 +1894,9 @@ object Generator {
       errT = vpr.NoTrafos,
       typ = retType,
       domainName = funcToDomainNameMap.get(funcName).getOrElse("Error"))
+  }
+
+  def getAssertWithCustomMessage(exp: vpr.Exp, msg: String): viper.silver.ast.Assert = {
+    vpr.Assert(exp)(info = AnnotationInfo(Map("msg" -> Seq(msg))))
   }
 }

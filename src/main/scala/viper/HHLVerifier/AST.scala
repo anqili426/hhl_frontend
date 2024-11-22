@@ -1,10 +1,11 @@
 package viper.HHLVerifier
 
-class Expr(){
+class Expr() {
   var typ: Type = UnknownType()
+  var pos: Int = -1
 
   override def toString: String = {
-    PrettyPrinter.printExpr(this)
+    PrettyPrinter.formatExpr(this)
   }
 }
 
@@ -45,7 +46,7 @@ case class MethodCallExpr(methodName: String, args: Seq[Id]) extends Expr {
 
 sealed trait Stmt {
   override def toString: String = {
-    PrettyPrinter.printStmt(this)
+    PrettyPrinter.formatStmt(this)
   }
 }
 
@@ -98,7 +99,7 @@ case class HHLProgram(methods: Seq[Method]) {
 
 sealed trait Type {
   override def toString: String = {
-    PrettyPrinter.printType(this)
+    PrettyPrinter.formatType(this)
   }
 }
 
