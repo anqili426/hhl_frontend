@@ -1,6 +1,6 @@
 package viper.HHLVerifier
 
-import viper.silver.ast.AnnotationInfo
+import viper.silver.ast.{AnnotationInfo, ErrorTrafo, Info, NoInfo, NoPosition, NoTrafos, Position}
 import viper.silver.{ast => vpr}
 
 import scala.collection.immutable.Seq
@@ -194,17 +194,15 @@ object Generator {
     // Forming the postconditions
     isPostcondition = true
     // postconditions and debug info
-    val wrapped_posts = method.post.map {
+    val posts = method.post.map {
       p =>
         val res = translatePostcondition(p, null, outputStates.localVar, outputFailureStates.localVar)
-        if (res.length == 2) (vpr.InhaleExhaleExp(res.head, res(1))(), PrettyPrinter.getErrorMessage(p, program_source))
-        else (res.head, PrettyPrinter.getErrorMessage(p, program_source))
+        val errMsg = f"The following postcondition might not hold!\n${PrettyPrinter.getErrorMessage(p, program_source)}"
+        if (res.length == 2) vpr.InhaleExhaleExp(res.head, res(1))(info = AnnotationInfo(Map("msg" -> Seq(errMsg))))
+        else vpr.And(res.head, res.head)(info = AnnotationInfo(Map("msg" -> Seq(errMsg))))
     }
     isPostcondition = false
 
-    // Error Message Generation
-    // Mapping postconditions to Viper asserts with custom messages
-    val error_asserts = wrapped_posts.map { case (exp, str) => getAssertWithCustomMessage(exp, f"The following postcondition might not hold!\n$str")}
     /* Method body contains the following
     *  Local variable declaration (program variables + auxiliary variables of type SetState + isIfBlock)
     *  Assume all program variables used in the method are different
@@ -233,12 +231,8 @@ object Generator {
     val nonIntAuxVars = Seq(tempStates, tempFailedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
     val localVars = progVarDecls ++ auxiliaryVarDecls ++ nonIntAuxVars
 
-    val posts = wrapped_posts.map { case (exp, _) => exp }
-
-    val methodBody = Seq(currStatesAssignment, assumeSFailEmpty) ++ inSetEq ++ inSetFailEq ++ assignToVars ++ translatedContent._1 ++ error_asserts
-    val thisMethod = vpr.Method(method.mName, translatedArgs, ret ++ Seq(outputStates, outputFailureStates), pres, posts, Some(vpr.Seqn(methodBody, localVars)()))(info = AnnotationInfo(
-      Map("msg" -> Seq("The postcondition of this method might not hold")))
-    )
+    val methodBody = Seq(currStatesAssignment, assumeSFailEmpty) ++ inSetEq ++ inSetFailEq ++ assignToVars ++ translatedContent._1
+    val thisMethod = vpr.Method(method.mName, translatedArgs, ret ++ Seq(outputStates, outputFailureStates), pres, posts, Some(vpr.Seqn(methodBody, localVars)()))() // UPDATED
     allMethods = allMethods :+ thisMethod
     postIsTopExists = false
   }
@@ -613,8 +607,8 @@ object Generator {
 
             newVars = Seq(loopFailureStates)
 
-            val normalizedInv = if (isAutoSelected) inv else inv.map(i => Normalizer.normalize(i, false))
-            if (!isAutoSelected) normalizedInv.foreach(i => Normalizer.detQuantifier(i, false))
+            val normalizedInv = if (isAutoSelected) inv else inv.map(i => Normalizer.normalize(i, negate = false))
+            if (!isAutoSelected) normalizedInv.foreach(i => Normalizer.detQuantifier(i, underForAll = false))
 
             if (autoSelectRules && rule == "unspecified") {
               val normalizedInvWithHints = normalizedInv.map(i => (Option.empty, i))
@@ -689,7 +683,7 @@ object Generator {
                  }
 
                  // Else branch
-                 val invHasTopExists = !normalizedInvWithHints.filter(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists).isEmpty
+                 val invHasTopExists = normalizedInvWithHints.exists(i => i._2.isInstanceOf[Assertion] && i._2.asInstanceOf[Assertion].topExists)
                  val useNotSyncRule =
                    if (invHasTopExists) {
                     // exists rule
@@ -702,6 +696,7 @@ object Generator {
                      dupLoop.isTotal = loop.isTotal
                      translateStmt(dupLoop, currStates, currFailureStates, true)
                    }
+
 
                   val applyRule = vpr.If(checkRuleCond, vpr.Seqn(useSyncRule._1, Seq.empty)(), vpr.Seqn(useNotSyncRule._1, Seq.empty)())()
 
@@ -903,6 +898,59 @@ object Generator {
       }
     }
 
+//    def translateWhileLoopStmt(loop: WhileLoopStmt): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
+//      // define naming of modular function
+//      loopCounter = loopCounter + 1
+//      val getSkFuncName = "__get_Sk_" + loopCounter
+//      currLoopIndex = zero
+//
+//      // extract invariants (currently containing hints) and normalize them if necessary
+//      val inv = loop.inv.map(i => i._2)
+//      val normalizedInv = if (isAutoSelected) {
+//        inv
+//      } else {
+//        inv.map{ i =>
+//          val n = Normalizer.normalize(i, negate = false) // what exactly is happening here
+//          Normalizer.detQuantifier(n, underForAll = false)
+//          n
+//        }
+//      }
+//
+//      // prepare states
+//      val loopFailureStatesName = failedStatesVarName + loopCounter
+//      val loopFailureStates = vpr.LocalVar(loopFailureStatesName, currFailureStates.typ)()
+//      val assumeEmptyFailureStates = vpr.Inhale(
+//        vpr.Forall(
+//          Seq(stateDecl), Seq.empty, vpr.And(
+//            vpr.Not(getInSetApp(Seq(state, loopFailureStates), typVarMap))(),
+//            vpr.Not(getInSetApp(Seq(state, loopFailureStates), typVarMap, useForAll=false))()
+//          )(),
+//        )()
+//      )()
+//
+//      // determine rule to use
+//      var appliedRule = loop.rule
+//      // no rule is specified => determine rule automatically
+//      if (autoSelectRules && loop.rule == "unspecified") {
+//        val normalizedInvWithHints = normalizedInv.map(i => (Option.empty, i))
+//
+//        val canUseSyncRule = checkSyncCondModular(normalizedInv, body, cond, typVarMap)
+//        if (canUseSyncRule) {
+//          // determine subrule
+//          if (loop.isTotal) appliedRule = "syncTotRule"
+//          else              appliedRule = "syncRule"
+//
+//        } else {
+//          // determine subrule
+//          val invHasTopExists = normalizedInvWithHints.exists(i => checkHasTopExists(i._2))
+//          if (invHasTopExists)  appliedRule = "existsRule"
+//          else                  appliedRule = "forAllExistsRule"
+//        }
+//      }
+//
+//      // the rule has been determined, it will now be
+//    }
+
     def transformExpr(e: Expr, loopGuard: Expr, transform: Boolean): Expr = {
       e match {
         case a@Assertion(quantifier, assertVarDecls, body) =>
@@ -993,7 +1041,7 @@ object Generator {
       val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
         vpr.And(getInSetApp(Seq(s1.localVar, outputStates.localVar), typVarMap), getInSetApp(Seq(s2.localVar, outputStates.localVar), typVarMap))(),
         vpr.EqCmp(translateExp(loopGuard, s1.localVar, outputStates.localVar, outputFailureStates.localVar), translateExp(loopGuard, s2.localVar, outputStates.localVar, outputFailureStates.localVar))()
-      )())()
+      )())(info = AnnotationInfo(Map("msg" -> Seq("Loop Error Message 1"))))
 
       val method = createViperMethod(checkSyncCondMethodName,
                       args, // Args
@@ -1078,6 +1126,8 @@ object Generator {
       methodBody = methodBody ++ inSetEq ++ inSetEqFail ++ Seq(assignToOutputStates, assignToOutputFailureStates)
       methodBody = methodBody ++ body
 
+      // Unclear usage of this function, normal error message implemented
+      // Error messages are implemented outside of this function
       vpr.Method(methodName, methodArgs, methodRes, methodPres, methodPosts,
         Option(vpr.Seqn(methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()))()))()
     }
@@ -1093,7 +1143,10 @@ object Generator {
 
       var methodLocalVars = Seq(tmpStates, tmpFailureStates)
       var methodPres = pres.map(i => getAssertionWithTriggers(i, inputStates.localVar, inputFailureStates.localVar))
-      val methodPosts = posts.map(i => translateExp(i, null, outputStates.localVar, outputFailureStates.localVar))
+      val methodPosts = posts.map{ i =>
+        val translatedExp = translateExp(i, null, outputStates.localVar, outputFailureStates.localVar)
+        vpr.And(translatedExp, translatedExp)(info = AnnotationInfo(Map("msg" -> Seq("Loop Error Message 2"))))
+      }
 
       val translatedStmt = translateStmt(stmt, outputStates.localVar, outputFailureStates.localVar)
       val methodBody = translatedStmt._1
@@ -1133,7 +1186,9 @@ object Generator {
       currLoopIndex = currLoopIndexDecl.localVar
       val In = getAllInvariantsWithTriggers(inv, inputStates.localVar, inputFailureStates.localVar)
       currLoopIndex = vpr.Add(currLoopIndex, one)()
-      val InPlus1 = getAllInvariants(inv, outputStates.localVar, outputFailureStates.localVar)
+
+      val temp = getAllInvariants(inv, outputStates.localVar, outputFailureStates.localVar)
+      val InPlus1 = vpr.And(temp, temp)(info = AnnotationInfo(Map("msg" -> Seq("Loop Error Message 4"))))
 
       val state = vpr.LocalVarDecl(sVarName, getConcreteStateType(typVarMap))()
       val decrExprPre: Seq[vpr.Exp] = if (decrExpr.isEmpty) Seq.empty else {
@@ -1149,7 +1204,7 @@ object Generator {
           vpr.Implies(getInSetApp(Seq(state.localVar, outputStates.localVar), typVarMap),
             vpr.And(vpr.GeCmp(translatedDecr, zero)(),
               vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-            )())())())
+            )())())(info = AnnotationInfo(Map("msg" -> Seq("Loop Error Message 4")))))
       }
 
       val tmpStates = vpr.LocalVarDecl(tempStatesVarName, getConcreteSetStateType(typVarMap))()
@@ -1345,7 +1400,8 @@ object Generator {
     var methodLocalVars: Seq[vpr.LocalVar] = Seq(STmp, SFailTmp)
 
     val pre1 = getAllInvariantsWithTriggers(normalizedInv, inputStates, inputFailureStates)
-    val post1 = getAllInvariants(normalizedInv, outputStates, outputFailureStates)
+    val temp = getAllInvariants(normalizedInv, outputStates, outputFailureStates)
+    val post1 = vpr.And(temp, temp)(info = AnnotationInfo(Map("msg" -> Seq("Loop Error Message 5"))))
     methodPres = methodPres :+ pre1
     methodPosts = methodPosts :+ post1
 
@@ -1359,7 +1415,7 @@ object Generator {
         val decrPre = vpr.Forall(Seq(state), trigger,
           vpr.Implies(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited = true),
             vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-          )())()
+          )())(info = AnnotationInfo(Map("msg" -> Seq("Loop Error Message 6"))))
         methodPres = methodPres :+ decrPre
       }
     }
@@ -1408,7 +1464,7 @@ object Generator {
                             vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
                             )()
                         )()
-                      )()
+                      )(info = AnnotationInfo(Map("msg" -> Seq("Loop Error Message 5"))))
       methodPosts = methodPosts :+ decrPost
     }
 

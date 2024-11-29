@@ -38,7 +38,7 @@ object SymbolChecker {
       varsAllowedInPost = varsAllowedInPost + (a.name -> a.typ)
     })
     allArgNames = m.paramsMap.keySet
-    m.pre.foreach(p => checkSymbolsExpr(p, false, false))
+    m.pre.foreach(p => checkSymbolsExpr(p, isInLoopInv = false, isFrame = false))
     // The return variables can only be referred to in the method body or postconditions
     m.res.foreach { r =>
       checkIdDup(r)

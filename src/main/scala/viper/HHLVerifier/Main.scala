@@ -7,6 +7,7 @@ import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
 
 object Main {
 
+  // [DOC] Variables
   var verified = 0  // 0: unknown, 1: failure, 2: success
   var runtime = 0.0
   var test = false
@@ -16,6 +17,8 @@ object Main {
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
     verified = 0
+
+    // [DOC] Read Files
     if (args.length == 0) {
       println("Please provide the program to verify. ")
       sys.exit(1)
@@ -26,6 +29,7 @@ object Main {
     val program = programSource.mkString
     programSource.close()
 
+    // [DOC] Handle command line arguments
     val outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
     if (args.contains("--noframe")) Generator.forAllFrame = false
     if (args.contains("--existsframe")) {
@@ -41,9 +45,12 @@ object Main {
     printMsg("The input program is read from " + programAbsPath)
 
     try {
+      // [DOC] parse program
       val t0 = System.nanoTime()
       val res = fastparse.parse(program, Parser.program(_))
+
       if (res.isSuccess) {
+
         printMsg("Parsing successful. ")
         val parsedProgram: HHLProgram = res.get.value
 
