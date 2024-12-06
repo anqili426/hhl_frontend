@@ -62,7 +62,7 @@ object PrettyPrinter {
       case Id(name) => name
       case AssertVar(name) => name
       case ProofVar(name) => name
-      case AssertVarDecl(vName, vType) => vName + ": " + formatType(vType)
+      case AssertVarDecl(vName, vType) => f"$vName"  // + ": " + formatType(vType)
       case Num(value) => value.toString
       case BoolLit(value) => value.toString
       case BinaryExpr(e1, op, e2) => "(" + formatExpr(e1) + ") " + op + " (" + formatExpr(e2) + ")"
