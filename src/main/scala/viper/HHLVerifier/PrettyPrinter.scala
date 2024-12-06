@@ -89,29 +89,4 @@ object PrettyPrinter {
       case StmtBlockType() => "StmtBlock"
     }
   }
-
-  def getErrorMessage(expr: Expr, source: String): String = {
-    // determine position
-    val (line, char) = findLineNumber(source, expr.pos)
-
-    f"[$line:$char] ${expr.toString()}"
-  }
-
-  def findLineNumber(source: String, charPosition: Int): (Int, Int) = {
-    val lines = source.split("\n")
-
-    var currentCharCount = 0
-    var lineNumber = 0
-
-    for (i <- lines.indices) {
-      currentCharCount += lines(i).length + 1
-
-      if (currentCharCount > charPosition) {
-        lineNumber = i + 1
-        return (lineNumber, charPosition - currentCharCount + lines(i).length + 1)
-      }
-    }
-
-    (lineNumber, charPosition - currentCharCount)
-  }
 }

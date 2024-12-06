@@ -21,7 +21,7 @@ object Parser {
   def precondition[$: P]: P[Expr] = P("requires" ~~ spaces ~ expr)
   def postcondition[$: P]: P[Expr] = P("ensures" ~~ spaces ~ expr)
 
-  def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ notStateTypeName).map{
+  def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ typeName).map{
     items => items._1.typ = items._2
       items._1
   }
@@ -29,18 +29,29 @@ object Parser {
 
   def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
 
-  def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ notStateTypeName).map(items => PVarDecl(items._1, items._2))
+  def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ typeName).map(items => PVarDecl(items._1, items._2))
 
-  def normalAssertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ notStateTypeName).map(items => AssertVarDecl(items._1, items._2))
+  def normalAssertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ typeName).map(items => AssertVarDecl(items._1, items._2))
 
-  def notStateTypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
+  def typeName[$: P] : P[Type] = P(primitiveTypeName | compositeSingleTypeName | compositeMultipleTypeName)
+
+  def compositeSingleTypeName[$: P] : P[Type] = P(("Seq" | "Set").! ~ "[" ~ primitiveTypeName ~ "]").map{
+    case ("Seq", t) => SeqType(t)
+    case ("Set", t) => SetType(t)
+  }
+
+  def compositeMultipleTypeName[$: P] : P[Type] = P("Map" ~ "[" ~ primitiveTypeName  ~ ", " ~ primitiveTypeName ~ "]").map{
+    case (t1, t2) => MapType(t1, t2)
+  }
+
+  def primitiveTypeName[$: P] : P[Type] = P("Int" | "Bool" ).!.map{
     case "Int" => IntType()
     case "Bool" => BoolType()
   }
 
   def proofVarDecl[$: P]: P[ProofVarDecl] = P(stateProofVarDeclErr | stateProofVarDecl | normalProofVarDecl)
 
-  def normalProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ notStateTypeName ~ "::" ~ expr).map{
+  def normalProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ typeName ~ "::" ~ expr).map{
     items =>
       items._1.typ = items._2
       ProofVarDecl(items._1, items._3)
@@ -67,10 +78,13 @@ object Parser {
 
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
   def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | multiAssign | assign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt | methodCallStmt)
+
   def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map{
     items => MultiAssignStmt(items._1, MethodCallExpr(items._2._1, items._2._2))
   }
+
   def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ otherExpr).map(e => AssignStmt(e._1, e._2))
+
   def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar ~ hintDecl.?).map{
     case(v, None) => HavocStmt(v, Option.empty)
     case(v, hintDecl) => HavocStmt(v, hintDecl)

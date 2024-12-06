@@ -5,7 +5,7 @@ import viper.silver.{ast => vpr}
 
 object Generator {
   // source code
-  var program_source = ""
+  var locater: Locater = null
 
   // State domain
   val stateDomainName = "State"
@@ -120,7 +120,7 @@ object Generator {
   var stateRemoved = ""
 
   def generate(input: HHLProgram, source: String): vpr.Program = {
-    program_source = source
+    locater = new Locater(source)
 
     var fields: Seq[vpr.Field] = Seq.empty
     var predicates: Seq[vpr.Predicate] = Seq.empty
@@ -196,7 +196,7 @@ object Generator {
       val normalizedPost = Normalizer.normalize(exp, negate = false)
       Normalizer.detQuantifier(normalizedPost, underForAll = false)
 
-      translateExp(normalizedPost, null, outputStates.localVar, outputFailureStates.localVar, info = PostconditionErr(exp).getMsg)
+      translateExp(normalizedPost, null, outputStates.localVar, outputFailureStates.localVar, info = PostconditionErr(exp, locater).getMsg)
     }
     isPostcondition = false
 
@@ -282,7 +282,7 @@ object Generator {
       case ProofVarDecl(pv, p) =>
         useAliasForProofVar = true
         currProofVarName = pv.name
-        val assertVarExists = vpr.Assert(vpr.Exists(Seq(getAliasForProofVar(pv, typVarMap)), Seq.empty, translateExp(p, state, currStates, currFailureStates))())(info = DeprecatedErr(p).getMsg)
+        val assertVarExists = vpr.Assert(vpr.Exists(Seq(getAliasForProofVar(pv, typVarMap)), Seq.empty, translateExp(p, state, currStates, currFailureStates))())(info = DeprecatedErr(p, locater).getMsg)
         useAliasForProofVar = false
         val assumeP = vpr.Inhale(translateExp(p, state, currStates, currFailureStates))()
         newStmts = Seq(assertVarExists, assumeP)
@@ -345,7 +345,7 @@ object Generator {
         (newStmts, Seq.empty)
 
       case HyperAssertStmt(e) =>
-        val assert = vpr.Assert(translateExp(e, null, currStates, currFailureStates))(info = HyperAssertionErr(e).getMsg)
+        val assert = vpr.Assert(translateExp(e, null, currStates, currFailureStates))(info = HyperAssertionErr(e, locater).getMsg)
         newStmts = Seq(assert)
         (newStmts, Seq.empty)
 
@@ -376,7 +376,7 @@ object Generator {
 
           callee.pre.foreach{ exp =>
             val vprExp = translateExp(exp, state, currStates, currFailureStates)
-            newStmts = newStmts :+ vpr.Assert(vprExp)(info = MultiAssignErr(exp).getMsg)
+            newStmts = newStmts :+ vpr.Assert(vprExp)(info = MultiAssignErr(exp, locater).getMsg)
           }
 
           useParamsToArgsMap = false
@@ -717,7 +717,7 @@ object Generator {
           // Assert I(0)
           if (normalizedInvariants.nonEmpty) {
             for ((normalizedInv, i) <- normalizedInvariants.zipWithIndex) {
-              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = LoopEntryPointErr(invariants(i)).getMsg)
+              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = LoopEntryPointErr(invariants(i), locater).getMsg)
             }
           }
 
@@ -784,7 +784,7 @@ object Generator {
 
       case FrameStmt(exp, body) =>
         val framedExpr = translateExp(exp, state, currStates, currFailureStates)
-        val assertFrame = vpr.Assert(framedExpr)(info = FrameErr(exp).getMsg)
+        val assertFrame = vpr.Assert(framedExpr)(info = FrameErr(exp, locater).getMsg)
         val translatedBody = translateStmt(body, currStates, currFailureStates)
         val inhaleFrame = vpr.Inhale(framedExpr)()
         (Seq(assertFrame) ++ translatedBody._1 ++ Seq(inhaleFrame), translatedBody._2)
@@ -799,7 +799,7 @@ object Generator {
           useParamsToArgsMap = true
           currParamsToArgsMap = call.paramsToArgs
           call.method.pre.foreach{ precondition =>
-            newStmts :+ vpr.Assert(translateExp(precondition, state, currStates, currFailureStates))(info = MethodCallPreconditionErr(precondition).getMsg)
+            newStmts :+ vpr.Assert(translateExp(precondition, state, currStates, currFailureStates))(info = MethodCallPreconditionErr(precondition, locater).getMsg)
           }
           useParamsToArgsMap = false
         }
@@ -929,7 +929,7 @@ object Generator {
     val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
       vpr.And(getInSetApp(Seq(s1.localVar, outputStates.localVar), typVarMap), getInSetApp(Seq(s2.localVar, outputStates.localVar), typVarMap))(),
       vpr.EqCmp(translateExp(loopGuard, s1.localVar, outputStates.localVar, outputFailureStates.localVar), translateExp(loopGuard, s2.localVar, outputStates.localVar, outputFailureStates.localVar))()
-    )())(info = LoopSyncGuardErr(loopGuard).getMsg)
+    )())(info = LoopSyncGuardErr(loopGuard, locater).getMsg)
 
     val method = createViperMethod(checkSyncCondMethodName, // no update needed
       args, // Args
@@ -1169,7 +1169,7 @@ object Generator {
     pres = pres :+ addToTopExists(firstExistsInv, exprAddedToPre)
 
     val exprAddedToPost = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
-    val temp = (addToTopExists(firstExistsInv, exprAddedToPost), Option(LoopExistsInvErr(firstExistsInv).getMsg))
+    val temp = (addToTopExists(firstExistsInv, exprAddedToPost), Option(LoopExistsInvErr(firstExistsInv, locater).getMsg))
     posts = posts :+ temp
 
     verifyStmtModular(methodName, stmt, varsInStmt, pres, posts, typVarMap)
@@ -1192,7 +1192,7 @@ object Generator {
     varsInStmt = varsInStmt :+ newState
     body.allProgVars +=  (newState.name -> StateType())
     pres = pres :+ newInv
-    val temp = (newInv, Option(LoopExistsInvErr(firstExistsInv).getMsg))
+    val temp = (newInv, Option(LoopExistsInvErr(firstExistsInv, locater).getMsg))
     posts = posts :+ temp
 
     val stmt = WhileLoopStmt(loopGuard, body, pres.map(i => (Option.empty, i)), Option(decrExpr))
@@ -1226,7 +1226,7 @@ object Generator {
     methodPres = methodPres :+ getAllInvariantsWithTriggers(normalizedInv, inputStates, inputFailureStates)
 
     for ((normInv, i) <- normalizedInv.zipWithIndex) {
-      methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = LoopInvariantErr(invs(i)).getMsg)
+      methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = LoopInvariantErr(invs(i), locater).getMsg)
     }
 
     if (decrExpr.isDefined) {
@@ -1239,7 +1239,7 @@ object Generator {
         val decrPre = vpr.Forall(Seq(state), trigger,
           vpr.Implies(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited = true),
             vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-          )())(info = LoopVariantErr(decrExpr.get).getMsg)
+          )())(info = LoopVariantErr(decrExpr.get, locater).getMsg)
         methodPres = methodPres :+ decrPre
       }
     }
@@ -1262,7 +1262,7 @@ object Generator {
     )())()
 
     if (rule == "syncRule" || rule == "syncTotRule") {
-      if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)(info = LoopSyncGuardErr(loopGuard).getMsg)
+      if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)(info = LoopSyncGuardErr(loopGuard, locater).getMsg)
       methodBody = methodBody :+ vpr.Inhale(loopGuardHoldsForAll)()
     }
 
@@ -1285,7 +1285,7 @@ object Generator {
             vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
           )()
         )()
-      )(info = LoopVariantErr(decrExpr.get).getMsg)
+      )(info = LoopVariantErr(decrExpr.get, locater).getMsg)
       methodPosts = methodPosts :+ decrPost
     }
 
@@ -1349,7 +1349,7 @@ object Generator {
         translateExp(loopGuard, s2.localVar, currStates, currFailureStates))()
     )())()
     if (rule == "syncRule" || rule == "syncTotRule") {
-      if (!isAutoSelected) ifBodyStmts = ifBodyStmts :+ vpr.Assert(sameGuardValue)(info = LoopSyncGuardErr(loopGuard).getMsg)
+      if (!isAutoSelected) ifBodyStmts = ifBodyStmts :+ vpr.Assert(sameGuardValue)(info = LoopSyncGuardErr(loopGuard, locater).getMsg)
       ifBodyStmts = ifBodyStmts :+ vpr.Inhale(loopGuardHoldsForAll)()
     } else if (rule == "desugaredRule") {
       val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates, currFailureStates)._1
@@ -1368,7 +1368,7 @@ object Generator {
     // Update loop index to be $n + 1 (Note that this only matters when the rule is default)
     currLoopIndex = vpr.Add(currLoopIndexDecl.localVar, one)()
     val assertIs = inv.map { i =>
-      vpr.Assert(translateExp(i, null, currStates, currFailureStates))(info = DeprecatedErr(i).getMsg)
+      vpr.Assert(translateExp(i, null, currStates, currFailureStates))(info = DeprecatedErr(i, locater).getMsg)
     }
     ifBodyStmts = ifBodyStmts ++ assertIs
 
@@ -1376,7 +1376,7 @@ object Generator {
       val translatedDecr = translateExp(decrExpr.get, state.localVar, currStates, currFailureStates)
       // Assert that the current value of decrExpr is in the range of [0, t)
       val tf_decr_exp = vpr.Forall(Seq(state), Seq.empty, vpr.Implies(getInSetApp(Seq(state.localVar, currStates), typVarMap), vpr.And(vpr.GeCmp(translatedDecr, zero)(), vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))())())())()
-      val assert_variant = vpr.Assert(tf_decr_exp)(info = LoopVariantErr(decrExpr.get).getMsg)
+      val assert_variant = vpr.Assert(tf_decr_exp)(info = LoopVariantErr(decrExpr.get, locater).getMsg)
       ifBodyStmts = ifBodyStmts :+ assert_variant
     }
 
