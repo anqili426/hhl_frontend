@@ -1168,7 +1168,7 @@ object Generator {
     e match {
       case a@Assertion(_, _, _) => a.topExists
       case BinaryExpr(e1, op, e2) =>
-        if (TypeChecker.boolOp.contains(op)) checkHasTopExists(e1) || checkHasTopExists(e2)
+        if (TypeChecker.boolOp.contains(op) && op == "&&") checkHasTopExists(e1) || checkHasTopExists(e2)
         else false
       case UnaryExpr(op, e) =>
         if (TypeChecker.boolOp.contains(op)) checkHasTopExists(e)
@@ -1208,7 +1208,7 @@ object Generator {
   def removeTopExistsState(e: Expr, stateToRemove: String=""): Expr = {
     e match {
       case a@Assertion(quantifier, assertVarDecls, body) =>
-         if (a.topExists) {
+         if (a.topExists && stateToRemove == "") {
            val stateToRemove = a.assertVarDecls.head.vName.name
            stateRemoved = stateToRemove
            val newBody = removeTopExistsState(body, stateToRemove)
