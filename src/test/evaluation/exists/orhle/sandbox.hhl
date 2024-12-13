@@ -16,7 +16,7 @@ ensures exists <_s> :: _s[sum] == 0
     p := 0
 
     while (i < 10)
-		invariant exists <_s> :: ((_s[i] <= 5) ==> ((_s[j] == 0) && (_s[p] == 0))) &&
+		invariant forall <_s> :: ((_s[i] <= 5) ==> ((_s[j] == 0) && (_s[p] == 0))) &&
                                     ((_s[i] > 5) ==> ((_s[j] == 1) && (_s[p] == 1))) &&        
                                     _s[sum] == 0 && 0 <= _s[i] && _s[i] <= 10
         invariant forall <_s> :: _s[i] <= 10

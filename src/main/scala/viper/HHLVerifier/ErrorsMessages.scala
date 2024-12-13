@@ -10,11 +10,11 @@ abstract sealed class ErrorMsg(expr: Expr) {
 }
 
 case class PostconditionErr(expr: Expr) extends ErrorMsg(expr) {
-  override def text: String = "The following post condition might not hold:"
+  override def text: String = "[Method] The following post condition might not hold:"
 }
 
 case class HyperAssertionErr(expr: Expr) extends ErrorMsg(expr) {
-  override def text: String = "The following hyper assertion might not hold:"
+  override def text: String = "[HyperAssertion] The following hyper assertion might not hold:"
 }
 
 case class DeprecatedErr(expr: Expr) extends ErrorMsg(expr) {
@@ -22,25 +22,30 @@ case class DeprecatedErr(expr: Expr) extends ErrorMsg(expr) {
 }
 
 case class MultiAssignErr(expr: Expr) extends ErrorMsg(expr) {
-  override def text: String = "The following precondition may not hold when using MultiAssign:"
-}
-
-case class LoopEntryPointErr(expr: Expr) extends ErrorMsg(expr) {
-  override def text: String = "The following loop invariant might not hold at entry point:"
+  override def text: String = "[MultiAssign] The following precondition may not hold when using MultiAssign:"
 }
 
 case class FrameErr(expr: Expr) extends ErrorMsg(expr) {
-  override def text: String = "The following hyper assertion (frame) might not hold:"
+  override def text: String = "[Frame] The following hyper assertion (frame) might not hold:"
 }
 
 case class MethodCallPreconditionErr(expr: Expr) extends ErrorMsg(expr) {
-  override def text: String = "The following precondition of a custom method might not hold:"
+  override def text: String = "[MethodCall] The following precondition of a custom method might not hold:"
+}
+
+case class LoopEntryPointErr(expr: Expr) extends ErrorMsg(expr) {
+  override def text: String = "[WhileLoop] The following loop invariant might not hold at entry point:"
 }
 
 case class LoopSyncGuardErr(expr: Expr) extends ErrorMsg(expr) {
-  override def text: String = "WhileSyncRule/WhileSyncTermRule:\nThe following loop guard might not be identical for all states, violating low(b):"
+  override def text: String = "[WhileLoop/WhileSync(-Tot)] The following loop guard might not be identical for all states, violating low(b):"
 }
 
 case class LoopVariantErr(expr: Expr) extends ErrorMsg(expr) {
-  override def text: String = "The following variant might not strictly decrease:"
+  override def text: String = "[WhileLoop] The following variant might not decrease strictly:"
+}
+
+// used for the exist rule
+case class LoopModularErr(expr: Expr) extends ErrorMsg(expr) {
+  override def text: String = "[WhileLoop/Exists] The following invariant might not hold:"
 }
