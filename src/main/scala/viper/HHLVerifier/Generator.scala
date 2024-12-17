@@ -1572,8 +1572,8 @@ object Generator {
     val sVar = vpr.LocalVarDecl(sVarName, stateType)()
     val s1Var = vpr.LocalVarDecl("s1", stateType)()
     val s2Var = vpr.LocalVarDecl("s2", stateType)()
-    val xVar = vpr.LocalVarDecl("x", typeVar)()
-    val yVar = vpr.LocalVarDecl("y", typeVar)()
+    val xVar = vpr.LocalVarDecl("x", viper.silver.ast.Int)()
+    val yVar = vpr.LocalVarDecl("y", viper.silver.ast.Int)()
     val SVar = vpr.LocalVarDecl("S", setStateType)()
     val S1Var = vpr.LocalVarDecl("S1", setStateType)()
     val S2Var = vpr.LocalVarDecl("S2", setStateType)()
@@ -1584,9 +1584,17 @@ object Generator {
       // Domain functions
       Seq(
         // function get
-        vpr.DomainFunc(getFuncName,
+        vpr.DomainFunc(
+          getFuncName + "_int",
           Seq(sVar, xVar),
-          typeVar)(domainName = stateDomainName),
+          viper.silver.ast.Int
+        )(domainName = stateDomainName),
+        // function get
+        vpr.DomainFunc(
+          getFuncName + "_bool",
+          Seq(sVar, xVar),
+          viper.silver.ast.Bool
+        )(domainName = stateDomainName),
         // function equal_on_everything_except
         vpr.DomainFunc(equalFuncName,
           Seq(s1Var, s2Var, xVar),
@@ -1620,7 +1628,7 @@ object Generator {
             )()
           )())(domainName = stateDomainName)),
       // Type variable of the domain
-      Seq(typeVar),
+      Seq.empty,
       // Interpretations
       Option.empty
     )()
@@ -1731,7 +1739,7 @@ object Generator {
   }
 
   def getConcreteStateType(typVarMap: Map[vpr.TypeVar, vpr.Type]): vpr.Type = {
-    vpr.DomainType(stateDomainName, typVarMap)(Seq(typeVar))
+    vpr.DomainType(stateDomainName, typVarMap)(Seq.empty)
   }
 
   def havocSetMethodCall(set: vpr.LocalVar): vpr.MethodCall = {

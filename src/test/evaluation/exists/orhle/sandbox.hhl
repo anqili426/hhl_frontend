@@ -8,8 +8,8 @@ ensures exists <_s> :: _s[sum] == 0
 {
     sum := 0
     var i: Int
-    var j: Int
-    var p: Int
+    var j: Int 
+    var p: Int 
     var n: Int
     i := 0
     j := 0
@@ -17,7 +17,7 @@ ensures exists <_s> :: _s[sum] == 0
 
     while (i < 10)
 		invariant exists <_s> :: ((_s[i] <= 5) ==> ((_s[j] == 0) && (_s[p] == 0))) &&
-                                    ((_s[i] > 5) ==> ((_s[j] == 1) && (_s[p] == 1))) &&
+                                    ((_s[i] > 5) ==> ((_s[j] == 1) && (_s[p] == 1))) &&        
                                     _s[sum] == 0 && 0 <= _s[i] && _s[i] <= 10
         invariant forall <_s> :: _s[i] <= 10
 	    decreases 10 - i

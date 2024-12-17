@@ -1,0 +1,13 @@
+/*
+    A simple program to translate booleans
+*/
+
+method testBooleans() returns (out: Int)
+requires exists <_s> :: true
+ensures exists <_s> :: _s[out] == 0
+{
+    var b: Bool
+    b := true
+
+    out := 0
+}
