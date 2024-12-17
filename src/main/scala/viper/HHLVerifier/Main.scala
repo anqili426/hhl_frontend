@@ -60,7 +60,7 @@ object Main {
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
         printMsg("Type checking successful. ")
-        
+
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram, program)
         SymbolChecker.reset()

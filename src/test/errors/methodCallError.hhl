@@ -1,0 +1,26 @@
+/*
+    A simple test case for errors caused by a method call for which the preconditions may not hold.
+    Output:
+        Verification failed
+        After stripping 0 quantifier(s):
+        [MethodCall] The following precondition of a custom method might not hold:
+        forall <_s: State> :: ((<_s>) ==> ((_s[inp]) == (1)))
+*/
+
+method methodCallError() returns (out: Int)
+    requires exists <_s> :: true
+    ensures exists <_s> :: _s[out] == 2
+{
+    var n: Int
+    n := 0
+
+    out := otherMethod(n)
+}
+
+method otherMethod(inp: Int) returns (out: Int)
+    requires forall <_s> :: _s[inp] == 1
+    ensures forall <_s> :: _s[out] == 2
+{
+    out := 2
+}
+

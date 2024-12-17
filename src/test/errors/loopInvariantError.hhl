@@ -1,0 +1,29 @@
+/*
+    A simple test case for errors caused by a loops invariant which may not be preserved.
+    Output:
+        Verification failed
+        After stripping 0 quantifier(s):
+        [WhileLoop] The following invariant might not hold:
+        forall <_s: State> :: ((!(<_s>)) || ((_s[i]) == (0)))
+
+        After stripping 0 quantifier(s):
+        [Method] The following post condition might not hold:
+        exists <_s: State> :: ((<_s>) && ((_s[out]) == (2)))
+*/
+
+method methodCallError() returns (out: Int)
+    requires exists <_s> :: true
+    ensures exists <_s> :: _s[out] == 2
+{
+    var i: Int
+    i := 0
+
+    while (i < 1)
+        invariant forall <_s> :: _s[i] == 0
+    {
+        i := i + 1
+    }
+
+    out := 2
+}
+

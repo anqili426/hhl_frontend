@@ -62,7 +62,7 @@ object PrettyPrinter {
       case Id(name) => name
       case AssertVar(name) => name
       case ProofVar(name) => name
-      case AssertVarDecl(vName, vType) => f"$vName"  // + ": " + formatType(vType)
+      case AssertVarDecl(vName, vType) => vName + ": " + formatType(vType)
       case Num(value) => value.toString
       case BoolLit(value) => value.toString
       case BinaryExpr(e1, op, e2) => "(" + formatExpr(e1) + ") " + op + " (" + formatExpr(e2) + ")"
@@ -88,5 +88,30 @@ object PrettyPrinter {
       case StateType() => "State"
       case StmtBlockType() => "StmtBlock"
     }
+  }
+
+  def getErrorMessage(expr: Expr, source: String): String = {
+    // determine position
+    val (line, char) = findLineNumber(source, expr.pos)
+
+    f"[$line:$char] ${expr.toString()}"
+  }
+
+  def findLineNumber(source: String, charPosition: Int): (Int, Int) = {
+    val lines = source.split("\n")
+
+    var currentCharCount = 0
+    var lineNumber = 0
+
+    for (i <- lines.indices) {
+      currentCharCount += lines(i).length + 1
+
+      if (currentCharCount > charPosition) {
+        lineNumber = i + 1
+        return (lineNumber, charPosition - currentCharCount + lines(i).length + 1)
+      }
+    }
+
+    (lineNumber, charPosition - currentCharCount)
   }
 }

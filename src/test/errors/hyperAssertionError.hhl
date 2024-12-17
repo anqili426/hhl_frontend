@@ -1,0 +1,17 @@
+/*
+    A simple test case for errors caused by a hyper assert which may not hold.
+    Output:
+        Verification failed
+        After stripping 0 quantifier(s):
+        [HyperAssertion] The following hyper assertion might not hold:
+        forall <_s: State> :: ((<_s>) ==> (false))
+*/
+
+method methodCallError() returns (out: Int)
+    requires exists <_s> :: true
+    ensures exists <_s> :: _s[out] == 2
+{
+    out := 2
+    hyperAssert forall <_s> :: false
+}
+

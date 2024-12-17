@@ -59,8 +59,6 @@ case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
   var modifiedProgVars: Map[String, Type] = Map.empty
 }
 case class AssignStmt(left: Id, right: Expr) extends Stmt
-case class SeqAssignStmt(left: Id, pos: Expr, right: Expr) extends Stmt
-case class SetAssignStmt(left: Id, pos: Expr, right: Expr) extends Stmt
 case class MultiAssignStmt(left: Seq[Id], right: MethodCallExpr) extends Stmt
 case class HavocStmt(id: Id, hintDecl: Option[HintDecl]) extends Stmt
 case class AssumeStmt(e: Expr) extends Stmt
@@ -106,14 +104,8 @@ sealed trait Type {
 }
 
 case class UnknownType() extends Type
-
 case class IntType() extends Type
 case class BoolType() extends Type
-
-case class SeqType(subtype: Type) extends Type
-case class SetType(subtype: Type) extends Type
-case class MapType(subtype1: Type, subtype2: Type) extends Type
-
 case class StateType() extends Type
 case class StmtBlockType() extends Type
 

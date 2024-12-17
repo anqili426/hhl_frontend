@@ -1,0 +1,25 @@
+/*
+    A simple test case for errors caused by a loops invariant which may not hold at entry point.
+    Output:
+        Verification failed
+        After stripping 0 quantifier(s):
+        [WhileLoop] The following loop invariant might not hold at entry point:
+        forall <_s: State> :: ((!(<_s>)) || (false))
+*/
+
+method methodCallError() returns (out: Int)
+    requires exists <_s> :: true
+    ensures exists <_s> :: _s[out] == 2
+{
+    var i: Int
+    i := 0
+
+    while (i < 1)
+        invariant forall <_s> :: false
+    {
+        i := i + 1
+    }
+
+    out := 2
+}
+
