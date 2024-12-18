@@ -1,0 +1,26 @@
+/*
+    A test case for errors caused by a violation of the second condition in the exist rule.
+    Output:
+        Verification failed
+        [WhileLoop] The following transformed invariant (stripped from its existential quantifier) with the automatically chosen loop rule does not result in a postcondition that entails the original invariant
+        (true) && ((exists <_s2: State> :: ((<_s2>) && ((__s1_0[x]) != (_s2[x])))) || (exists <_s3: State> :: ((<_s3>) && ((__s1_0[x]) != (_s3[x])))))
+        Metadata:
+        - LoopRule: ExistsRule
+        - QuantifiersRemoved: 0
+*/
+
+method loopExistsRuleErr(x: Int) returns (z: Int)
+requires exists <_s1>, <_s2> :: _s1[x] != _s2[x]
+{
+    var i: Int
+    i := 10
+    while (i > 0)
+        invariant exists <_s1> :: ((exists <_s2> :: _s1[x] != _s2[x]) || (exists <_s3> :: _s1[x] != _s3[x]))
+        // Hypra has a bug when the following invariant is used instead. Fix later
+        // invariant exists <_s1> :: ((exists <_s2> :: _s1[x] != _s2[x]) && (exists <_s3> :: _s1[x] != _s3[x]))
+        decreases i
+    {
+        i := i - 1
+    }
+}
+

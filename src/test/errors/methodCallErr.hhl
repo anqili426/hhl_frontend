@@ -2,7 +2,6 @@
     A simple test case for errors caused by a method call for which the preconditions may not hold.
     Output:
         Verification failed
-        After stripping 0 quantifier(s):
         [MethodCall] The following precondition of a custom method might not hold:
         forall <_s: State> :: ((<_s>) ==> ((_s[inp]) == (1)))
 */

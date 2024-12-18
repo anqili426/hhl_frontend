@@ -1,13 +1,12 @@
 /*
-    A simple test case for errors caused by a frame statement which may not hold.
+    A test case for errors caused by a frame statement which may not hold.
     Output:
         Verification failed
-        After stripping 0 quantifier(s):
         [Frame] The following hyper assertion used in a frame might not hold:
         forall <_s: State> :: ((<_s>) ==> (false))
 */
 
-method methodCallError() returns (out: Int)
+method frameErr() returns (out: Int)
     requires exists <_s> :: true
     ensures exists <_s> :: _s[out] == 2
 {

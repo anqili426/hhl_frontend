@@ -119,7 +119,7 @@ object Generator {
   val checkExistsRuleCond2MethodName = "check_exists_cond2"
   var stateRemoved = ""
 
-  var countQuantifiersRemoved = 0
+  var quantifiersRemoved = 0
 
   def generate(input: HHLProgram, source: String): vpr.Program = {
     program_source = source
@@ -719,7 +719,8 @@ object Generator {
           // Assert I(0)
           if (normalizedInvariants.nonEmpty) {
             for ((normalizedInv, i) <- normalizedInvariants.zipWithIndex) {
-              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = LoopEntryPointErr(invariants(i)).getMsg)
+              val err = LoopInvEntryErr(invariants(i), Map("LoopRule" -> rule, "QuantifiersRemoved" -> f"$quantifiersRemoved"))
+              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = err.getMsg)
             }
           }
 
@@ -1163,16 +1164,17 @@ object Generator {
     var posts: Seq[(Expr, Option[Info])] = Seq.empty
 
     // Find the first invariant that contains a top-level existential quantifier
-    val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i) == true).get
+    val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i)).get
     pres = normalizedInvs.diff(Seq(firstExistsInv))
-    posts = pres.map(inv => (inv, Option(LoopInvariantErr(inv).getMsg)))
+    posts = pres.map(inv => (inv, Option(LoopInvariantErr(inv, Map("LoopRule" -> "ExistsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)))
 
     val exprAddedToPre = BinaryExpr(loopGuard, "&&", BinaryExpr(tProgVar, "==", decrExpr))
     pres = pres :+ addToTopExists(firstExistsInv, exprAddedToPre)
 
+    // As there is an exist, we need to assess all three cases
+    posts = posts :+ (firstExistsInv, Option(LoopInvariantErr(firstExistsInv, Map("LoopRule" -> "ExistsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)) // Test Invariant
     val exprAddedToPost = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
-    val temp = (addToTopExists(firstExistsInv, exprAddedToPost), Option(LoopVariantErr(decrExpr).getMsg))
-    posts = posts :+ temp
+    posts = posts :+ (addToTopExists(firstExistsInv, exprAddedToPost), Option(LoopVariantErr(decrExpr, Map("LoopRule" -> "ExistsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg))
 
     verifyStmtModular(methodName, stmt, varsInStmt, pres, posts, typVarMap)
   }
@@ -1186,19 +1188,23 @@ object Generator {
     // Find the first invariant that contains a top-level existential quantifier
     val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i)).get
     pres = normalizedInvs.diff(Seq(firstExistsInv))
-    posts = pres.map(inv => (inv, Option(null)))
+    posts = pres.map(inv => (inv, Option(LoopExistsRuleInvariantErr(inv, Map("LoopRule" -> "ExistsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)))
 
-    val newInv = removeTopExistsState(firstExistsInv, "")
+    val newInv = removeTopExistsState(firstExistsInv)
     val newState = vpr.LocalVar(stateAliasPrefix + stateRemoved + "_" + stateVarCounter, getConcreteStateType(typVarMap))()
     stateVarCounter = stateVarCounter + 1
     varsInStmt = varsInStmt :+ newState
     body.allProgVars +=  (newState.name -> StateType())
     pres = pres :+ newInv
-    val temp = (newInv, Option(LoopExistsInvErr(firstExistsInv).getMsg))
-    posts = posts :+ temp
+    posts = posts :+ (newInv, Option(LoopExistsRuleInvariantErr(newInv, Map("LoopRule" -> "ExistsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg))
 
     val stmt = WhileLoopStmt(loopGuard, body, pres.map(i => (Option.empty, i)), Option(decrExpr))
-    verifyStmtModular(methodName, stmt, varsInStmt, pres, posts, typVarMap)
+
+    quantifiersRemoved += 1
+    val res = verifyStmtModular(methodName, stmt, varsInStmt, pres, posts, typVarMap)
+    quantifiersRemoved -= 1
+
+    res
   }
 
   // This generates a method to verify the invariant when using sync, syncTot or forAllExists loop rule
@@ -1227,8 +1233,9 @@ object Generator {
 
     methodPres = methodPres :+ getAllInvariantsWithTriggers(normalizedInv, inputStates, inputFailureStates)
 
+    // wrapping all invariants which should be preserved in corresponding error messagsed -> violated only on non preservance
     for ((normInv, i) <- normalizedInv.zipWithIndex) {
-      methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = LoopInvariantErr(invs(i)).getMsg)
+      methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = LoopInvariantErr(invs(i), Map("LoopRule" -> rule, "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)
     }
 
     if (decrExpr.isDefined) {
@@ -1241,7 +1248,7 @@ object Generator {
         val decrPre = vpr.Forall(Seq(state), trigger,
           vpr.Implies(getInSetApp(Seq(state.localVar, inputStates), typVarMap, useLimited = true),
             vpr.EqCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
-          )())(info = LoopVariantErr(decrExpr.get).getMsg)
+          )())()
         methodPres = methodPres :+ decrPre
       }
     }
@@ -1264,7 +1271,11 @@ object Generator {
     )())()
 
     if (rule == "syncRule" || rule == "syncTotRule") {
-      if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)(info = LoopSyncGuardErr(loopGuard).getMsg)
+      if (!isAutoSelected) {
+        // violated if LoopGuard does not hold
+        val err = LoopSyncGuardErr(loopGuard, Map("LoopRule" -> rule, "QuantifiersRemoved" -> f"$quantifiersRemoved"))
+        methodBody = methodBody :+ vpr.Assert(sameGuardValue)(info = err.getMsg)
+      }
       methodBody = methodBody :+ vpr.Inhale(loopGuardHoldsForAll)()
     }
 
@@ -1278,7 +1289,7 @@ object Generator {
     methodBody = methodBody ++ methodBodyAndVars._1
     methodLocalVars = methodLocalVars ++ methodBodyAndVars._2
 
-    if (!decrExpr.isEmpty && rule != "syncRule" && rule != "forAllExistsRule") {
+    if (decrExpr.isDefined && rule != "syncRule" && rule != "forAllExistsRule") {
       val translatedDecr = translateExp(decrExpr.get, state.localVar, outputStates, outputFailureStates)
       // Assert that the current value of decrExpr is in the range of [0, t)
       val decrPost = vpr.Forall(Seq(state), Seq.empty,
@@ -1287,7 +1298,7 @@ object Generator {
             vpr.LtCmp(translatedDecr, getGetApp(Seq(state.localVar, t), typVarMap))()
           )()
         )()
-      )(info = LoopVariantErr(decrExpr.get).getMsg)
+      )(info = LoopVariantErr(decrExpr.get, Map("LoopRule" -> rule, "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)
       methodPosts = methodPosts :+ decrPost
     }
 

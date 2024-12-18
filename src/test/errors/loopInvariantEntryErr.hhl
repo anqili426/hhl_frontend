@@ -2,14 +2,16 @@
     A simple test case for errors caused by a loops invariant which may not hold at entry point.
     Output:
         Verification failed
-        After stripping 0 quantifier(s):
         [WhileLoop] The following loop invariant might not hold at entry point:
         forall <_s: State> :: ((!(<_s>)) || (false))
+        Metadata:
+        - LoopRule: syncRule
+        - QuantifiersRemoved: 0
 */
 
-method methodCallError() returns (out: Int)
-    requires exists <_s> :: true
-    ensures exists <_s> :: _s[out] == 2
+method loopInvariantEntryErr() returns (out: Int)
+    requires forall <_s> :: true
+    ensures forall <_s> :: _s[out] == 2
 {
     var i: Int
     i := 0

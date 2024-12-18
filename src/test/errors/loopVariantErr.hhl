@@ -1,0 +1,29 @@
+/*
+    A test case for errors caused by a loops variant which may not strictly decrease.
+    Output:
+        Verification failed
+        [WhileLoop] The following variant might not decrease strictly:
+        10
+        Metadata:
+        - LoopRule: syncTotRule
+        - QuantifiersRemoved: 0
+*/
+
+method loopVariantErr(inp: Int) returns (sum: Int)
+    requires forall <_s1>, <_s2> :: _s1[inp] == _s2[inp]
+    ensures forall <_s1>, <_s2> :: _s1[sum] == _s2[sum]
+{
+    var i: Int
+    i := 0
+
+    sum := 0
+
+    while (i < 10)
+        invariant forall <_s1>, <_s2> :: _s1[i] == _s2[i]
+        invariant forall <_s1>, <_s2> :: _s1[sum] == _s2[sum]
+		decreases 10
+    {
+        i := i + 1
+        sum := sum + i
+    }
+}

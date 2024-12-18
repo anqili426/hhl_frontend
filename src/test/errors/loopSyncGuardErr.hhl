@@ -1,0 +1,26 @@
+/*
+    A test case for errors caused by a loops invariant which may not hold at entry point.
+    Output:
+        Verification failed
+        [WhileLoop] The following loop guard might not be identical for all states, violating low(b):
+        (i) < (2)
+        Metadata:
+        - LoopRule: syncTotRule
+        - QuantifiersRemoved: 0
+*/
+
+method loopSyncGuardErr() returns (i: Int)
+    requires forall <_s> :: true
+    ensures forall <_s> :: true
+{
+    i := 1
+
+    while syncTotRule (i < 2) // syncTotRule cannot be applied here bc. guard does not hold (normally not selected)
+        invariant forall <_s> :: _s[i] <= 2 && _s[i] >= 1
+        decreases 2
+    {
+        i := i + 1
+    }
+
+    i := 2
+}
