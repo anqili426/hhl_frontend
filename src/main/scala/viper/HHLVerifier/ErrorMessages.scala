@@ -7,23 +7,16 @@ import viper.silver.ast.AnnotationInfo
    - text: Description of the error
    - meta: Metadata describing the environment in which the error was generated
  */
-sealed class ErrorMsg(expr: Expr, text: String, meta: Map[String, String]) {
+sealed class ErrorMsg(name: String, text: String, expr: Expr, meta: Map[String, String]) {
   private def getExprStr: String = PrettyPrinter.formatExpr(expr)
 
   def getMsg: AnnotationInfo = {
     val formatted = new StringBuilder()
 
-    formatted.append(text)
-    formatted.append("\n")
-    formatted.append(getExprStr)
-    formatted.append("\n")
-    if (meta.nonEmpty) {
-      formatted.append("Metadata:")
-
-      meta.foreach { case (key, value) =>
-        formatted.append(s"\n- $key: $value")
-      }
-    }
+    formatted.append(f"[$name")
+    if (meta.contains("LoopRule")) formatted.append(f", ${meta("LoopRule")} selected")
+    if (meta.contains("QuantifiersRemoved") && meta("QuantifiersRemoved").toInt > 0) formatted.append(f", ${meta("QuantifiersRemoved")} quantifier(s) removed")
+    formatted.append(f"] $text\n$getExprStr")
 
     AnnotationInfo(Map("msg" -> Seq(formatted.toString())))
   }
@@ -31,63 +24,41 @@ sealed class ErrorMsg(expr: Expr, text: String, meta: Map[String, String]) {
 
 // General Errors
 case class PostconditionErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[Method] The following post condition might not hold:",
-  meta
+  "Method", "The following post condition might not hold:", expr, meta
 )
 
 case class HyperAssertionErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[HyperAssertion] The following hyper assertion might not hold:",
-  meta
+  "HyperAssertion", "The following hyper assertion might not hold:", expr, meta
 )
 
 case class DeprecatedErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[CRITICAL] The following expression caused an error, but should be deprecated:",
-  meta
+  "CRITICAL", "The following expression caused an error, but should be deprecated:", expr, meta
 )
 
 case class FrameErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[Frame] The following hyper assertion used in a frame might not hold:",
-  meta
+  "Frame", "The following hyper assertion used in a frame might not hold:", expr, meta
 )
 
 case class MethodCallPreconditionErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[MethodCall] The following precondition of a custom method might not hold:",
-  meta
+  "MethodCall", "The following precondition of a custom method might be preserved:", expr, meta
 )
 
-// Loop Errors
 case class LoopInvEntryErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[WhileLoop] The following loop invariant might not hold at entry point:",
-  meta
+  "WhileLoop", "The following loop invariant might not hold at entry point:", expr, meta
 )
 
 case class LoopSyncGuardErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[WhileLoop] The following loop guard might not be identical for all states, violating low(b):",
-  meta
+  "WhileLoop", "The following loop guard might not be identical for all states, violating low(b):", expr, meta
 )
 
 case class LoopVariantErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[WhileLoop] The following variant might not decrease strictly:",
-  meta
+  "WhileLoop", "The following variant might not decrease strictly:", expr, meta
 )
 
 case class LoopInvariantErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[WhileLoop] The following invariant might not be preserved:",
-  meta
+  "WhileLoop", "The following invariant might not hold:", expr, meta
 )
 
 case class LoopExistsRuleInvariantErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  expr,
-  "[WhileLoop] The following transformed invariant (stripped from its existential quantifier) with the automatically chosen " +
-    "loop rule does not result in a postcondition that entails the original invariant",
-  meta
+  "WhileLoop", "The following invariant might not hold:", expr, meta
 )

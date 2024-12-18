@@ -1166,13 +1166,13 @@ object Generator {
     // Find the first invariant that contains a top-level existential quantifier
     val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i)).get
     pres = normalizedInvs.diff(Seq(firstExistsInv))
-    posts = pres.map(inv => (inv, Option(LoopInvariantErr(inv, Map("LoopRule" -> "ExistsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)))
+    posts = pres.map(inv => (inv, Option(LoopInvariantErr(inv, Map("LoopRule" -> "existsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)))
 
     val exprAddedToPre = BinaryExpr(loopGuard, "&&", BinaryExpr(tProgVar, "==", decrExpr))
     pres = pres :+ addToTopExists(firstExistsInv, exprAddedToPre)
 
     // As there is an exist, we need to assess all three cases
-    posts = posts :+ (firstExistsInv, Option(LoopInvariantErr(firstExistsInv, Map("LoopRule" -> "ExistsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)) // Test Invariant
+    posts = posts :+ (firstExistsInv, Option(LoopInvariantErr(firstExistsInv, Map("LoopRule" -> "existsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg)) // Test Invariant
     val exprAddedToPost = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
     posts = posts :+ (addToTopExists(firstExistsInv, exprAddedToPost), Option(LoopVariantErr(decrExpr, Map("LoopRule" -> "ExistsRule", "QuantifiersRemoved" -> f"$quantifiersRemoved")).getMsg))
 
