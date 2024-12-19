@@ -60,5 +60,5 @@ case class LoopInvariantErr(expr: Expr, meta: Map[String, String] = Map.empty) e
 )
 
 case class LoopExistsRuleInvariantErr(expr: Expr, meta: Map[String, String] = Map.empty) extends ErrorMsg(
-  "WhileLoop", "The following invariant might not hold:", expr, meta
+  "WhileLoop", "The following transformed invariant (stripped from its existential quantifier) with the automatically chosen loop rule does not result in a postcondition that entails the original invariant:", expr, meta
 )
