@@ -2,6 +2,7 @@ package viper.HHLVerifier
 
 import fastparse._
 import JavaWhitespace._
+import viper.HHLVerifier.Generation.Generator
 
 object Parser {
   def program[$: P]: P[HHLProgram] = P(Start ~ method.rep ~ End).map{
@@ -33,10 +34,20 @@ object Parser {
 
   def normalAssertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ notStateTypeName).map(items => AssertVarDecl(items._1, items._2))
 
-  def notStateTypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
+  def primitiveTypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
     case "Int" => IntType()
     case "Bool" => BoolType()
   }
+
+  def seqOrSetType[$: P] : P[Type] = P(("Seq" | "Set").! ~ "[" ~ notStateTypeName ~ "]").map {
+    case ("Seq", t) => SeqType(t)
+    case ("Set", t) => SetType(t)
+  }
+  def mapType[$: P] : P[Type] = P("Map[" ~ notStateTypeName ~ "," ~ spaces.? ~ notStateTypeName ~ "]").map{
+    case (t1, t2) => MapType(t1, t2)
+  }
+
+  def notStateTypeName[$: P] : P[Type] = P(primitiveTypeName | seqOrSetType | mapType)
 
   def proofVarDecl[$: P]: P[ProofVarDecl] = P(stateProofVarDeclErr | stateProofVarDecl | normalProofVarDecl)
 
@@ -196,7 +207,7 @@ object Parser {
     case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
 
-  def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | "(" ~ expr ~ ")" | seqExpr)
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   // Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
@@ -221,4 +232,10 @@ object Parser {
   def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(value => Num(value))
 
   def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr ~ ")").map { items => Hint(items._1, items._2) }
+
+  def seqExpr[$: P]: P[Expr] = P(seqDeclExpr | seqLookupExpr | seqLengthExpr)
+
+  def seqDeclExpr[$: P]: P[SeqDeclExpr] = P("Seq(" ~ expr.?.rep(sep=",") ~ ")").map(params => SeqDeclExpr(params))
+  def seqLookupExpr[$: P]: P[SeqLookupExpr] = P(identifier ~ "[" ~ number ~ "]").map(params => SeqLookupExpr(params._1, params._2))
+  def seqLengthExpr[$: P]: P[SeqLengthExpr] = P("|" ~ identifier ~ "|").map(expr => SeqLengthExpr(expr))
 }

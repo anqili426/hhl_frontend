@@ -82,11 +82,14 @@ object PrettyPrinter {
   // prints type by simple case distinction
   def formatType(typ: Type): String = {
     typ match {
-      case UnknownType() => "Unknown"
-      case IntType() => "Int"
-      case BoolType() => "Bool"
-      case StateType() => "State"
-      case StmtBlockType() => "StmtBlock"
+      case t: UnknownType => "unknown"
+      case t: IntType => "int"
+      case t: BoolType => "bool"
+      case t: StateType => "state"
+      case t: StmtBlockType => "StmtBlock"
+      case t: SetType => f"set_${formatType(t.subtype)}_"
+      case t: SeqType => f"seq_${formatType(t.subtype)}_"
+      case t: MapType => f"map_${formatType(t.keySubtype)}1${formatType(t.valueSubtype)}_"
     }
   }
 

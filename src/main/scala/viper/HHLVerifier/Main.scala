@@ -1,6 +1,8 @@
 package viper.HHLVerifier
 
 import fastparse.Parsed
+import viper.HHLVerifier.Generation.Generator
+import viper.HHLVerifier.TypeChecker
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
@@ -59,10 +61,11 @@ object Main {
 
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
-        printMsg("Type checking successful. ")
+        printMsg("Type checking successful.")
+        printMsg(f"The following types have been used:\n${TypeChecker.declaredTypes}")
 
         // Generate the Viper program
-        val viperProgram = Generator.generate(parsedProgram, program)
+        val viperProgram = Generator.generate(parsedProgram, program, TypeChecker.declaredTypes)
         SymbolChecker.reset()
         TypeChecker.reset()
         Generator.reset()

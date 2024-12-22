@@ -44,6 +44,12 @@ case class MethodCallExpr(methodName: String, args: Seq[Id]) extends Expr {
   var paramsToArgs: Map[String, String] = Map.empty
 }
 
+// Handle sequences and initial operations
+case class SeqDeclExpr(elements: Seq[Option[Expr]]) extends Expr
+case class SeqLookupExpr(id: Expr, index: Expr) extends Expr
+case class SeqLengthExpr(id: Expr) extends Expr
+
+
 sealed trait Stmt {
   override def toString: String = {
     PrettyPrinter.formatStmt(this)
@@ -103,17 +109,32 @@ sealed trait Type {
   }
 }
 
+// Primitive Types
 case class UnknownType() extends Type
 case class IntType() extends Type
 case class BoolType() extends Type
+
+// Logic Types
 case class StateType() extends Type
 case class StmtBlockType() extends Type
 
+// Composite Types
+case class SeqType(subtype: Type) extends Type
+case class SetType(subtype: Type) extends Type
+case class MapType(keySubtype: Type, valueSubtype: Type) extends Type
+
+// TODO: What is this used for? Omptimize
 object TypeInstance {
   val unknownType = UnknownType()
   val boolType = BoolType()
   val intType = IntType()
+
   val stateType = StateType()
   val stmtBlockType = StmtBlockType()
+
+  // TODO: This might be completely non-sensical
+  def seqType(subtype: Type) = SeqType(subtype)
+  def setType(subtype: Type) = SetType(subtype)
+  def mapType(keySubtype: Type, valueSubtype: Type) = MapType(keySubtype, valueSubtype)
 }
 
