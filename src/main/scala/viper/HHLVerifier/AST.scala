@@ -44,10 +44,12 @@ case class MethodCallExpr(methodName: String, args: Seq[Id]) extends Expr {
   var paramsToArgs: Map[String, String] = Map.empty
 }
 
-// Handle sequences and initial operations
-case class SeqDeclExpr(elements: Seq[Option[Expr]]) extends Expr
-case class SeqLookupExpr(id: Expr, index: Expr) extends Expr
-case class SeqLengthExpr(id: Expr) extends Expr
+// Handle composite operations
+case class SeqAssignExpr(elements: Seq[Expr]) extends Expr
+case class SetAssignExpr(elements: Seq[Expr]) extends Expr
+case class MapAssignExpr(elements: Seq[(Expr, Expr)]) extends Expr
+case class LookupExpr(id: Expr, index: Expr) extends Expr
+case class LengthExpr(id: Expr) extends Expr
 
 
 sealed trait Stmt {

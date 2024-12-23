@@ -77,7 +77,7 @@ object Parser {
   def methodCall[$: P]: P[(String, Seq[Id])] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")")
 
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
-  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | multiAssign | assign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt | methodCallStmt)
+  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign | multiAssign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt | methodCallStmt)
   def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map{
     items => MultiAssignStmt(items._1, MethodCallExpr(items._2._1, items._2._2))
   }
@@ -207,7 +207,7 @@ object Parser {
     case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
 
-  def basicExpr[$: P]: P[Expr] = P(loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | "(" ~ expr ~ ")" | seqExpr)
+  def basicExpr[$: P]: P[Expr] = P(compositeTypeExpr | loopIndex | proofVar | boolean | unaryExpr | getProgVarExpr | useHint | identifier | number | "(" ~ expr ~ ")")
 
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
   // Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
@@ -233,9 +233,11 @@ object Parser {
 
   def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr ~ ")").map { items => Hint(items._1, items._2) }
 
-  def seqExpr[$: P]: P[Expr] = P(seqDeclExpr | seqLookupExpr | seqLengthExpr)
+  def compositeTypeExpr[$: P]: P[Expr] = P(compositeTypeAssign | lengthExpr)
+  def compositeTypeAssign[$: P]: P[Expr] = P(seqAssignExpr | setAssignExpr | mapAssignExpr)
 
-  def seqDeclExpr[$: P]: P[SeqDeclExpr] = P("Seq(" ~ expr.?.rep(sep=",") ~ ")").map(params => SeqDeclExpr(params))
-  def seqLookupExpr[$: P]: P[SeqLookupExpr] = P(identifier ~ "[" ~ number ~ "]").map(params => SeqLookupExpr(params._1, params._2))
-  def seqLengthExpr[$: P]: P[SeqLengthExpr] = P("|" ~ identifier ~ "|").map(expr => SeqLengthExpr(expr))
+  def seqAssignExpr[$: P]: P[SeqAssignExpr] = P("Seq(" ~ expr.rep(sep=",").? ~ ")").map(params => SeqAssignExpr(params.getOrElse(Seq.empty)))
+  def setAssignExpr[$: P]: P[SetAssignExpr] = P("Set(" ~ expr.rep(sep=",").? ~ ")").map(params => SetAssignExpr(params.getOrElse(Seq.empty)))
+  def mapAssignExpr[$: P]: P[MapAssignExpr] = P("Map(" ~ (expr ~ ":=" ~ expr).rep(sep=",").? ~ ")").map(params => MapAssignExpr(params.getOrElse(Seq.empty)))
+  def lengthExpr[$: P]: P[LengthExpr] = P("|" ~ identifier ~ "|").map(expr => LengthExpr(expr))
 }
