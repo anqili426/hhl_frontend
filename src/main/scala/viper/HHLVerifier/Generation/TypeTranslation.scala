@@ -4,7 +4,7 @@ import viper.HHLVerifier.Generation.Generator.{defaultTypeVarMap, getConcreteSta
 import viper.silver.{ast => vpr}
 import viper.HHLVerifier.{BoolType, Id, IntType, MapType, SeqType, SetType, StateType, Type, UnknownException, Expr}
 
-object TypeHandling {
+object TypeTranslation {
   // type for tracking variables on the viper level
   private val defaultTrackerType = vpr.Int
   // prefix for programming variables

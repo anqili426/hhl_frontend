@@ -129,7 +129,7 @@ object Generator {
   def generate(input: HHLProgram, source: String, types: Set[Type]): vpr.Program = {
     program_source = source
 
-    TypeHandling.setOfDeclaredTypes = types
+    TypeTranslation.setOfDeclaredTypes = types
 
     var fields: Seq[vpr.Field] = Seq.empty
     var predicates: Seq[vpr.Predicate] = Seq.empty
@@ -185,15 +185,15 @@ object Generator {
     val inSetFailEq = inhaleInSetEqStmt(state, outputFailureStates.localVar, typVarMap)
 
     // Arguments of the input method
-    val args = TypeHandling.translateMethodVariables(method.params)
+    val args = TypeTranslation.translateMethodVariables(method.params)
     val translatedArgs = args :+ inputStates
 
     // Return variables of the input method
-    val ret = TypeHandling.translateMethodVariables(method.res)
+    val ret = TypeTranslation.translateMethodVariables(method.res)
     val retVars = ret.map(r => r.localVar)
 
     // Forming the preconditions
-    val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(TypeHandling.assignId())())())
+    val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(TypeTranslation.assignId())())())
     val preAboutArgs = if (argsWithValues.isEmpty) Seq.empty else Seq(argsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
     val normalizedPres = method.pre.map(p => Normalizer.normalize(p, false))
     normalizedPres.foreach(p => Normalizer.detQuantifier(p, false))
@@ -236,11 +236,11 @@ object Generator {
     }.toSeq
 
     // Currently, we only support program variables of type Integer, so pick them out
-    val translatedProgVars = progVars.map(v => TypeHandling.getVprVar(v._1))
+    val translatedProgVars = progVars.map(v => TypeTranslation.getVprVar(v._1))
     val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars
-    val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(TypeHandling.assignId())())())
+    val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(TypeTranslation.assignId())())())
 
-    val progVarDecls = TypeHandling.translateMethodVariables(progVarsAsIds)
+    val progVarDecls = TypeTranslation.translateMethodVariables(progVarsAsIds)
     val nonIntAuxVars = Seq(tempStates, tempFailedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
     val localVars = progVarDecls ++ auxiliaryVarDecls ++ nonIntAuxVars
 
@@ -366,7 +366,7 @@ object Generator {
         (newStmts, Seq.empty)
 
       case AssignStmt(left, right) =>
-        val leftVar = TypeHandling.declareVariable(left)
+        val leftVar = TypeTranslation.declareVariable(left)
 
         val s0 = vpr.LocalVar(s0VarName, state.typ)()
         val s1 = vpr.LocalVar(s1VarName, state.typ)()
@@ -1587,8 +1587,8 @@ object Generator {
 
   def generatePreamble(typVarMap: Map[vpr.TypeVar, vpr.Type]): (Seq[vpr.Domain], Seq[vpr.Method]) = {
     // Create State Domain
-    val getsStateDomain = TypeHandling.setOfDeclaredTypes.map(t => genGetFuncStateDomain(t)).toSeq :+ genEquaOnEverythingExcept()
-    val axiomsStateDomain = TypeHandling.setOfDeclaredTypes.map(t => genAxiomStateDomain(t)).toSeq
+    val getsStateDomain = TypeTranslation.setOfDeclaredTypes.map(t => genGetFuncStateDomain(t)).toSeq :+ genEquaOnEverythingExcept()
+    val axiomsStateDomain = TypeTranslation.setOfDeclaredTypes.map(t => genAxiomStateDomain(t)).toSeq
 
     val stateDomain = vpr.Domain(stateDomainName, getsStateDomain, axiomsStateDomain)()
 
@@ -1803,12 +1803,12 @@ object Generator {
   // Helper functions for Generate SetState Domain
 
   def createDomainFuncApp(state: vpr.LocalVar, name: String): vpr.DomainFuncApp = vpr.DomainFuncApp(
-    TypeHandling.getGetFunctionName(name),
-    Seq(state, TypeHandling.getVprVar(name)),
+    TypeTranslation.getGetFunctionName(name),
+    Seq(state, TypeTranslation.getVprVar(name)),
     Map.empty
   )(info = vpr.NoInfo,
     pos = vpr.NoPosition,
     errT = vpr.NoTrafos,
-    typ = TypeHandling.getVprType(name),
+    typ = TypeTranslation.getVprType(name),
     domainName = "State")
 }

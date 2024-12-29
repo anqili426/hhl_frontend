@@ -174,7 +174,7 @@ object SymbolChecker {
 
       case loop@WhileLoopStmt(cond, body, inv, decr, _) =>
         val allHintDecls = inv.map(i => i._1).filter(h => !h.isEmpty)
-        allHintDecls.map(h => checkHintDecl(h.get))
+        allHintDecls.foreach(h => checkHintDecl(h.get))
         // When using the sync rule/forall-exists rule, loop invariants cannot use the loop index
         var allVarsOfLoop = checkSymbolsExpr(cond, false, false) ++ inv.map(i => checkSymbolsExpr(i._2, loop.rule=="desugaredRule", false)).flatten
         if (!decr.isEmpty) allVarsOfLoop = allVarsOfLoop ++ checkSymbolsExpr(decr.get, false, false)
