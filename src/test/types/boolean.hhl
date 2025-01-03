@@ -2,12 +2,60 @@
     A simple program to translate booleans
 */
 
-method testBooleans() returns (out: Int)
-requires exists <_s> :: true
-ensures exists <_s> :: _s[out] == 0
+method testBooleans2() returns ()
+requires forall <_s> :: true
+ensures forall <_s> :: true
 {
-    var b: Bool
-    b := true
+    // Testing Booleans
+    var b1: Bool
+    var b2: Bool
+    var b3: Bool
 
-    out := 0
+    b1 := true
+    b2 := false
+
+    b3 := (true && false) || b1 && !b2
+    hyperAssert forall <_s> :: _s[b3] == true
+
+    // Testing Sequences
+    var s1: Seq[Int]
+    var s2: Seq[Int]
+    var s3: Seq[Int]
+
+    s1 := Seq[Int](1, 2)
+    s2 := Seq[Int](3, 4)
+
+    s3 := s1 ++ s2
+    hyperAssert forall <_s> :: _s[s3] == Seq[Int](1, 2, 3, 4)
+
+    var l: Int
+    l := |s3|
+    hyperAssert forall <_s> :: _s[l] == 4
+
+    /* Talk about this
+    hyperAssume forall <_s> :: |_s[s3]| == 4
+    var s3_1: Int
+    s3_1 := s3[1]
+    hyperAssert forall <_s> :: _s[s3_1] == 2
+    */
+
+    var ss: Seq[Seq[Int]]
+    ss := Seq[Seq[Int]](s1, s2, s3)
+    hyperAssert forall <_s> :: _s[ss] == Seq[Seq[Int]](Seq[Int](1,2), Seq[Int](3,4), Seq[Int](1,2, 3, 4))
+
+    // Testing Sets
+    var set: Set[Seq[Int]]
+    set := Set[Seq[Int]]()
+    hyperAssert forall <_s> :: |_s[set]| == 0
+
+    set := Set[Seq[Int]](s1, s2, s1)
+    hyperAssert forall <_s> :: |_s[set]| == 2
+
+    // Testing Maps
+    var m: Map[Int, Int]
+    m := Map[Int, Int](1 := 2, 2 := 1)
+    var el: Int
+    el := m[1]
+    hyperAssert forall <_s> :: |_s[m]| == 2
+    // How to hanlde this? hyperAssert forall <_s> :: _s[el][1] == 2
 }

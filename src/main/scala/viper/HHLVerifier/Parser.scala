@@ -34,21 +34,6 @@ object Parser {
 
   def normalAssertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ notStateTypeName).map(items => AssertVarDecl(items._1, items._2))
 
-  def primitiveTypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
-    case "Int" => IntType()
-    case "Bool" => BoolType()
-  }
-
-  def seqOrSetType[$: P] : P[Type] = P(("Seq" | "Set").! ~ "[" ~ notStateTypeName ~ "]").map {
-    case ("Seq", t) => SeqType(t)
-    case ("Set", t) => SetType(t)
-  }
-  def mapType[$: P] : P[Type] = P("Map[" ~ notStateTypeName ~ "," ~ spaces.? ~ notStateTypeName ~ "]").map{
-    case (t1, t2) => MapType(t1, t2)
-  }
-
-  def notStateTypeName[$: P] : P[Type] = P(primitiveTypeName | seqOrSetType | mapType)
-
   def proofVarDecl[$: P]: P[ProofVarDecl] = P(stateProofVarDeclErr | stateProofVarDecl | normalProofVarDecl)
 
   def normalProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ notStateTypeName ~ "::" ~ expr).map{
@@ -233,11 +218,51 @@ object Parser {
 
   def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr ~ ")").map { items => Hint(items._1, items._2) }
 
-  def compositeTypeExpr[$: P]: P[Expr] = P(compositeTypeAssign | lengthExpr)
+  // Composite Type Expressions
+  def compositeTypeExpr[$: P]: P[Expr] = P(compositeTypeAssign | lookupExpr | lengthExpr | concatSeqs)
+
+  def concatSeqs[$: P]: P[ConcatSeqExpr] = P(progVar ~ "++" ~ progVar).map((exps) => ConcatSeqExpr(exps._1, exps._2))
+
+  def lookupExpr[$: P]: P[LookupExpr] = P(progVar ~~ "[" ~ expr ~ "]").map{
+    case (id, expr) => LookupExpr(id, expr)
+  }
+
   def compositeTypeAssign[$: P]: P[Expr] = P(seqAssignExpr | setAssignExpr | mapAssignExpr)
 
-  def seqAssignExpr[$: P]: P[SeqAssignExpr] = P("Seq(" ~ expr.rep(sep=",").? ~ ")").map(params => SeqAssignExpr(params.getOrElse(Seq.empty)))
-  def setAssignExpr[$: P]: P[SetAssignExpr] = P("Set(" ~ expr.rep(sep=",").? ~ ")").map(params => SetAssignExpr(params.getOrElse(Seq.empty)))
-  def mapAssignExpr[$: P]: P[MapAssignExpr] = P("Map(" ~ (expr ~ ":=" ~ expr).rep(sep=",").? ~ ")").map(params => MapAssignExpr(params.getOrElse(Seq.empty)))
-  def lengthExpr[$: P]: P[LengthExpr] = P("|" ~ identifier ~ "|").map(expr => LengthExpr(expr))
+  def seqAssignExpr[$: P]: P[SeqAssignExpr] = P("Seq[" ~~ notStateTypeName ~~ "]" ~~ "(" ~ expr.rep(sep=",").? ~ ")").map {
+    case (typ, params) =>
+      val exp = SeqAssignExpr(params.getOrElse(Seq.empty))
+      exp.typ = SeqType(typ)
+      exp
+  }
+  def setAssignExpr[$: P]: P[SetAssignExpr] = P("Set[" ~~ notStateTypeName ~~ "]" ~~ "(" ~ expr.rep(sep=",").? ~ ")").map {
+    case (typ, params) =>
+      val exp = SetAssignExpr(params.getOrElse(Seq.empty))
+      exp.typ = SetType(typ)
+      exp
+  }
+  def mapAssignExpr[$: P]: P[MapAssignExpr] = P("Map[" ~~ notStateTypeName ~~ "," ~ notStateTypeName ~~ "]" ~~ "(" ~ (expr ~ ":=" ~ expr).rep(sep=",").? ~ ")").map {
+    case (kTyp, pTyp, params) =>
+      val exp = MapAssignExpr(params.getOrElse(Seq.empty))
+      exp.typ = MapType(kTyp, pTyp)
+      exp
+  }
+  def lengthExpr[$: P]: P[LengthExpr] = P("|" ~ expr ~ "|").map(expr => LengthExpr(expr))
+
+  // Type Handling
+  def notStateTypeName[$: P] : P[Type] = P(primitiveTypeName | seqOrSetType | mapType)
+
+  def primitiveTypeName[$: P] : P[Type] = P("Int" | "Bool").!.map{
+    case "Int" => IntType()
+    case "Bool" => BoolType()
+  }
+
+  def seqOrSetType[$: P] : P[Type] = P(("Seq" | "Set").! ~~ "[" ~ notStateTypeName ~ "]").map {
+    case ("Seq", t) => SeqType(t)
+    case ("Set", t) => SetType(t)
+  }
+
+  def mapType[$: P] : P[Type] = P("Map[" ~ notStateTypeName ~~ "," ~ notStateTypeName ~ "]").map{
+    case (t1, t2) => MapType(t1, t2)
+  }
 }

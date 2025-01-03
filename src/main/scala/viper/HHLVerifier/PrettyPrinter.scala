@@ -76,6 +76,12 @@ object PrettyPrinter {
       case HintDecl(name) => "(" + name + ")"
       case Hint(name, arg) => name + "(" + formatExpr(arg) + ")"
       case MethodCallExpr(methodName, args) => methodName + "(" + args.map(a => formatExpr(a)).mkString(", ") + ")"
+      case SeqAssignExpr(elements) => "Seq(" + elements.foldLeft("")((a, b) => f"$a${formatExpr(b)}, ") + ")"
+      case SetAssignExpr(elements) => "Set(" + elements.foldLeft("")((a, b) => f"$a${formatExpr(b)}, ") + ")"
+      case MapAssignExpr(elements) => "Map(" + elements.foldLeft("")((a, b) => f"$a${formatExpr(b._1)} := ${formatExpr(b._2)}, ") + ")"
+      case LookupExpr(id, ind) => f"${formatExpr(id)}[${formatExpr(ind)}]"
+      case LengthExpr(id) => f"|${formatExpr(id)}|"
+      case ConcatSeqExpr(left, right) => f"${formatExpr(left)} ++ ${formatExpr(right)}"
     }
   }
 

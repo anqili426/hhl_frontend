@@ -279,6 +279,24 @@ object SymbolChecker {
             val paramNames = callExpr.method.params.map(p => p.name)
             callExpr.paramsToArgs = paramNames.zip(argNames).toMap
             varsInArgs
+        case SeqAssignExpr(elements) =>
+          elements.foldRight(Seq.empty[(String, Type)]) {
+            case (l, r) => r ++ checkSymbolsExpr(l, isInLoopInv, isFrame)
+          }
+        case SetAssignExpr(elements) =>
+          elements.foldRight(Seq.empty[(String, Type)]) {
+            case (l, r) => r ++ checkSymbolsExpr(l, isInLoopInv, isFrame)
+          }
+        case MapAssignExpr(elements) =>
+          elements.foldRight(Seq.empty[(String, Type)]) {
+            case (l, r) => r ++ checkSymbolsExpr(l._1, isInLoopInv, isFrame) ++ checkSymbolsExpr(l._2, isInLoopInv, isFrame)
+          }
+        case LookupExpr(id, ind) =>
+          checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(ind, isInLoopInv, isFrame)
+        case LengthExpr(id) =>
+          checkSymbolsExpr(id, isInLoopInv, isFrame)
+        case ConcatSeqExpr(left, right) =>
+          checkSymbolsExpr(left, isInLoopInv, isFrame) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
         case _ =>
           throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
       }

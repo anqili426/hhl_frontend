@@ -1,8 +1,9 @@
 package viper.HHLVerifier
 
-class Expr() {
+sealed class Expr() {
   var typ: Type = UnknownType()
   var pos: Int = -1
+  var baseType: Type = UnknownType()
 
   override def toString: String = {
     PrettyPrinter.formatExpr(this)
@@ -49,8 +50,8 @@ case class SeqAssignExpr(elements: Seq[Expr]) extends Expr
 case class SetAssignExpr(elements: Seq[Expr]) extends Expr
 case class MapAssignExpr(elements: Seq[(Expr, Expr)]) extends Expr
 case class LookupExpr(id: Expr, index: Expr) extends Expr
+case class ConcatSeqExpr(left: Expr, right: Expr) extends Expr
 case class LengthExpr(id: Expr) extends Expr
-
 
 sealed trait Stmt {
   override def toString: String = {

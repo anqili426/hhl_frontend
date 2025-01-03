@@ -4,7 +4,13 @@ import viper.HHLVerifier.Generation.Generator.{defaultTypeVarMap, getConcreteSta
 import viper.silver.{ast => vpr}
 import viper.HHLVerifier.{BoolType, Id, IntType, MapType, SeqType, SetType, StateType, Type, UnknownException, Expr}
 
-object TypeTranslation {
+object TypeHandler {
+  object DefaultTypes {
+    val stateType     = vpr.DomainType("State", Map.empty)(Seq.empty)
+    val setStateType  = vpr.DomainType("SetState", Map.empty)(Seq.empty)
+    val idType        = vpr.Int
+  }
+
   // type for tracking variables on the viper level
   private val defaultTrackerType = vpr.Int
   // prefix for programming variables
@@ -32,7 +38,7 @@ object TypeTranslation {
   // declares a variable and returns vpr declaration
   def declareVariable(id: Id): vpr.LocalVarDecl = {
     mapHHLTypeOfId = mapHHLTypeOfId + (getName(id.name) -> id.typ)
-    mapVprTypeOfId = mapVprTypeOfId + (getName(id.name) -> translateTypeToVprType(id.typ))
+    mapVprTypeOfId = mapVprTypeOfId + (getName(id.name) -> translateType(id.typ))
     vpr.LocalVarDecl(progValPrefix + id.name, defaultTrackerType)()
   }
 
@@ -43,13 +49,13 @@ object TypeTranslation {
   def getName(name: String): String = progValPrefix + name
 
   // translate type to vpr type
-  def translateTypeToVprType(typ: Type, typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.Type = {
+  def translateType(typ: Type, typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.Type = {
     typ match {
       case t: IntType => viper.silver.ast.Int
       case t: BoolType => viper.silver.ast.Bool
-      case t: SeqType => viper.silver.ast.SeqType(translateTypeToVprType(t.subtype))
-      case t: SetType => viper.silver.ast.SetType(translateTypeToVprType(t.subtype))
-      case t: MapType => viper.silver.ast.MapType(translateTypeToVprType(t.keySubtype), translateTypeToVprType(t.valueSubtype))
+      case t: SeqType => viper.silver.ast.SeqType(translateType(t.subtype))
+      case t: SetType => viper.silver.ast.SetType(translateType(t.subtype))
+      case t: MapType => viper.silver.ast.MapType(translateType(t.keySubtype), translateType(t.valueSubtype))
       case StateType() => getConcreteStateType(typVarMap)
       case _ =>
         throw UnknownException("Cannot translate type " + typ)

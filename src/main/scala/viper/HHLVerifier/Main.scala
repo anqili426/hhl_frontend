@@ -52,12 +52,12 @@ object Main {
       val res = fastparse.parse(program, Parser.program(_))
 
       if (res.isSuccess) {
-
-        printMsg("Parsing successful. ")
+        printMsg("Parsing successful.\n")
         val parsedProgram: HHLProgram = res.get.value
 
         // Symbol table
         SymbolChecker.checkSymbolsProg(parsedProgram)
+        printMsg("Symbol checking successful.\n")
 
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
@@ -118,5 +118,4 @@ object Main {
   def printMsg(msg: String): Unit = {
     if (!test || testWithLogs) println(msg)
   }
-
 }

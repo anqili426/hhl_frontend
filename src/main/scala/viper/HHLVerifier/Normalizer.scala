@@ -18,6 +18,7 @@ object Normalizer {
         if (e1.typ.isInstanceOf[BoolType]) {
           val normalizedE1 = normalize(e1, negate)
           val normalizedE2 = normalize(e2, negate)
+
           if (negate) {
             val newOp = {
               op match {
@@ -28,7 +29,9 @@ object Normalizer {
                 case _ => throw UnknownException("Unexpected binary operator " + op)
               }
             }
+
             BinaryExpr(normalizedE1, newOp, normalizedE2)
+
           } else BinaryExpr(normalizedE1, op, normalizedE2)
         } else {
           if (negate) UnaryExpr("!", be)
@@ -54,7 +57,8 @@ object Normalizer {
           else quantifier
         }
         Assertion(newQuantifier, assertVarDecls, normalizedBody)
-      case _ => throw UnknownException("Normalizer: expression " + e + " is not expected")
+      case e@GetValExpr(_, _) => e
+      case _ => throw UnknownException("Normalizer: expression " + e + " is not expected. Typ is " + e.getClass())
     }
   }
 

@@ -52,7 +52,7 @@ object TypeChecker {
           val stmtIsTotal = typeCheckStmt(stmt, isInLoop)
           isTotal = isTotal && stmtIsTotal
         })
-      case AssignStmt(left, right) =>
+      case e@AssignStmt(left, right) =>
         exprContainsHyperAssertion(left, false)
         exprContainsHyperAssertion(right, false)
         res = checkIfTypeMatch(left.typ, right.typ)
@@ -138,6 +138,7 @@ object TypeChecker {
           res = res && checkIfTypeMatch(a.typ, call.method.params(args.indexOf(a)).typ)
         })
         if (!res) throw TypeException("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters")
+      case _ => throw TypeException("Unkown statement detected")
     }
     if (!res) throw TypeException("The statement has a type error: " + s)
     else isTotal
@@ -148,6 +149,8 @@ object TypeChecker {
   def exprContainsHyperAssertion(e: Expr, hyperAssertionExpected: Boolean, polarity: Int = 1) : Boolean = {
     var res = true
     var isHyperAssertion = false
+    println("Now class " + e.getClass() + " of " + e.toString())
+
     e match {
       case id@Id(_) =>
         if (hyperAssertionExpected) throw TypeException("Program variables cannot appear in a hyper assertion or a hint")
@@ -167,7 +170,10 @@ object TypeChecker {
         } else if (e1.typ.isInstanceOf[BoolType]) {
             res = res && boolOp.contains(op)
             be.typ = boolType
-        } else res = false  // e1 & e2 have the same type, but their type is undefined for the binary operator
+        } else {
+          res = true
+          be.typ = boolType // TODO: Check if this is correct
+        }  // e1 & e2 have the same type, but their type is undefined for the binary operator
       case ue@UnaryExpr(op, e) =>
         if (op == "!") {
           isHyperAssertion = exprContainsHyperAssertion(e, hyperAssertionExpected, polarity)
@@ -232,8 +238,47 @@ object TypeChecker {
           res = res && checkIfTypeMatch(a.typ, call.method.params(args.indexOf(a)).typ)
         })
         if (!res) throw TypeException("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters")
+      case SeqAssignExpr(elements) =>
+        elements.foreach(el => {
+          exprContainsHyperAssertion(el, false)
+          res = res && checkIfTypeMatch(e.typ.asInstanceOf[SeqType].subtype, el.typ)
+        })
+      case SetAssignExpr(elements) =>
+        elements.foreach(el => {
+          exprContainsHyperAssertion(el, false)
+          res = res && checkIfTypeMatch(e.typ.asInstanceOf[SetType].subtype, el.typ)
+        })
+      case MapAssignExpr(elements) =>
+        elements.foreach(el => {
+          exprContainsHyperAssertion(el._1, false)
+          exprContainsHyperAssertion(el._2, false)
+          res = res && checkIfTypeMatch(e.typ.asInstanceOf[MapType].keySubtype, el._1.typ) && checkIfTypeMatch(e.typ.asInstanceOf[MapType].valueSubtype, el._2.typ)
+        })
+      case e@LookupExpr(id, ind) =>
+        exprContainsHyperAssertion(id, false)
+        exprContainsHyperAssertion(ind, false)
+
+        if (id.typ.isInstanceOf[SeqType]) {
+          res = ind.typ.isInstanceOf[IntType]
+          e.baseType = id.typ.asInstanceOf[SeqType]
+          e.typ = id.typ.asInstanceOf[SeqType].subtype
+        } else if (id.typ.isInstanceOf[MapType]) {
+          res = checkIfTypeMatch(id.typ.asInstanceOf[MapType].keySubtype, ind.typ)
+          e.baseType = id.typ.asInstanceOf[MapType]
+          e.typ = id.typ.asInstanceOf[MapType].keySubtype
+        } else throw TypeException("Lookup can only be applied to SeqType or MapType")
+      case e@LengthExpr(id) =>
+        exprContainsHyperAssertion(id, false)
+        if (!id.typ.isInstanceOf[SeqType] && !id.typ.isInstanceOf[SetType] && !id.typ.isInstanceOf[MapType]) throw TypeException("|.| can only be applied to composite types")
+        e.typ = IntType()
+      case e@ConcatSeqExpr(left, right) =>
+        exprContainsHyperAssertion(left, false)
+        exprContainsHyperAssertion(right, false)
+        res = checkIfTypeMatch(left.typ, right.typ)
+        e.typ = left.typ
+      case _ => throw TypeException("Unkown type detected in Expression")
     }
-    if (!res) throw TypeException("The expression has a type error: " + e)
+    if (!res) throw TypeException(f"The expression has a type error: $e is of type ${e.getClass}")
     isHyperAssertion
   }
 
@@ -252,6 +297,9 @@ object TypeChecker {
   }
 
   def checkIfTypeMatch(t1: Type, t2: Type): Boolean = {
+    println("Left: " + t1.toString())
+    println("Right: " + t2.toString())
+
     (t1, t2) match {
       // Primitive types
       case (s: IntType, t: IntType) => true
@@ -265,7 +313,6 @@ object TypeChecker {
       // Non-matching types
       case _ => false
     }
-
   }
 
 }
