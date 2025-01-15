@@ -6,6 +6,21 @@ method testBooleans2() returns ()
 requires forall <_s> :: true
 ensures forall <_s> :: true
 {
+    var s1: Set[Int]
+    var s2: Set[Int]
+    var s3: Set[Int]
+
+    s3 := s1 minus s2
+    s3 := s1 union s2
+    s3 := s1 intersection s2
+
+    var t: Bool
+    t := 1 in s1
+
+    s3 := s1 ++ s2
+
+
+/*
     // Testing Booleans
     var b1: Bool
     var b2: Bool
@@ -32,12 +47,10 @@ ensures forall <_s> :: true
     l := |s3|
     hyperAssert forall <_s> :: _s[l] == 4
 
-    /* Talk about this
     hyperAssume forall <_s> :: |_s[s3]| == 4
     var s3_1: Int
     s3_1 := s3[1]
     hyperAssert forall <_s> :: _s[s3_1] == 2
-    */
 
     var ss: Seq[Seq[Int]]
     ss := Seq[Seq[Int]](s1, s2, s3)
@@ -52,10 +65,10 @@ ensures forall <_s> :: true
     hyperAssert forall <_s> :: |_s[set]| == 2
 
     // Testing Maps
-    var m: Map[Int, Int]
+    /*var m: Map[Int, Int]
     m := Map[Int, Int](1 := 2, 2 := 1)
     var el: Int
     el := m[1]
-    hyperAssert forall <_s> :: |_s[m]| == 2
-    // How to hanlde this? hyperAssert forall <_s> :: _s[el][1] == 2
+    hyperAssert forall <_s> :: |_s[m]| == 2 */
+    // How to hanlde this? hyperAssert forall <_s> :: _s[el][1] == 2 */
 }

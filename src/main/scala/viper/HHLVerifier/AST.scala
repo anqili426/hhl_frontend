@@ -29,7 +29,7 @@ case class Assertion(quantifier: String, assertVarDecls: Seq[AssertVarDecl], bod
   var topExists: Boolean = false
   var triggers: Seq[Seq[StateExistsExpr]] = Seq.empty
 }
-case class GetValExpr(state: SpecialId, id: Id) extends Expr
+// case class GetValExpr(state: SpecialId, id: Id) extends Expr
 case class StateExistsExpr(state: SpecialId, err: Boolean) extends Expr {
   // When useForAll is true, <_s> is translated to in_set_forall(_s, S) later
   // Otherwise, it is translated to in_set_exists(_s, S)
@@ -48,10 +48,13 @@ case class MethodCallExpr(methodName: String, args: Seq[Id]) extends Expr {
 // Handle composite operations
 case class SeqAssignExpr(elements: Seq[Expr]) extends Expr
 case class SetAssignExpr(elements: Seq[Expr]) extends Expr
-case class MapAssignExpr(elements: Seq[(Expr, Expr)]) extends Expr
+case class MapAssignExpr(elements: Seq[MapTupleExpr]) extends Expr
 case class LookupExpr(id: Expr, index: Expr) extends Expr
-case class ConcatSeqExpr(left: Expr, right: Expr) extends Expr
+case class ConcatSeqExpr(lhs: Expr, rhs: Expr) extends Expr
 case class LengthExpr(id: Expr) extends Expr
+case class SetCombExpr(lhs: Expr, rhs: Expr, op: String) extends Expr
+case class UpdateMapExpr(id: Expr, update: MapTupleExpr) extends Expr
+case class MapTupleExpr(k: Expr, v: Expr) extends Expr
 
 sealed trait Stmt {
   override def toString: String = {

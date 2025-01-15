@@ -4,6 +4,8 @@ import viper.HHLVerifier.Generation.Generator.{defaultTypeVarMap, getConcreteSta
 import viper.silver.{ast => vpr}
 import viper.HHLVerifier.{BoolType, Id, IntType, MapType, SeqType, SetType, StateType, Type, UnknownException, Expr}
 
+// TODO: Avoid collisions by modifying generator: sVarName == "s", but should be "_s",
+// also append underscore to s0VarName, s1VarName, s2VarName
 object TypeHandler {
   object DefaultTypes {
     val stateType     = vpr.DomainType("State", Map.empty)(Seq.empty)
