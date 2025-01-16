@@ -50,9 +50,8 @@ case class SeqAssignExpr(elements: Seq[Expr]) extends Expr
 case class SetAssignExpr(elements: Seq[Expr]) extends Expr
 case class MapAssignExpr(elements: Seq[MapTupleExpr]) extends Expr
 case class LookupExpr(id: Expr, index: Expr) extends Expr
-case class ConcatSeqExpr(lhs: Expr, rhs: Expr) extends Expr
 case class LengthExpr(id: Expr) extends Expr
-case class SetCombExpr(lhs: Expr, rhs: Expr, op: String) extends Expr
+case class CombExpr(lhs: Expr, rhs: Expr, op: String) extends Expr
 case class UpdateMapExpr(id: Expr, update: MapTupleExpr) extends Expr
 case class MapTupleExpr(k: Expr, v: Expr) extends Expr
 
@@ -125,9 +124,9 @@ case class StateType() extends Type
 case class StmtBlockType() extends Type
 
 // Composite Types
-case class SeqType(subtype: Type) extends Type
-case class SetType(subtype: Type) extends Type
-case class MapType(keySubtype: Type, valueSubtype: Type) extends Type
+case class SeqType(sType: Type) extends Type
+case class SetType(sType: Type) extends Type
+case class MapType(kType: Type, vType: Type) extends Type
 
 // TODO: What is this used for? Omptimize
 object TypeInstance {
@@ -137,10 +136,5 @@ object TypeInstance {
 
   val stateType = StateType()
   val stmtBlockType = StmtBlockType()
-
-  // TODO: This might be completely non-sensical
-  def seqType(subtype: Type) = SeqType(subtype)
-  def setType(subtype: Type) = SetType(subtype)
-  def mapType(keySubtype: Type, valueSubtype: Type) = MapType(keySubtype, valueSubtype)
 }
 

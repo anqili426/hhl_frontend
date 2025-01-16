@@ -1,0 +1,22 @@
+/*
+    A simple program to test maps.
+*/
+
+method testMaps() returns ()
+requires forall <_s> :: true
+ensures forall <_s> :: true
+{
+    // Testing Maps
+    var m: Map[Int, Int]
+    m := Map[Int, Int](1 := 2, 2 := 1)
+
+    var el: Int
+    el := m[1]
+
+    hyperAssert forall <_s> :: el in _s[m]
+
+    m := m[1 := 1]
+
+    hyperAssert forall <_s> :: |_s[m]| == 2
+    hyperAssert forall <_s> :: _s[m][1] == 1
+}

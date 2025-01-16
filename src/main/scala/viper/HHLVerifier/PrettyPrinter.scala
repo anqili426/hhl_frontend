@@ -70,7 +70,6 @@ object PrettyPrinter {
       case ImpliesExpr(left, right) => "(" + formatExpr(left) + ") ==> (" + formatExpr(right) + ")"
       case Assertion(quantifier, assertVarDecls, body) =>
         quantifier + " " + assertVarDecls.map(a => "<" + formatExpr(a) + ">").mkString(", ") + " :: (" + formatExpr(body) + ")"
-      case GetValExpr(state, id) => formatExpr(state) + "[" + formatExpr(id) + "]"
       case StateExistsExpr(state, err) => if (err) "<<" + formatExpr(state) + ">>" else "<" + formatExpr(state) + ">"
       case LoopIndex() => "$n"
       case HintDecl(name) => "(" + name + ")"
@@ -78,10 +77,10 @@ object PrettyPrinter {
       case MethodCallExpr(methodName, args) => methodName + "(" + args.map(a => formatExpr(a)).mkString(", ") + ")"
       case SeqAssignExpr(elements) => "Seq(" + elements.foldLeft("")((a, b) => f"$a${formatExpr(b)}, ") + ")"
       case SetAssignExpr(elements) => "Set(" + elements.foldLeft("")((a, b) => f"$a${formatExpr(b)}, ") + ")"
-      case MapAssignExpr(elements) => "Map(" + elements.foldLeft("")((a, b) => f"$a${formatExpr(b._1)} := ${formatExpr(b._2)}, ") + ")"
+      case MapAssignExpr(elements) => "Map(" + elements.foldLeft("")((a, b) => f"$a${formatExpr(b.k)} := ${formatExpr(b.v)}, ") + ")"
       case LookupExpr(id, ind) => f"${formatExpr(id)}[${formatExpr(ind)}]"
       case LengthExpr(id) => f"|${formatExpr(id)}|"
-      case ConcatSeqExpr(left, right) => f"${formatExpr(left)} ++ ${formatExpr(right)}"
+      case CombExpr(lhs, rhs, op) => f"${formatExpr(lhs)} ${op} ${formatExpr(rhs)}"
     }
   }
 
@@ -93,9 +92,9 @@ object PrettyPrinter {
       case t: BoolType => "bool"
       case t: StateType => "state"
       case t: StmtBlockType => "StmtBlock"
-      case t: SetType => f"set_${formatType(t.subtype)}_"
-      case t: SeqType => f"seq_${formatType(t.subtype)}_"
-      case t: MapType => f"map_${formatType(t.keySubtype)}1${formatType(t.valueSubtype)}_"
+      case t: SetType => f"set_${formatType(t.sType)}_"
+      case t: SeqType => f"seq_${formatType(t.sType)}_"
+      case t: MapType => f"map_${formatType(t.kType)}1${formatType(t.vType)}_"
     }
   }
 

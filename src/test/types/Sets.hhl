@@ -1,0 +1,29 @@
+/*
+    A simple program to test sets.
+*/
+
+method testSets() returns ()
+requires forall <_s> :: true
+ensures forall <_s> :: true
+{
+    // Testing Sets
+    var set: Set[Seq[Int]]
+    set := Set[Seq[Int]]()
+    hyperAssert forall <_s> :: |_s[set]| == 0
+
+    set := Set[Seq[Int]](Seq[Int](1), Seq[Int](1,2), Seq[Int](1,2) union)
+
+    hyperAssert forall <_s> :: |_s[set]| == 2
+    hyperAssert forall <_s> :: Seq[Int](1) in _s[set]
+
+    var s1: Set[Int]
+    var s2: Set[Int]
+    var s3: Set[Int]
+
+    s1 := Set[Int](1,2)
+    s2 := Set[Int](2,3)
+
+    s3 := s1 union s2
+    s3 := s1 intersection s2
+    s3 := s1 setminus s2
+}

@@ -123,7 +123,7 @@ object Parser {
   def impliesOp[$: P]: P[String] = P("==>").!
   def boolOp1[$: P]: P[String] = P("&&" | "||").!
   def boolOp2[$: P]: P[String] = P("==" ~ &(!CharIn(">")) | "!=").!
-  def combinatorOps[$: P]: P[String] = P("union" | "intersection" | "minus" | "in" | "++").!
+  def combinatorOps[$: P]: P[String] = P("union" | "intersection" | "setminus" | "in" | "++").!
   def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
@@ -203,9 +203,13 @@ object Parser {
     case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
   }
   // seventh-highest ranking expr, containing all set operations
-  def combinatorOpExpr[$: P]: P[Expr] = P(basicExpr ~ (combinatorOps ~/ combinatorOpExpr).?).map{
+  def combinatorOpExpr[$: P]: P[Expr] = P(accessValExpr ~ (combinatorOps ~/ combinatorOpExpr).?).map{
     case (lhs, None) => lhs
-    case (lhs, Some(par)) => SetCombExpr(lhs, par._2, par._1)
+    case (lhs, Some(par)) => CombExpr(lhs, par._2, par._1)
+  }
+  def accessValExpr[$: P]: P[Expr] = P(basicExpr ~ ("[" ~/ expr ~ "]").rep.?).map{
+    case (lhs, None) => lhs
+    case (lhs, Some(l)) => l.foldLeft(lhs)(LookupExpr)
   }
   // eigth-highest ranking expr, containing all usable elements..
   def basicExpr[$: P]: P[Expr] = P(compositeTypeExpr | loopIndex | proofVar | boolean | unaryExpr | /* getProgVarExpr | */ useHint | identifier | number | "(" ~ expr ~ ")")
@@ -224,7 +228,7 @@ object Parser {
   def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr ~ ")").map { items => Hint(items._1, items._2) }
 
   // Composite Type Expressions
-  def compositeTypeExpr[$: P]: P[Expr] = P(compositeTypeAssign | lookupExpr | updateMapExpr | lengthExpr)
+  def compositeTypeExpr[$: P]: P[Expr] = P(compositeTypeAssign | updateMapExpr | lengthExpr)
 
   // Initialisation
   def compositeTypeAssign[$: P]: P[Expr] = P(seqAssignExpr | setAssignExpr | mapAssignExpr)
@@ -250,10 +254,6 @@ object Parser {
 
   // Lookup and membership
   // TODO: Modify this in type checker / symbol checker: Var s3: Int // Forall <_s> :: _s[s3][0] this must be forbidden
-  // def lookupExpr[$: P]: P[LookupExpr] = P((progVar | getProgVarExpr) ~~ "[" ~ expr ~ "]").map{
-  def lookupExpr[$: P]: P[LookupExpr] = P(identifier ~~ "[" ~ expr ~ "]").map{
-    case (id, expr) => LookupExpr(id, expr)
-  }
   def updateMapExpr[$: P]: P[UpdateMapExpr] = P(identifier ~~ "[" ~ mapTupleExpr ~ "]").map(items => UpdateMapExpr(items._1, items._2))
 
   // Special operations
@@ -267,9 +267,10 @@ object Parser {
     case "Bool" => BoolType()
   }
 
-  def seqOrSetType[$: P] : P[Type] = P(("Seq" | "Set").! ~~ "[" ~ notStateTypeName ~ "]").map {
+  def seqOrSetType[$: P] : P[Type] = P(("Seq" | "Set").! ~~ "[" ~ notStateTypeName ~ "]").map{
     case ("Seq", t) => SeqType(t)
     case ("Set", t) => SetType(t)
+    case _ => throw UnknownException("Critical error occured while passing Seq/Set type declarations")
   }
 
   def mapType[$: P] : P[Type] = P("Map[" ~ notStateTypeName ~~ "," ~ notStateTypeName ~ "]").map{

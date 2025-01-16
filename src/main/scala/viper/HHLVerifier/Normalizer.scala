@@ -57,7 +57,8 @@ object Normalizer {
           else quantifier
         }
         Assertion(newQuantifier, assertVarDecls, normalizedBody)
-      case e@GetValExpr(_, _) => e
+      // TODO: Adapt this case
+      case e@LookupExpr(_, _) => e
       case _ => throw UnknownException("Normalizer: expression " + e + " is not expected. Typ is " + e.getClass())
     }
   }

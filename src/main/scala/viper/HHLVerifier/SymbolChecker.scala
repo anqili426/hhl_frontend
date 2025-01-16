@@ -252,12 +252,16 @@ object SymbolChecker {
           allVars = originalAllVars
           allVarsInCurrScope = originalAllVarsInScope
           varsInBody
-        case GetValExpr(state, id) =>
+          // TODO: ADAPT THIS
+        // TODO: Ask Anqi what happens here
+        /*case GetValExpr(state, id) =>
             checkIdDefined(state)
             checkIdDefined(id)
           var varsInExpr = Seq((id.name, allVarsInCurrScope.get(id.name).get))
           if (state.isInstanceOf[ProofVar]) varsInExpr = varsInExpr :+ (state.idName, allVarsInCurrScope.get(state.idName).get)
-          varsInExpr
+          varsInExpr*/
+        case LookupExpr(id, ind) =>
+          checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(ind, isInLoopInv, isFrame)
         case StateExistsExpr(state, _) =>
             if (isFrame) throw UnknownException("Framed assertion cannot include state-exists-expression")
             checkIdDefined(state)
@@ -289,16 +293,18 @@ object SymbolChecker {
           }
         case MapAssignExpr(elements) =>
           elements.foldRight(Seq.empty[(String, Type)]) {
-            case (l, r) => r ++ checkSymbolsExpr(l._1, isInLoopInv, isFrame) ++ checkSymbolsExpr(l._2, isInLoopInv, isFrame)
+            case (l, r) => r ++ checkSymbolsExpr(l.k, isInLoopInv, isFrame) ++ checkSymbolsExpr(l.v, isInLoopInv, isFrame)
           }
-        case LookupExpr(id, ind) =>
-          checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(ind, isInLoopInv, isFrame)
         case LengthExpr(id) =>
           checkSymbolsExpr(id, isInLoopInv, isFrame)
-        case ConcatSeqExpr(left, right) =>
-          checkSymbolsExpr(left, isInLoopInv, isFrame) ++ checkSymbolsExpr(right, isInLoopInv, isFrame)
+        case UpdateMapExpr(id, update) =>
+          checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(update, isInLoopInv, isFrame)
+        case MapTupleExpr(k, v) =>
+          checkSymbolsExpr(k, isInLoopInv, isFrame) ++ checkSymbolsExpr(v, isInLoopInv, isFrame)
+        case CombExpr(lhs, rhs, _) =>
+          checkSymbolsExpr(lhs, isInLoopInv, isFrame) ++ checkSymbolsExpr(rhs, isInLoopInv, isFrame)
         case _ =>
-          throw UnknownException("Expression " + exp + " is of unexpected type " + exp.getClass)
+          throw UnknownException("Symbol checker: Expression " + exp + " is of unexpected type " + exp.getClass)
       }
     }
 

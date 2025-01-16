@@ -149,7 +149,7 @@ object TypeChecker {
   def exprContainsHyperAssertion(e: Expr, hyperAssertionExpected: Boolean, polarity: Int = 1) : Boolean = {
     var res = true
     var isHyperAssertion = false
-    println("Now class " + e.getClass() + " of " + e.toString())
+    // println("Now class " + e.getClass() + " of " + e.toString())
 
     e match {
       case id@Id(_) =>
@@ -204,14 +204,15 @@ object TypeChecker {
       case ast@Assertion(_, assertVarDecls, body) =>
         isHyperAssertion = typeCheckAssertionHelper(assertVarDecls, body, hyperAssertionExpected, polarity)
         ast.typ = boolType
-      case gve@GetValExpr(state, id) =>
+        // TODO: ADAPT THIS
+      /*case gve@GetValExpr(state, id) =>
         isHyperAssertion = true
         // When type checking for id in a GetValExpr, fix hyperAssertionExpected to be false
         // Any other occurrence of Id instances should be type checked with the correct inHyperAssertion flag
         exprContainsHyperAssertion(state, hyperAssertionExpected)
         exprContainsHyperAssertion(id, false)
         res = checkIfTypeMatch(state.typ, stateType)
-        gve.typ = id.typ
+        gve.typ = id.typ*/
       case se@StateExistsExpr(state, _) =>
         isHyperAssertion = true
         se.useForAll = (polarity < 0)
@@ -241,18 +242,18 @@ object TypeChecker {
       case SeqAssignExpr(elements) =>
         elements.foreach(el => {
           exprContainsHyperAssertion(el, false)
-          res = res && checkIfTypeMatch(e.typ.asInstanceOf[SeqType].subtype, el.typ)
+          res = res && checkIfTypeMatch(e.typ.asInstanceOf[SeqType].sType, el.typ)
         })
       case SetAssignExpr(elements) =>
         elements.foreach(el => {
           exprContainsHyperAssertion(el, false)
-          res = res && checkIfTypeMatch(e.typ.asInstanceOf[SetType].subtype, el.typ)
+          res = res && checkIfTypeMatch(e.typ.asInstanceOf[SetType].sType, el.typ)
         })
       case MapAssignExpr(elements) =>
         elements.foreach(el => {
-          exprContainsHyperAssertion(el._1, false)
-          exprContainsHyperAssertion(el._2, false)
-          res = res && checkIfTypeMatch(e.typ.asInstanceOf[MapType].keySubtype, el._1.typ) && checkIfTypeMatch(e.typ.asInstanceOf[MapType].valueSubtype, el._2.typ)
+          exprContainsHyperAssertion(el.k, false)
+          exprContainsHyperAssertion(el.v, false)
+          res = res && checkIfTypeMatch(e.typ.asInstanceOf[MapType].kType, el.k.typ) && checkIfTypeMatch(e.typ.asInstanceOf[MapType].vType, el.v.typ)
         })
       case e@LookupExpr(id, ind) =>
         exprContainsHyperAssertion(id, false)
@@ -261,22 +262,48 @@ object TypeChecker {
         if (id.typ.isInstanceOf[SeqType]) {
           res = ind.typ.isInstanceOf[IntType]
           e.baseType = id.typ.asInstanceOf[SeqType]
-          e.typ = id.typ.asInstanceOf[SeqType].subtype
+          e.typ = id.typ.asInstanceOf[SeqType].sType
         } else if (id.typ.isInstanceOf[MapType]) {
-          res = checkIfTypeMatch(id.typ.asInstanceOf[MapType].keySubtype, ind.typ)
+          res = checkIfTypeMatch(id.typ.asInstanceOf[MapType].kType, ind.typ)
           e.baseType = id.typ.asInstanceOf[MapType]
-          e.typ = id.typ.asInstanceOf[MapType].keySubtype
-        } else throw TypeException("Lookup can only be applied to SeqType or MapType")
+          e.typ = id.typ.asInstanceOf[MapType].kType
+        } else if (id.typ.isInstanceOf[StateType]) {
+          isHyperAssertion = true
+          exprContainsHyperAssertion(id, hyperAssertionExpected)
+          exprContainsHyperAssertion(ind, false)
+          e.typ = ind.typ
+        } else throw TypeException("Lookup can only be applied to SeqType, MapType or StateType")
       case e@LengthExpr(id) =>
         exprContainsHyperAssertion(id, false)
         if (!id.typ.isInstanceOf[SeqType] && !id.typ.isInstanceOf[SetType] && !id.typ.isInstanceOf[MapType]) throw TypeException("|.| can only be applied to composite types")
         e.typ = IntType()
-      case e@ConcatSeqExpr(left, right) =>
-        exprContainsHyperAssertion(left, false)
-        exprContainsHyperAssertion(right, false)
-        res = checkIfTypeMatch(left.typ, right.typ)
-        e.typ = left.typ
-      case _ => throw TypeException("Unkown type detected in Expression")
+      case e@UpdateMapExpr(id, update) =>
+        exprContainsHyperAssertion(id, false)
+        exprContainsHyperAssertion(update.k, false)
+        exprContainsHyperAssertion(update.v, false)
+        if (!id.typ.isInstanceOf[MapType]) throw TypeException("Map update can only be applied to variables of type Map!")
+        val t = id.typ.asInstanceOf[MapType]
+        res = checkIfTypeMatch(t.kType, update.k.typ) && checkIfTypeMatch(t.vType, update.v.typ)
+        e.typ = t
+      case e@CombExpr(lhs, rhs, op) =>
+        exprContainsHyperAssertion(lhs, false)
+        exprContainsHyperAssertion(rhs, false)
+
+        if (op == "in") {
+          if (rhs.typ.isInstanceOf[SetType]) res = checkIfTypeMatch(lhs.typ, rhs.typ.asInstanceOf[SetType].sType)
+          else if (rhs.typ.isInstanceOf[MapType]) res = checkIfTypeMatch(lhs.typ, rhs.typ.asInstanceOf[MapType].kType)
+          else throw TypeException("in operation can only be applied to maps or sets!")
+          e.typ = BoolType()
+        } else if (op == "++") {
+          if (!rhs.typ.isInstanceOf[SeqType] || !lhs.typ.isInstanceOf[SeqType]) throw TypeException("++ operation can only be applied to seqs!")
+          res = checkIfTypeMatch(rhs.typ, lhs.typ)
+          e.typ = rhs.typ
+        } else {
+          if (!rhs.typ.isInstanceOf[SetType] || !lhs.typ.isInstanceOf[SetType]) throw TypeException("set operation can only be applied to sets!")
+          res = checkIfTypeMatch(lhs.typ, rhs.typ)
+          e.typ = lhs.typ
+        }
+      case _ => throw TypeException("Unkown type detected in Expression" + e.getClass())
     }
     if (!res) throw TypeException(f"The expression has a type error: $e is of type ${e.getClass}")
     isHyperAssertion
@@ -297,9 +324,6 @@ object TypeChecker {
   }
 
   def checkIfTypeMatch(t1: Type, t2: Type): Boolean = {
-    println("Left: " + t1.toString())
-    println("Right: " + t2.toString())
-
     (t1, t2) match {
       // Primitive types
       case (s: IntType, t: IntType) => true
@@ -307,9 +331,9 @@ object TypeChecker {
       case (s: StateType, t: StateType) => true
       case (s: StmtBlockType, t: StmtBlockType) => true
       // Composite types
-      case (s: SeqType, t: SeqType) => checkIfTypeMatch(s.subtype, t.subtype)
-      case (s: SetType, t: SetType) => checkIfTypeMatch(s.subtype, t.subtype)
-      case (s: MapType, t: MapType) => checkIfTypeMatch(s.keySubtype, t.keySubtype) && checkIfTypeMatch(s.valueSubtype, t.valueSubtype)
+      case (s: SeqType, t: SeqType) => checkIfTypeMatch(s.sType, t.sType)
+      case (s: SetType, t: SetType) => checkIfTypeMatch(s.sType, t.sType)
+      case (s: MapType, t: MapType) => checkIfTypeMatch(s.kType, t.kType) && checkIfTypeMatch(s.vType, t.vType)
       // Non-matching types
       case _ => false
     }
