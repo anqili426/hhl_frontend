@@ -24,9 +24,9 @@ object Generator {
   val setUnionFuncName = "set_union"
 
   val sVarName = "_s"
-  val s0VarName = "s0"
-  val s1VarName = "s1"
-  val s2VarName = "s2"
+  val s0VarName = "_s0"
+  val s1VarName = "_s1"
+  val s2VarName = "_s2"
   val currStatesVarName = "S"
   val tempStatesVarName = "S_temp"
   val failedStatesVarName = "S_fail"
