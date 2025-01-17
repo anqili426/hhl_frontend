@@ -1,0 +1,28 @@
+/*
+    A test case for errors caused by a loops invariant which may not be preserved.
+    Output:
+        Verification failed
+        [WhileLoop, syncTotRule selected, 1 quantifier(s) removed] The following invariant might not hold:
+        (true) && (forall <_s: State> :: ((!(<_s>)) || ((_s[i]) == (0))))
+
+        [WhileLoop, existsRule selected] The following invariant might not hold:
+        exists <_sa: State> :: ((<_sa>) && (forall <_s: State> :: ((!(<_s>)) || ((_s[i]) == (0)))))
+*/
+
+method RecursiveRuleFails() returns (out: Int)
+    requires exists <_s> :: true
+    ensures exists <_s> :: _s[out] == 2
+{
+    var i: Int
+    i := 0
+
+    while existsRule (i < 1)
+        invariant exists <_sa> :: forall <_s> :: _s[i] == 0
+        decreases 1 - i
+    {
+        i := i + 1
+    }
+
+    out := 2
+}
+
