@@ -117,7 +117,7 @@ object Generator {
   // - translates actual program
   def generate(input: HHLProgram, source: String, types: Set[Type]): vpr.Program = {
     program_source = source
-    TypeHandler.setOfDeclaredTypes = types
+    declaredTypes = types
 
     val fields: Seq[vpr.Field] = Seq.empty
     val predicates: Seq[vpr.Predicate] = Seq.empty
@@ -152,12 +152,12 @@ object Generator {
   def translateMethod(method: Method): Unit = {
     currMethod = method
     // Declaring states
-    val inputStates = TypeHandler.setState("S0")
-    val outputStates = TypeHandler.setState(TypeHandler.VarNames.currStatesVarName)
-    val tempStates = TypeHandler.setState(TypeHandler.VarNames.tempStatesVarName)
-    val outputFailureStates = TypeHandler.setState(TypeHandler.VarNames.failedStatesVarName)
-    val tempFailedStates = TypeHandler.setState(TypeHandler.VarNames.tempFailedStatesVarName)
-    val state = TypeHandler.state(TypeHandler.VarNames.sVarName)
+    val inputStates = SetState.localVarDecl("S0")
+    val outputStates = SetState.localVarDecl(currStatesVarName)
+    val tempStates = SetState.localVarDecl(tempStatesVarName)
+    val outputFailureStates = SetState.localVarDecl(failedStatesVarName)
+    val tempFailedStates = SetState.localVarDecl(tempFailedStatesVarName)
+    val state = State.localVarDecl(sVarName)
 
     // The following statement assumes that S_fail is empty
     val assumeSFailEmpty = vpr.Inhale(vpr.Forall(
@@ -171,15 +171,15 @@ object Generator {
     val inSetFailEq = inhaleInSetEqStmt(state, outputFailureStates.localVar)
 
     // Arguments of the input method
-    val args = TypeHandler.translateMethodVariables(method.params)
+    val args = translateMethodVariables(method.params)
     val translatedArgs = args :+ inputStates
 
     // Return variables of the input method
-    val ret = TypeHandler.translateMethodVariables(method.res)
+    val ret = translateMethodVariables(method.res)
     val retVars = ret.map(r => r.localVar)
 
     // Forming the preconditions
-    val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(TypeHandler.assignId())())())
+    val argsWithValues = args.map(v => vpr.EqCmp(v.localVar, vpr.IntLit(assignId())())())
     val preAboutArgs = if (argsWithValues.isEmpty) Seq.empty else Seq(argsWithValues.reduce((e1: vpr.Exp, e2: vpr.Exp) => vpr.And(e1, e2)()))
     val normalizedPres = method.pre.map(p => Normalizer.normalize(p, false))
     normalizedPres.foreach(p => Normalizer.detQuantifier(p, false))
@@ -222,11 +222,11 @@ object Generator {
     }.toSeq
 
     // Currently, we only support program variables of type Integer, so pick them out
-    val translatedProgVars = progVars.map(v => TypeHandler.getVprVar(v._1))
+    val translatedProgVars = progVars.map(v => getVprVar(v._1))
     val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars
-    val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(TypeHandler.assignId())())())
+    val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(assignId())())())
 
-    val progVarDecls = TypeHandler.translateMethodVariables(progVarsAsIds)
+    val progVarDecls = translateMethodVariables(progVarsAsIds)
     val nonIntAuxVars = Seq(tempStates, tempFailedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
     val localVars = progVarDecls ++ auxiliaryVarDecls ++ nonIntAuxVars
 
@@ -351,7 +351,7 @@ object Generator {
         (newStmts, Seq.empty)
 
       case AssignStmt(left, right) =>
-        val leftVar = TypeHandler.declareVariable(left)
+        val leftVar = vpr.LocalVarDecl(left.name, vpr.Int)()
 
         val s0 = vpr.LocalVar(s0VarName, state.typ)()
         val s1 = vpr.LocalVar(s1VarName, state.typ)()
@@ -901,7 +901,7 @@ object Generator {
       )()
     } else {
       // modifiedVarsVpr is guaranteed to be non-empty
-      val modifiedVarsVpr = modifiedVars.map(v => vpr.LocalVar(v._1, TypeHandler.translateType(v._2))())
+      val modifiedVarsVpr = modifiedVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
       vpr.Exists(Seq(s_prime), Seq.empty,
         vpr.And(SetState.getInSetApp(Seq(s_prime.localVar, S2), useForAll),
           vpr.Forall(Seq(vVar), Seq.empty,
@@ -930,7 +930,7 @@ object Generator {
     // I
     val pre1 = getAllInvariantsWithTriggers(normalizedInv, inputStates.localVar, inputFailureStates.localVar)
     // All program variables are different
-    val allProgVarsInLoopBody = body.allProgVars.map(v => vpr.LocalVar(v._1, TypeHandler.translateType(v._2))()).toSeq
+    val allProgVarsInLoopBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))()).toSeq
     val (allIntVars, stateVars, allOtherVars, pre2) = separateVarsByType(allProgVarsInLoopBody)
 
     val args = (allIntVars ++ stateVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
@@ -1167,7 +1167,7 @@ object Generator {
     val tProgVar = Id(tViperVar.name)
     tProgVar.typ = IntType()
     val stmt = IfElseStmt(loopGuard, body, CompositeStmt(Seq.empty))
-    val varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, TypeHandler.translateType(v._2))()).toSeq ++ Seq(tViperVar)
+    val varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))()).toSeq ++ Seq(tViperVar)
     var pres: Seq[Expr] = Seq.empty
     var posts: Seq[(Expr, Option[Info])] = Seq.empty
 
@@ -1188,7 +1188,7 @@ object Generator {
 
   def translateExistsRuleCond2(normalizedInvs: Seq[Expr], loopGuard: Expr, body: CompositeStmt, decrExpr: Expr): vpr.Method = {
     val methodName = checkExistsRuleCond2MethodName + "_" +loopCounter
-    var varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, TypeHandler.translateType(v._2))()).toSeq
+    var varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))()).toSeq
     var pres: Seq[Expr] = Seq.empty
     var posts: Seq[(Expr, Option[Info])] = Seq.empty
 
@@ -1259,7 +1259,7 @@ object Generator {
       }
     }
 
-    val allVars = loopBody.allProgVars.map(v => vpr.LocalVar(v._1, TypeHandler.translateType(v._2))()).toSeq
+    val allVars = loopBody.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))()).toSeq
     val (_, _, otherVars, pre2) = separateVarsByType(allVars :+ t)
     methodArgs = methodArgs ++ allVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
     methodLocalVars = methodLocalVars ++ otherVars
@@ -1408,7 +1408,7 @@ object Generator {
   // Returns an alias that is formed by appending a $ to v's identifier
   def getAliasForProofVar(v: ProofVar): vpr.LocalVarDecl = {
     if (!useAliasForProofVar) throw UnknownException("Method getAliasForProofVar cannot be called when assertProofVar == false")
-    vpr.LocalVarDecl("$" + v.name, TypeHandler.translateType(v.typ))()
+    vpr.LocalVarDecl("$" + v.name, translateType(v.typ))()
   }
 
   def inhaleInSetEqStmt(state: vpr.LocalVarDecl, currStates: vpr.LocalVar): Seq[vpr.Inhale] = {
@@ -1460,7 +1460,7 @@ object Generator {
           case "-" => vpr.Minus(translateExp(e, state, currStates, failureStates))(info = info)
         }
       case av@AssertVar(name) =>
-        vpr.LocalVar(name, TypeHandler.translateType(av.typ))(info = info)
+        vpr.LocalVar(name, translateType(av.typ))(info = info)
       case a@Assertion(quantifier, vars, body) =>
         // if (!hintDecl.isEmpty) translateHintDecl(hintDecl)
         val variables = vars.map(v => translateAssertVarDecl(v))
@@ -1485,7 +1485,7 @@ object Generator {
       case LoopIndex() => currLoopIndex
       case pv@ProofVar(name) =>
         if (useAliasForProofVar && currProofVarName==name) getAliasForProofVar(pv).localVar
-        else vpr.LocalVar(name, TypeHandler.translateType(pv.typ))(info = info)
+        else vpr.LocalVar(name, translateType(pv.typ))(info = info)
       case Hint(name, arg) =>
         containsHints = true
         if (removeHints) trueLit
@@ -1495,13 +1495,13 @@ object Generator {
       // case HintDecl(name, args) => This is translated in a separate method
       // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
       case e@SeqAssignExpr(elems) =>
-        if (elems.isEmpty) vpr.EmptySeq(TypeHandler.translateType(e.typ.asInstanceOf[SeqType].sType))()
+        if (elems.isEmpty) vpr.EmptySeq(translateType(e.typ.asInstanceOf[SeqType].sType))()
         else vpr.ExplicitSeq(elems.map(el => translateExp(el, state, currStates, failureStates, info)))()
       case e@SetAssignExpr(elems) =>
-        if (elems.isEmpty) vpr.EmptySet(TypeHandler.translateType(e.typ.asInstanceOf[SetType].sType))()
+        if (elems.isEmpty) vpr.EmptySet(translateType(e.typ.asInstanceOf[SetType].sType))()
         else vpr.ExplicitSet(elems.map(el => translateExp(el, state, currStates, failureStates, info)))()
       case e@MapAssignExpr(elems) =>
-        if (elems.isEmpty) vpr.EmptyMap(TypeHandler.translateType(e.typ.asInstanceOf[MapType].kType), TypeHandler.translateType(e.typ.asInstanceOf[MapType].vType))()
+        if (elems.isEmpty) vpr.EmptyMap(translateType(e.typ.asInstanceOf[MapType].kType), translateType(e.typ.asInstanceOf[MapType].vType))()
         else vpr.ExplicitMap(elems.map(el => vpr.Maplet(
           translateExp(el.k, state, currStates, failureStates, info),
           translateExp(el.v, state, currStates, failureStates, info)
@@ -1582,7 +1582,7 @@ object Generator {
   }
 
   def translateAssertVarDecl(decl: AssertVarDecl): vpr.LocalVarDecl = {
-    vpr.LocalVarDecl(decl.vName.name, TypeHandler.translateType(decl.vType))()
+    vpr.LocalVarDecl(decl.vName.name, translateType(decl.vType))()
   }
 
   // This returns a Viper assume statement that expresses the following:
@@ -1620,7 +1620,7 @@ object Generator {
 
   def generatePreamble(): (Seq[vpr.Domain], Seq[vpr.Method]) = {
     // Create domains
-    val stateDomain = State.domain(TypeHandler.setOfDeclaredTypes)
+    val stateDomain = State.domain(declaredTypes)
     val setStateDomain = SetState.domain()
 
     // Create additional methods
@@ -1646,4 +1646,31 @@ object Generator {
   def havocIntMethodCall(i: vpr.LocalVar): vpr.MethodCall = {
     vpr.MethodCall(havocIntMethodName, Seq.empty, Seq(i))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
   }
+
+  // translate type to vpr type
+  def translateType(typ: Type): vpr.Type = {
+    typ match {
+      case t: IntType => viper.silver.ast.Int
+      case t: BoolType => viper.silver.ast.Bool
+      case t: SeqType => viper.silver.ast.SeqType(translateType(t.sType))
+      case t: SetType => viper.silver.ast.SetType(translateType(t.sType))
+      case t: MapType => viper.silver.ast.MapType(translateType(t.kType), translateType(t.vType))
+      case StateType() => State.stateType
+      case _ =>
+        throw UnknownException("Cannot translate type " + typ)
+    }
+  }
+
+  private var variablesIdCounter = 0
+
+  // assigns unique ids to vpr variables
+  def assignId(): Int = {
+    val r = variablesIdCounter
+    variablesIdCounter += 1
+    r
+  }
+
+  def translateMethodVariables(params: Seq[Id]): Seq[vpr.LocalVarDecl] = params.map(id => vpr.LocalVarDecl(id.name, vpr.Int)())
+
+  def getVprVar(name: String): vpr.LocalVar = vpr.LocalVar(name, vpr.Int)()
 }

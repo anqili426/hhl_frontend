@@ -1,5 +1,6 @@
 package viper.HHLVerifier.Generation
 
+import viper.HHLVerifier.Generation.Generator.translateType
 import viper.HHLVerifier.{Id, Type}
 import viper.silver.{ast => vpr}
 
@@ -25,7 +26,7 @@ object State {
       state,
       vpr.LocalVar(id.name, identType)()
     ),
-    TypeHandler.translateType(id.typ)
+    translateType(id.typ)
   )
 
 //  def getGetApp(args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type] = defaultTypeVarMap): vpr.DomainFuncApp = {
@@ -51,7 +52,7 @@ object State {
         vpr.LocalVarDecl("s", stateType)(),
         vpr.LocalVarDecl("x", vpr.Int)()
       ),
-      TypeHandler.translateType(typ)
+      translateType(typ)
     )(domainName = stateDomainName)
   }
 
@@ -71,7 +72,7 @@ object State {
     val idVar = vpr.LocalVarDecl("x", vpr.Int)()
     val notIdVar = vpr.LocalVarDecl("y", vpr.Int)()
     val typeID = typ.toString()
-    val vprType = TypeHandler.translateType(typ)
+    val vprType = translateType(typ)
 
     vpr.NamedDomainAxiom(
       // Name of the axiom
