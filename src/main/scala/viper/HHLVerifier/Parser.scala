@@ -123,7 +123,7 @@ object Parser {
   def impliesOp[$: P]: P[String] = P("==>").!
   def boolOp1[$: P]: P[String] = P("&&" | "||").!
   def boolOp2[$: P]: P[String] = P("==" ~ &(!CharIn(">")) | "!=").!
-  def combinatorOps[$: P]: P[String] = P("union" | "intersection" | "setminus" | "in" | "++").!
+  def combinatorOps[$: P]: P[String] = P("union " | "intersection " | "setminus " | "in " | "++").! // the spaces are there to avaid a very specfic bug introduced by using cuts in compositeOpsExpr
   def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
@@ -216,7 +216,7 @@ object Parser {
 
   // Basic building components and utils
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
-  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ expr).map(e => UnaryExpr("!", e))// Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
+  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ expr).map(e => UnaryExpr("!", e)) // Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
   def negExpr[$: P]: P[UnaryExpr] = P("-" ~ number).map(e => UnaryExpr("-", e))
   def boolean[$: P] : P[BoolLit] = P(boolTrue | boolFalse)
   def boolTrue[$: P]: P[BoolLit] = P("true").!.map(_ => BoolLit(true))

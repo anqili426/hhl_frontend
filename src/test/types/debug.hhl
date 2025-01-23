@@ -1,0 +1,14 @@
+method debug(i: Int) returns ()
+requires forall <_a> :: true
+requires forall <_b> :: true
+ensures forall <_c> :: true
+{
+    var b: Bool
+    b := true
+
+    while (b)
+        invariant forall <_d> :: true
+        invariant forall <_e> :: true
+        decreases i
+    {}
+}

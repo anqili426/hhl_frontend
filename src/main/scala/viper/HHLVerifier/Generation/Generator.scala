@@ -4,6 +4,10 @@ import viper.HHLVerifier._
 import viper.silver.ast.{Info, NoInfo}
 import viper.silver.{ast => vpr}
 
+// TODO: Check if the filter works correctly when verifying loops => generateViperMethod might filter for Ints as well
+// TODO: All auxilary variables must be checked
+// TODO: Search for vpr.Method and do this
+
 object Generator {
   // source code
   var program_source = ""
@@ -215,6 +219,7 @@ object Generator {
     // Assume that all program variables + return variables are different by assigning a distinct value to each of them
     // Program variables that are not method arguments or return values
     val progVars = method.body.allProgVars.filter(v => !method.paramsMap.keySet.contains(v._1) && !method.resMap.keySet.contains(v._1))
+    progVars.foreach(v => println(v))
     val progVarsAsIds = progVars.map { keyVal =>
       val id = Id(keyVal._1)
       id.typ = keyVal._2
@@ -223,7 +228,7 @@ object Generator {
 
     // Currently, we only support program variables of type Integer, so pick them out
     val translatedProgVars = progVars.map(v => getVprVar(v._1))
-    val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars
+    val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars // TODO: remove all the type set variables
     val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(assignId())())())
 
     val progVarDecls = translateMethodVariables(progVarsAsIds)
@@ -1669,6 +1674,7 @@ object Generator {
     variablesIdCounter += 1
     r
   }
+  // TODO: Undo this and reverse this to the original standard
 
   def translateMethodVariables(params: Seq[Id]): Seq[vpr.LocalVarDecl] = params.map(id => vpr.LocalVarDecl(id.name, vpr.Int)())
 
