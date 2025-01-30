@@ -1,7 +1,7 @@
 package viper.HHLVerifier.Generation
 
 import viper.HHLVerifier._
-import viper.silver.ast.{Info, NoInfo}
+import viper.silver.ast.{DomainType, Info, NoInfo}
 import viper.silver.{ast => vpr}
 
 // TODO: Check if the filter works correctly when verifying loops => generateViperMethod might filter for Ints as well
@@ -175,11 +175,11 @@ object Generator {
     val inSetFailEq = inhaleInSetEqStmt(state, outputFailureStates.localVar)
 
     // Arguments of the input method
-    val args = translateMethodVariables(method.params)
+    val args = method.params.map(id => vpr.LocalVarDecl(id.name, vpr.Int)()) // TODO: This might need to be changed, Int could be too restrictive
     val translatedArgs = args :+ inputStates
 
     // Return variables of the input method
-    val ret = translateMethodVariables(method.res)
+    val ret = method.res.map(id => vpr.LocalVarDecl(id.name, vpr.Int)()) // TODO: This might need to be changed, Int could be too restrictive
     val retVars = ret.map(r => r.localVar)
 
     // Forming the preconditions
@@ -213,7 +213,7 @@ object Generator {
     val translatedContent = translateStmt(method.body, outputStates.localVar, outputFailureStates.localVar)
 
     // Aux variables of type Int generated during translation of the method body
-    val auxiliaryVars = translatedContent._2
+    val auxiliaryVars = translatedContent._2.filter(el => el.typ == vpr.Int)
     val auxiliaryVarDecls = auxiliaryVars.map(v => vpr.LocalVarDecl(v.name, v.typ)()) // TODO: Take care of aux variables
 
     // Assume that all program variables + return variables are different by assigning a distinct value to each of them
@@ -230,6 +230,11 @@ object Generator {
     val translatedProgVars = progVars.map(v => getVprVar(v._1))
     val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars // TODO: remove all the type set variables
     val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(assignId())())())
+
+    // DEBUG
+    println(translatedProgVars)
+    println(auxiliaryVars)
+    println(retVars)
 
     val progVarDecls = translateMethodVariables(progVarsAsIds)
     val nonIntAuxVars = Seq(tempStates, tempFailedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
@@ -266,6 +271,36 @@ object Generator {
     val forAllTriggers = Seq(vpr.Trigger(Seq(SetState.getInSetApp(Seq(state, STmp))))())
     val existsTriggers = Seq(vpr.Trigger(Seq(SetState.getInSetApp(Seq(state, currStates), useForAll=false, useLimited=true)))())
 
+    // Handle accesses for lookup expressions
+    stmt.lookUpAccesses.foreach { luExp =>
+      println("Translating check for lookup expression.")
+      val assertVar = AssertVar("s")
+      assertVar.typ = StateType()
+      val assertVarDecl = AssertVarDecl(assertVar, StateType())
+
+      newStmts = newStmts ++ translateStmt(
+        AssertStmt(
+          BinaryExpr(
+            BinaryExpr(
+              Num(0),
+              "<=",
+              luExp.index
+            ),
+            "&&",
+            BinaryExpr(
+              luExp.index,
+              "<",
+              LengthExpr(luExp.id)
+            )
+          )
+        ),
+        currStates, currFailureStates, isAutoSelected
+      )._1
+    }
+
+    println(f"Now there are ${newStmts.length} checks:")
+    if (newStmts.length > 0) println(newStmts(0))
+
     stmt match {
       case CompositeStmt(stmts) =>
         // Translate each statement in the sequence
@@ -277,13 +312,13 @@ object Generator {
           resStmts = resStmts ++ tmpRes._1
           resNewVars = resNewVars ++ tmpRes._2
         }
-        (resStmts, resNewVars)
+        (resStmts ++ newStmts, resNewVars)
 
       case PVarDecl(_, _) =>
         // No translation needed here
         // The translation of variable declarations always happens when translating a viper method
         // Either in translateMethod or translateInvariantVerification
-        (Seq.empty, Seq.empty)
+        (newStmts, Seq.empty)
 
       case ProofVarDecl(pv, p) =>
         useAliasForProofVar = true
@@ -291,7 +326,7 @@ object Generator {
         val assertVarExists = vpr.Assert(vpr.Exists(Seq(getAliasForProofVar(pv)), Seq.empty, translateExp(p, state, currStates, currFailureStates))())(info = DeprecatedErr(p).getMsg)
         useAliasForProofVar = false
         val assumeP = vpr.Inhale(translateExp(p, state, currStates, currFailureStates))()
-        newStmts = Seq(assertVarExists, assumeP)
+        newStmts = newStmts ++ Seq(assertVarExists, assumeP)
         (newStmts, Seq.empty)
 
       case AssumeStmt(e) =>
@@ -301,7 +336,7 @@ object Generator {
           // Assume forall s: State :: in_set(s, S_tmp) ==> in_set(s, S) && exp
           val exp = vpr.And(SetState.getInSetApp(Seq(state, currStates)),
             translateExp(e, state, currStates, currFailureStates))()
-          forallNewStmts = Seq(translateAssumeWithViperExpr(state, STmp, exp, triggers=forAllTriggers))
+          forallNewStmts = newStmts ++Seq(translateAssumeWithViperExpr(state, STmp, exp, triggers=forAllTriggers))
         }
 
         if (verifierOption != 0) {
@@ -309,10 +344,10 @@ object Generator {
           // Assume forall s: State :: in_set(s, S) && expLeft ==> in_set(s, S_tmp)
           val expRight = SetState.getInSetApp(Seq(state, STmp), useForAll=false)
           val expLeft = translateExp(e, state, currStates, currFailureStates)
-          existsNewStmts = Seq(translateAssumeWithViperExpr(state, currStates, expRight, expLeft, useForAll=false, triggers=existsTriggers))
+          existsNewStmts = newStmts ++Seq(translateAssumeWithViperExpr(state, currStates, expRight, expLeft, useForAll=false, triggers=existsTriggers))
         }
 
-        newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
+        newStmts = newStmts ++ Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
         (newStmts, Seq.empty)
 
       case AssertStmt(e) =>
@@ -343,16 +378,16 @@ object Generator {
           val stmt2 = translateAssumeWithViperExpr(state, currStates, exp2Right, exp2Left, useForAll=false, triggers=existsFailTriggers)
           existsNewStmts = Seq(stmt1, stmt2)
         }
-        newStmts = Seq(havocSTmp, havocSFailTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateSFail, updateProgStates)
+        newStmts = newStmts ++ Seq(havocSTmp, havocSFailTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateSFail, updateProgStates)
         (newStmts, Seq.empty)
 
       case HyperAssumeStmt(e) =>
-        newStmts = Seq(vpr.Inhale(translateExp(e, null, currStates, currFailureStates))())
+        newStmts = newStmts ++ newStmts ++ Seq(vpr.Inhale(translateExp(e, null, currStates, currFailureStates))())
         (newStmts, Seq.empty)
 
       case HyperAssertStmt(e) =>
         val assert = vpr.Assert(translateExp(e, null, currStates, currFailureStates))(info = HyperAssertionErr(e).getMsg)
-        newStmts = Seq(assert)
+        newStmts = newStmts ++ Seq(assert)
         (newStmts, Seq.empty)
 
       case AssignStmt(left, right) =>
@@ -375,7 +410,7 @@ object Generator {
           existsNewStmts = Seq(stmt)
         }
 
-        newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
+        newStmts = newStmts ++ Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
         (newStmts, Seq.empty)
 
       case MultiAssignStmt(left, right) =>
@@ -386,7 +421,7 @@ object Generator {
 
           callee.pre.foreach{ exp =>
             val vprExp = translateExp(exp, state, currStates, currFailureStates)
-            newStmts = newStmts :+ vpr.Assert(vprExp)(info = MethodCallPreconditionErr(exp).getMsg)
+            newStmts =  newStmts :+ vpr.Assert(vprExp)(info = MethodCallPreconditionErr(exp).getMsg)
           }
 
           useParamsToArgsMap = false
@@ -449,7 +484,7 @@ object Generator {
             k, triggers = triggers2, false)
           existsNewStmts = Seq(stmt1, stmt2)
         }
-        newStmts = Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
+        newStmts = newStmts ++ Seq(havocSTmp) ++ forallNewStmts ++ existsNewStmts ++ Seq(updateProgStates)
         (newStmts, Seq.empty)
 
       case IfElseStmt(cond, ifStmt, elseStmt) =>
@@ -560,13 +595,13 @@ object Generator {
           val ifRes2 = translateStmt(ifStmt2, ifBlockStates, currFailureStates)
           val elseRes2 = translateStmt(elseStmt2, elseBlockStates, currFailureStates)
 
-          newStmts = Seq(assign1, assign2) ++ assumeCond._1 ++ assumeNotCond._1 ++ ifRes1._1 ++ elseRes1._1 ++ setFlagForIf ++ setFlagForElse ++ Seq(defineAlignedStates) ++ alignedStmt._1 ++ resumeIfBlockStates ++ resumeElseBlockStates ++ ifRes2._1 ++ elseRes2._1 ++ Seq(updateSTmp, updateProgStates)
+          newStmts = newStmts ++ Seq(assign1, assign2) ++ assumeCond._1 ++ assumeNotCond._1 ++ ifRes1._1 ++ elseRes1._1 ++ setFlagForIf ++ setFlagForElse ++ Seq(defineAlignedStates) ++ alignedStmt._1 ++ resumeIfBlockStates ++ resumeElseBlockStates ++ ifRes2._1 ++ elseRes2._1 ++ Seq(updateSTmp, updateProgStates)
           (newStmts, Seq(ifBlockStates, elseBlockStates, isIfBlockVpr) ++ ifRes1._2 ++ elseRes1._2 ++ alignedStmt._2 ++ ifRes2._2 ++ elseRes2._2)
         } else {
           // No alignment
           val ifBlock = translateStmt(ifStmt, ifBlockStates, currFailureStates)
           val elseBlock = translateStmt(elseStmt, elseBlockStates, currFailureStates)
-          newStmts = Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp, updateProgStates)
+          newStmts = newStmts ++ Seq(assign1) ++ assumeCond._1 ++ ifBlock._1 ++ Seq(assign2) ++ assumeNotCond._1 ++ elseBlock._1 ++ Seq(updateSTmp, updateProgStates)
           (newStmts, Seq(ifBlockStates, elseBlockStates) ++ ifBlock._2 ++ elseBlock._2)
         }
       case DeclareStmt(_, block) =>
@@ -803,7 +838,7 @@ object Generator {
         (Seq(assertFrame) ++ translatedBody._1 ++ Seq(inhaleFrame), translatedBody._2)
 
       case UseHintStmt(hint) =>
-        newStmts = Seq(vpr.Inhale(translateExp(hint, state, currStates, currFailureStates))())
+        newStmts = newStmts ++ Seq(vpr.Inhale(translateExp(hint, state, currStates, currFailureStates))())
         (newStmts, Seq.empty)
 
       case call@MethodCallStmt(_, _) =>
@@ -1499,9 +1534,7 @@ object Generator {
           vpr.FuncApp(name + hintWrapperSuffix, Seq(translateExp(arg, state, currStates, failureStates)))(vpr.NoPosition, info, vpr.Bool, vpr.NoTrafos)
       // case HintDecl(name, args) => This is translated in a separate method
       // case AssertVarDecl(vName, vType) => This is translated in a separate method below, as vpr.LocalVarDecl is of type Stmt
-      case e@SeqAssignExpr(elems) =>
-        if (elems.isEmpty) vpr.EmptySeq(translateType(e.typ.asInstanceOf[SeqType].sType))()
-        else vpr.ExplicitSeq(elems.map(el => translateExp(el, state, currStates, failureStates, info)))()
+      case e@SeqAssignExpr(elems) => { println("1"); HHLSeq.create(elems.map(el => translateExp(el, state, currStates, failureStates, info)), translateType(e.typ.asInstanceOf[SeqType].sType)) }
       case e@SetAssignExpr(elems) =>
         if (elems.isEmpty) vpr.EmptySet(translateType(e.typ.asInstanceOf[SetType].sType))()
         else vpr.ExplicitSet(elems.map(el => translateExp(el, state, currStates, failureStates, info)))()
@@ -1513,10 +1546,12 @@ object Generator {
         )()))()
       case e@LookupExpr(base, id) =>
         if (e.baseType.isInstanceOf[SeqType]) {
-          vpr.SeqIndex(
+          println("2");
+          HHLSeq.access(
             translateExp(base, state, currStates, failureStates, info),
-            translateExp(id, state, currStates, failureStates, info)
-          )()
+            translateExp(id, state, currStates, failureStates, info),
+            translateType(base.typ.asInstanceOf[SeqType].sType)
+          )
         } else if (e.baseType.isInstanceOf[MapType]) {
           // must be a map
           vpr.MapLookup(
@@ -1531,7 +1566,7 @@ object Generator {
       case e@LengthExpr(id) =>
         val tId = translateExp(id, state, currStates, failureStates, info)
         id.typ match {
-          case _: SeqType => vpr.SeqLength(tId)()
+          case seq: SeqType => {  println("3"); HHLSeq.length(tId, translateType(seq.sType)) }
           case _: SetType => vpr.AnySetCardinality(tId)()
           case _: MapType => vpr.MapCardinality(tId)()
         }
@@ -1552,7 +1587,7 @@ object Generator {
             else // rhs has typ map
               vpr.MapContains(translatedLhs, translatedRhs)()
           case "++" =>
-            vpr.SeqAppend(translatedLhs, translatedRhs)()
+            HHLSeq.append(translatedLhs, translatedRhs, translateType(lhs.typ.asInstanceOf[SeqType].sType))
           case _ =>
             throw UnknownException("Unknown operator detected while translating expression!")
         }
@@ -1655,11 +1690,11 @@ object Generator {
   // translate type to vpr type
   def translateType(typ: Type): vpr.Type = {
     typ match {
-      case t: IntType => viper.silver.ast.Int
-      case t: BoolType => viper.silver.ast.Bool
-      case t: SeqType => viper.silver.ast.SeqType(translateType(t.sType))
-      case t: SetType => viper.silver.ast.SetType(translateType(t.sType))
-      case t: MapType => viper.silver.ast.MapType(translateType(t.kType), translateType(t.vType))
+      case t: IntType => vpr.Int
+      case t: BoolType => vpr.Bool
+      case t: SeqType => HHLSeq.seqDomainType(translateType(t.sType))
+      case t: SetType => vpr.SetType(translateType(t.sType))
+      case t: MapType => vpr.MapType(translateType(t.kType), translateType(t.vType))
       case StateType() => State.stateType
       case _ =>
         throw UnknownException("Cannot translate type " + typ)

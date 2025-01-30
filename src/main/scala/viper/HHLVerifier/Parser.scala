@@ -123,7 +123,7 @@ object Parser {
   def impliesOp[$: P]: P[String] = P("==>").!
   def boolOp1[$: P]: P[String] = P("&&" | "||").!
   def boolOp2[$: P]: P[String] = P("==" ~ &(!CharIn(">")) | "!=").!
-  def combinatorOps[$: P]: P[String] = P("union " | "intersection " | "setminus " | "in " | "++").! // the spaces are there to avaid a very specfic bug introduced by using cuts in compositeOpsExpr
+  def combinatorOps[$: P]: P[String] = P("union".! | "intersection".! | "setminus".! | "in".! ~~ spaces | "++".!) // the spaces are there to avaid a very specfic bug introduced by using cuts in compositeOpsExpr
   def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 

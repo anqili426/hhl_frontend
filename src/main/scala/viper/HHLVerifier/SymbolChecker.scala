@@ -218,6 +218,7 @@ object SymbolChecker {
     // isInLoopInv: indicates whether exp is part of a loop invariant
     // isFrame: indicates whether exp is part of a framed assertion -- used to check whether state-exists-expression can appear in exp
     // Returns a sequence of all program variables that appear in the expression
+    // TODO: Modify Lookupexpr in order add proof variables
     def checkSymbolsExpr(exp: Expr, isInLoopInv: Boolean, isFrame: Boolean): Seq[(String, Type)] = {
       exp match {
         case id@Id(_) => // This is identifier used. Id in variable declarations are not checked here

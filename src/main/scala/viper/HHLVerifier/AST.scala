@@ -59,6 +59,8 @@ sealed trait Stmt {
   override def toString: String = {
     PrettyPrinter.formatStmt(this)
   }
+
+  var lookUpAccesses: Seq[LookupExpr] = Seq.empty
 }
 
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
