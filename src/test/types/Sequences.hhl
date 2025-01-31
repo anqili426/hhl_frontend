@@ -2,13 +2,42 @@
     A simple program to test sequences.
 */
 
-method testSequences() returns ()
-requires forall <_s> :: true
-ensures forall <_s> :: true
+method testSequences(s1: Seq[Int]) returns ()
+requires forall <_s> :: |_s[s1]| == 1
+ensures forall <_s> ::
 {
     // Testing Sequences
-    var s1: Seq[Int]
     var s2: Seq[Int]
+    s2 := s1
+
+    var i: Int
+    i := s2[1]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// hyperAssert forall <_s> :: _s[i] >= 0 && _s[i] < |_s[s1]|
+    // TODO: what's happening here: hyperAssert forall <_s> :: _s[i] >= 0 && _s[i] < |s1|
+
+
+    /* var s2: Seq[Int]
     var s3: Seq[Int]
 
     s1 := Seq[Int](1, 2)
@@ -28,5 +57,5 @@ ensures forall <_s> :: true
 
     var ss: Seq[Seq[Int]]
     ss := Seq[Seq[Int]](s1, s2, s3)
-    hyperAssert forall <_s> :: _s[ss] == Seq[Seq[Int]](Seq[Int](1,2), Seq[Int](3,4), Seq[Int](1,2, 3, 4))
+    hyperAssert forall <_s> :: _s[ss] == Seq[Seq[Int]](Seq[Int](1,2), Seq[Int](3,4), Seq[Int](1,2, 3, 4)) */
 }

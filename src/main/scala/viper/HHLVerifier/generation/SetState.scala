@@ -1,4 +1,4 @@
-package viper.HHLVerifier.Generation
+package viper.HHLVerifier.generation
 
 import viper.silver.{ast => vpr}
 

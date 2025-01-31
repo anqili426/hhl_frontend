@@ -1,7 +1,7 @@
 package viper.HHLVerifier
 
 import fastparse.Parsed
-import viper.HHLVerifier.Generation.Generator
+import viper.HHLVerifier.generation.Generator
 import viper.HHLVerifier.TypeChecker
 
 import java.io.FileWriter

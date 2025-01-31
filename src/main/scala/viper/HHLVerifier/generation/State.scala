@@ -1,6 +1,6 @@
-package viper.HHLVerifier.Generation
+package viper.HHLVerifier.generation
 
-import viper.HHLVerifier.Generation.Generator.translateType
+import viper.HHLVerifier.generation.Generator.translateType
 import viper.HHLVerifier.{Id, Type}
 import viper.silver.{ast => vpr}
 

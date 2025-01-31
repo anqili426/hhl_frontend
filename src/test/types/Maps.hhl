@@ -13,10 +13,14 @@ ensures forall <_s> :: true
     var el: Int
     el := m[1]
 
-    hyperAssert forall <_s> :: el in _s[m]
+    var b: Bool
+    b := el in m
+
+    // hyperAssert forall <_s> :: el in _s[m]
+    hyperAssert forall <_s> :: _s[b]
 
     m := m[1 := 1]
 
     hyperAssert forall <_s> :: |_s[m]| == 2
-    hyperAssert forall <_s> :: _s[m][1] == 1
+    hyperAssert forall <_s> :: _s[m][2] == 1
 }

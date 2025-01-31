@@ -1,6 +1,6 @@
 package viper.HHLVerifier
 
-import viper.HHLVerifier.Generation.Generator
+import viper.HHLVerifier.generation.Generator
 
 // TODO: How to hanlde accesses in pre/postconditions
 
@@ -303,6 +303,7 @@ object TypeChecker {
           if (rhs.typ.isInstanceOf[SetType]) res = checkIfTypeMatch(lhs.typ, rhs.typ.asInstanceOf[SetType].sType)
           else if (rhs.typ.isInstanceOf[MapType]) res = checkIfTypeMatch(lhs.typ, rhs.typ.asInstanceOf[MapType].kType)
           else throw TypeException("in operation can only be applied to maps or sets!")
+          print("I was here")
           e.typ = BoolType()
         } else if (op == "++") {
           if (!rhs.typ.isInstanceOf[SeqType] || !lhs.typ.isInstanceOf[SeqType]) throw TypeException("++ operation can only be applied to seqs!")

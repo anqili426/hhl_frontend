@@ -1,4 +1,4 @@
-package viper.HHLVerifier.Generation
+package viper.HHLVerifier.generation
 
 import viper.HHLVerifier._
 import viper.silver.ast.{DomainType, Info, NoInfo}
@@ -1539,25 +1539,24 @@ object Generator {
         if (elems.isEmpty) vpr.EmptySet(translateType(e.typ.asInstanceOf[SetType].sType))()
         else vpr.ExplicitSet(elems.map(el => translateExp(el, state, currStates, failureStates, info)))()
       case e@MapAssignExpr(elems) =>
-        if (elems.isEmpty) vpr.EmptyMap(translateType(e.typ.asInstanceOf[MapType].kType), translateType(e.typ.asInstanceOf[MapType].vType))()
-        else vpr.ExplicitMap(elems.map(el => vpr.Maplet(
-          translateExp(el.k, state, currStates, failureStates, info),
-          translateExp(el.v, state, currStates, failureStates, info)
-        )()))()
+        HHLMap.create(elems.map(mExp => (
+          translateExp(mExp.k, state, currStates, failureStates, info),
+          translateExp(mExp.v, state, currStates, failureStates, info)
+        )), translateType(e.typ.asInstanceOf[MapType].kType), translateType(e.typ.asInstanceOf[MapType].vType))
       case e@LookupExpr(base, id) =>
         if (e.baseType.isInstanceOf[SeqType]) {
-          println("2");
-          HHLSeq.access(
+          HHLSeq.lookUp(
             translateExp(base, state, currStates, failureStates, info),
             translateExp(id, state, currStates, failureStates, info),
             translateType(base.typ.asInstanceOf[SeqType].sType)
           )
         } else if (e.baseType.isInstanceOf[MapType]) {
-          // must be a map
-          vpr.MapLookup(
+          HHLMap.lookUp(
             translateExp(base, state, currStates, failureStates, info),
-            translateExp(id, state, currStates, failureStates, info)
-          )()
+            translateExp(id, state, currStates, failureStates, info),
+            translateType(base.typ.asInstanceOf[MapType].kType),
+            translateType(base.typ.asInstanceOf[MapType].vType)
+          )
         } else {
           val stateVar = translateExp(base, state, currStates, failureStates)
           translateExp(id, stateVar.asInstanceOf[vpr.LocalVar], currStates, failureStates, info = info)
@@ -1566,9 +1565,9 @@ object Generator {
       case e@LengthExpr(id) =>
         val tId = translateExp(id, state, currStates, failureStates, info)
         id.typ match {
-          case seq: SeqType => {  println("3"); HHLSeq.length(tId, translateType(seq.sType)) }
+          case seq: SeqType => HHLSeq.length(tId, translateType(seq.sType))
           case _: SetType => vpr.AnySetCardinality(tId)()
-          case _: MapType => vpr.MapCardinality(tId)()
+          case map: MapType => HHLMap.cardinality(tId, translateType(map.kType), translateType(map.vType))
         }
 
       case e@CombExpr(lhs, rhs, op) =>
@@ -1584,13 +1583,29 @@ object Generator {
             vpr.AnySetMinus(translatedLhs, translatedRhs)()
           case "in" =>
             if (rhs.typ.isInstanceOf[SetType]) vpr.AnySetContains(translatedLhs, translatedRhs)()
-            else // rhs has typ map
-              vpr.MapContains(translatedLhs, translatedRhs)()
+            else {
+              println("1 ")
+              val kType = translateType(rhs.typ.asInstanceOf[MapType].kType)
+              println("2 ")
+              val vType = translateType(rhs.typ.asInstanceOf[MapType].vType)
+
+              val map2 = HHLMap.create(Seq((translatedLhs, vpr.IntLit(0)())), kType, vType)
+              HHLMap.disjoint(translatedRhs, map2, kType, vType)
+              // vpr.MapContains(translatedLhs, translatedRhs)()
+            }
           case "++" =>
             HHLSeq.append(translatedLhs, translatedRhs, translateType(lhs.typ.asInstanceOf[SeqType].sType))
           case _ =>
             throw UnknownException("Unknown operator detected while translating expression!")
         }
+      case e@UpdateMapExpr(map, mExp) =>
+        HHLMap.update(
+          translateExp(map, state, currStates, failureStates, info),
+          translateExp(mExp.k, state, currStates, failureStates, info),
+          translateExp(mExp.v, state, currStates, failureStates, info),
+          translateType(map.typ.asInstanceOf[MapType].kType),
+          translateType(map.typ.asInstanceOf[MapType].vType)
+        )
       case _ =>
         throw UnknownException("Unexpected expression " + e + " with class " + e.getClass())
     }
@@ -1692,9 +1707,9 @@ object Generator {
     typ match {
       case t: IntType => vpr.Int
       case t: BoolType => vpr.Bool
-      case t: SeqType => HHLSeq.seqDomainType(translateType(t.sType))
+      case t: SeqType => HHLSeq.domainType(translateType(t.sType))
       case t: SetType => vpr.SetType(translateType(t.sType))
-      case t: MapType => vpr.MapType(translateType(t.kType), translateType(t.vType))
+      case t: MapType => HHLMap.domainType(translateType(t.kType), translateType(t.vType))
       case StateType() => State.stateType
       case _ =>
         throw UnknownException("Cannot translate type " + typ)

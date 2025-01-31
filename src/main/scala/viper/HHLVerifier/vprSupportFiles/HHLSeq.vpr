@@ -1,0 +1,214 @@
+// import "./sequences.vpr"
+
+// Sequence axioms translated from Carbon release 22.07
+domain HHLSeq[E] {
+    // Start basica
+
+    function HHLSeq_length(s: HHLSeq[E]): Int
+
+    axiom {
+        forall s: HHLSeq[E] :: {HHLSeq_length(s)} 0 <= HHLSeq_length(s)
+    }
+
+    function HHLSeq_empty(): HHLSeq[E]
+    axiom {
+        HHLSeq_length((HHLSeq_empty(): HHLSeq[E])) == 0
+    }
+    axiom {
+        forall s: HHLSeq[E] :: {HHLSeq_length(s)} HHLSeq_length(s) == 0 ==> s == HHLSeq_empty()
+    }
+
+    function HHLSeq_singleton(e: E): HHLSeq[E]
+    axiom {
+        forall e: E :: {HHLSeq_singleton(e)} HHLSeq_length(HHLSeq_singleton(e)) == 1
+    }
+
+    function HHLSeq_append(s1: HHLSeq[E], s2: HHLSeq[E]): HHLSeq[E]
+    axiom {
+        forall s0: HHLSeq[E], s1: HHLSeq[E] :: { HHLSeq_length(HHLSeq_append(s0, s1)) }
+            s0 != HHLSeq_empty() && s1 != HHLSeq_empty() ==>
+                HHLSeq_length(HHLSeq_append(s0, s1)) == HHLSeq_length(s0) + HHLSeq_length(s1)
+    }
+    axiom {
+        forall s0: HHLSeq[E], s1: HHLSeq[E] :: { HHLSeq_append(s0, s1) } (s0 == HHLSeq_empty() ==> HHLSeq_append(s0, s1) == s1) && (s1 == HHLSeq_empty() ==> HHLSeq_append(s0, s1) == s0)
+    }
+
+    function HHLSeq_index(s: HHLSeq[E], i: Int): E
+    axiom {
+        forall e: E :: { HHLSeq_singleton(e) } HHLSeq_index(HHLSeq_singleton(e), 0) == e
+    }
+
+    // End basics
+    // Start index-append-update
+
+    function HHLSeq_add(i0: Int, i1: Int): Int
+    axiom {
+        forall i: Int, j: Int :: { HHLSeq_add(i, j) } HHLSeq_add(i, j) == i + j
+    }
+    function HHLSeq_sub(i0: Int, i1: Int): Int
+    axiom {
+        forall i: Int, j: Int :: { HHLSeq_sub(i, j) } HHLSeq_sub(i, j) == i - j
+    }
+
+    axiom {
+        forall s0: HHLSeq[E], s1: HHLSeq[E], n: Int :: { HHLSeq_index(HHLSeq_append(s0, s1), n) } { HHLSeq_index(s0, n), HHLSeq_append(s0, s1) }
+            s0 != HHLSeq_empty() && s1 != HHLSeq_empty() && 0 <= n && n < HHLSeq_length(s0) ==> HHLSeq_index(HHLSeq_append(s0, s1), n) == HHLSeq_index(s0, n)
+    }
+    axiom {
+        forall s0: HHLSeq[E], s1: HHLSeq[E], n: Int :: { HHLSeq_index(HHLSeq_append(s0, s1), n) }
+            s0 != HHLSeq_empty() && s1 != HHLSeq_empty() && HHLSeq_length(s0) <= n && n < HHLSeq_length(HHLSeq_append(s0, s1)) ==> HHLSeq_add(HHLSeq_sub(n, HHLSeq_length(s0)), HHLSeq_length(s0)) == n &&
+            HHLSeq_index(HHLSeq_append(s0, s1), n) == HHLSeq_index(s1, HHLSeq_sub(n, HHLSeq_length(s0)))
+    }
+    axiom {
+        forall s0: HHLSeq[E], s1: HHLSeq[E], m: Int :: { HHLSeq_index(s1, m), HHLSeq_append(s0, s1) }
+            s0 != HHLSeq_empty() && s1 != HHLSeq_empty() && 0 <= m && m < HHLSeq_length(s1) ==> HHLSeq_sub(HHLSeq_add(m, HHLSeq_length(s0)), HHLSeq_length(s0)) == m
+            && HHLSeq_index(HHLSeq_append(s0, s1), HHLSeq_add(m, HHLSeq_length(s0))) == HHLSeq_index(s1, m)
+    }
+
+    function HHLSeq_update(s: HHLSeq[E], i: Int, e: E): HHLSeq[E]
+    axiom {
+        forall s: HHLSeq[E], i: Int, v: E :: { HHLSeq_length(HHLSeq_update(s, i, v)) } { HHLSeq_length(s), HHLSeq_update(s, i, v) }
+            0 <= i && i < HHLSeq_length(s) ==> HHLSeq_length(HHLSeq_update(s, i, v)) == HHLSeq_length(s)
+    }
+    axiom {
+        forall s: HHLSeq[E], i: Int, v: E, n: Int :: { HHLSeq_index(HHLSeq_update(s, i, v), n) } { HHLSeq_index(s, n), HHLSeq_update(s, i, v) }
+            0 <= n && n < HHLSeq_length(s) ==>
+                (i == n ==> HHLSeq_index(HHLSeq_update(s, i, v), n) == v) &&
+                (i != n ==> HHLSeq_index(HHLSeq_update(s, i, v), n) == HHLSeq_index(s, n))
+    }
+
+    // end index-append-update
+
+    // start take/drop
+
+    function HHLSeq_take(s: HHLSeq[E], howMany: Int): HHLSeq[E]
+    axiom {
+        forall s: HHLSeq[E], n: Int :: { HHLSeq_length(HHLSeq_take(s, n)) } { HHLSeq_take(s, n), HHLSeq_length(s) }
+            (0 <= n ==>
+                (n <= HHLSeq_length(s) ==> HHLSeq_length(HHLSeq_take(s, n)) == n) &&
+                (HHLSeq_length(s) < n ==> HHLSeq_length(HHLSeq_take(s, n)) == HHLSeq_length(s))
+            ) &&
+            (n < 0 ==> HHLSeq_length(HHLSeq_take(s, n)) == 0)
+    }
+    axiom {
+        forall s: HHLSeq[E], n: Int, j: Int :: { HHLSeq_index(HHLSeq_take(s, n), j) } { HHLSeq_index(s, j), HHLSeq_take(s, n) }
+            0 <= j && j < n && j < HHLSeq_length(s) ==>
+                HHLSeq_index(HHLSeq_take(s, n), j) == HHLSeq_index(s, j)
+    }
+
+    function HHLSeq_drop(s: HHLSeq[E], howMany: Int): HHLSeq[E]
+    axiom {
+        forall s: HHLSeq[E], n: Int :: { HHLSeq_length(HHLSeq_drop(s, n)) } { HHLSeq_length(s), HHLSeq_drop(s, n) }
+            (0 <= n ==>
+                (n <= HHLSeq_length(s) ==> HHLSeq_length(HHLSeq_drop(s, n)) == HHLSeq_length(s) - n) &&
+                (HHLSeq_length(s) < n ==> HHLSeq_length(HHLSeq_drop(s, n)) == 0))
+            &&
+            (n < 0 ==> HHLSeq_length(HHLSeq_drop(s, n)) == HHLSeq_length(s))
+    }
+    axiom {
+        forall s: HHLSeq[E], n: Int, j: Int :: { HHLSeq_index(HHLSeq_drop(s, n), j) }
+            0 < n && 0 <= j && j < HHLSeq_length(s) - n ==>
+                HHLSeq_sub(HHLSeq_add(j, n), n) == j && HHLSeq_index(HHLSeq_drop(s, n), j) == HHLSeq_index(s, HHLSeq_add(j, n))
+    }
+    axiom {
+        forall s: HHLSeq[E], n: Int, i: Int :: { HHLSeq_drop(s, n), HHLSeq_index(s, i) }
+            0 < n && n <= i && i < HHLSeq_length(s) ==>
+            HHLSeq_add(HHLSeq_sub(i, n), n) == i && HHLSeq_index(HHLSeq_drop(s, n), HHLSeq_sub(i, n)) == HHLSeq_index(s, i)
+    }
+    axiom {
+        forall s: HHLSeq[E], t: HHLSeq[E], n: Int ::
+        { HHLSeq_take(HHLSeq_append(s, t), n) }
+        0 < n && n <= HHLSeq_length(s) ==> HHLSeq_take(HHLSeq_append(s, t), n) == HHLSeq_take(s, n)
+    }
+    axiom {
+        forall s: HHLSeq[E], t: HHLSeq[E], n: Int ::
+        { HHLSeq_take(HHLSeq_append(s, t), n) }
+        n > 0 && n > HHLSeq_length(s) && n < HHLSeq_length(HHLSeq_append(s, t)) ==> HHLSeq_add(HHLSeq_sub(n, HHLSeq_length(s)), HHLSeq_length(s)) == n && HHLSeq_take(HHLSeq_append(s, t), n) == HHLSeq_append(s, HHLSeq_take(t, HHLSeq_sub(n, HHLSeq_length(s))))
+    }
+    axiom {
+        forall s: HHLSeq[E], t: HHLSeq[E], n: Int ::
+        { HHLSeq_drop(HHLSeq_append(s, t), n) }
+        0 < n && n <= HHLSeq_length(s) ==> HHLSeq_drop(HHLSeq_append(s,t), n) == HHLSeq_append(HHLSeq_drop(s, n), t)
+    }
+    axiom {
+        forall s: HHLSeq[E], t: HHLSeq[E], n: Int ::
+        { HHLSeq_drop(HHLSeq_append(s,t), n) }
+        n > 0 && n > HHLSeq_length(s) ==> HHLSeq_add(HHLSeq_sub(n, HHLSeq_length(s)), HHLSeq_length(s)) == n && HHLSeq_drop(HHLSeq_append(s, t), n) == HHLSeq_drop(t, HHLSeq_sub(n, HHLSeq_length(s)))
+    }
+    // Note: the following (especially the third) are actually needed to cut matching loops that can otherwise be introduced by the axioms above (which introduce new append terms)
+    axiom {
+        forall s: HHLSeq[E], n: Int :: { HHLSeq_take(s, n) }
+        n <= 0 ==> HHLSeq_take(s, n) == HHLSeq_empty()
+    }
+    axiom {
+        forall s: HHLSeq[E], n: Int :: { HHLSeq_drop(s, n) }
+        n <= 0 ==> HHLSeq_drop(s, n) == s
+    }
+    axiom {
+        forall s: HHLSeq[E], n: Int :: { HHLSeq_take(s, n) }
+        n >= HHLSeq_length(s) ==> HHLSeq_take(s, n) == s
+    }
+    axiom {
+        forall s: HHLSeq[E], n: Int :: { HHLSeq_drop(s, n) }
+        n >= HHLSeq_length(s) ==> HHLSeq_drop(s, n) == HHLSeq_empty()
+    }
+
+    // end take/drop
+
+    // start contains
+
+    function HHLSeq_contains(s: HHLSeq[E], e: E): Bool
+    function HHLSeq_contains_trigger(s: HHLSeq[E], e: E): Bool  // usages of Contains inside quantifier triggers are replaced with this
+    function HHLSeq_skolem(s: HHLSeq[E], e: E): Int
+    axiom {
+        forall s: HHLSeq[E], x: E :: { HHLSeq_contains(s, x) }
+          HHLSeq_contains(s, x) ==>
+            (0 <= HHLSeq_skolem(s, x) && HHLSeq_skolem(s, x) < HHLSeq_length(s) && HHLSeq_index(s, HHLSeq_skolem(s, x)) == x)
+    }
+    axiom {
+        forall s: HHLSeq[E], x: E, i: Int :: { HHLSeq_contains(s, x), HHLSeq_index(s, i) }
+        (0 <= i && i < HHLSeq_length(s) && HHLSeq_index(s, i) == x ==> HHLSeq_contains(s, x))
+    }
+    axiom {
+        forall s: HHLSeq[E], i: Int :: { HHLSeq_index(s, i) }
+        (0 <= i && i < HHLSeq_length(s) ==> HHLSeq_contains_trigger(s, HHLSeq_index(s, i)))
+    }
+    // end contains
+
+    // start equals
+    function HHLSeq_equal(s0: HHLSeq[E], s1: HHLSeq[E]): Bool
+
+    function HHLSeq_skolem_diff(s0: HHLSeq[E], s1: HHLSeq[E]): Int
+
+    axiom {
+        forall s0: HHLSeq[E], s1: HHLSeq[E] :: { HHLSeq_equal(s0, s1) }
+        (s0 == s1 && HHLSeq_equal(s0, s1)) ||
+        (s0 != s1 && !HHLSeq_equal(s0, s1) && HHLSeq_length(s0) != HHLSeq_length(s1)) ||
+        (s0 != s1 && !HHLSeq_equal(s0, s1) && HHLSeq_length(s0) == HHLSeq_length(s1) && HHLSeq_skolem_diff(s0, s1) == HHLSeq_skolem_diff(s1, s0) && 0 <= HHLSeq_skolem_diff(s0, s1) && HHLSeq_skolem_diff(s0, s1) < HHLSeq_length(s0) &&
+            HHLSeq_index(s0, HHLSeq_skolem_diff(s0, s1)) != HHLSeq_index(s1, HHLSeq_skolem_diff(s0, s1)))
+    }
+    axiom {
+        forall a: HHLSeq[E], b: HHLSeq[E] :: { HHLSeq_equal(a, b) }
+        HHLSeq_equal(a, b) ==> a == b
+    }
+
+    // end equals
+
+    // start extras
+    axiom {
+        forall x: E, y: E :: { HHLSeq_contains(HHLSeq_singleton(x), y) }
+        HHLSeq_contains(HHLSeq_singleton(x), y) <==> (x == y)
+    }
+    function HHLSeq_range(min: Int, max: Int): HHLSeq[Int]
+    axiom ranged_HHLSeq_length {
+        forall min: Int, max: Int :: { HHLSeq_length(HHLSeq_range(min, max)) }
+            (min < max ==> HHLSeq_length(HHLSeq_range(min, max)) == max-min) && (max <= min ==> HHLSeq_length(HHLSeq_range(min, max)) == 0)
+    }
+    axiom ranged_HHLSeq_index {
+        forall min: Int, max: Int, j: Int :: { HHLSeq_index(HHLSeq_range(min, max), j) } 0 <= j && j < (max - min) ==> HHLSeq_index(HHLSeq_range(min, max), j) == min + j
+    }
+    axiom ranged_HHLSeq_contains {
+        forall min: Int, max: Int, v: Int :: { HHLSeq_contains(HHLSeq_range(min, max), v) }
+            HHLSeq_contains(HHLSeq_range(min, max), v) <==> min <= v && v < max
+    }
+}

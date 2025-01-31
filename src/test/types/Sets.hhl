@@ -7,14 +7,14 @@ requires forall <_s> :: true
 ensures forall <_s> :: true
 {
     // Testing Sets
-    var set: Set[Seq[Int]]
-    set := Set[Seq[Int]]()
+    var set: Set[Int]
+    set := Set[Int]()
     hyperAssert forall <_s> :: |_s[set]| == 0
 
-    set := Set[Seq[Int]](Seq[Int](1), Seq[Int](1,2), Seq[Int](1,2) union)
+    set := Set[Int](1,2,3,4)
 
-    hyperAssert forall <_s> :: |_s[set]| == 2
-    hyperAssert forall <_s> :: Seq[Int](1) in _s[set]
+    hyperAssert forall <_s> :: |_s[set]| == 4
+    hyperAssert forall <_s> :: 1 in _s[set]
 
     var s1: Set[Int]
     var s2: Set[Int]

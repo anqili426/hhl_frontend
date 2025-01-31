@@ -2,7 +2,7 @@ package viper.HHLVerifier
 
 import fastparse._
 import JavaWhitespace._
-import viper.HHLVerifier.Generation.Generator
+import viper.HHLVerifier.generation.Generator
 
 object Parser {
   // Program Structure ---------------------------------------------------------

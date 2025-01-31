@@ -1,9 +1,9 @@
 package viper.HHLVerifier
 
 sealed class Expr() {
-  var typ: Type = UnknownType()
   var pos: Int = -1
-  var baseType: Type = UnknownType()
+  var typ: Type = UnknownType() // Actual type of expression (i.e. type in viper)
+  var baseType: Type = UnknownType() // Additional type information needed to generate (e.g. type of map from which value is accessed)
 
   override def toString: String = {
     PrettyPrinter.formatExpr(this)
