@@ -9,7 +9,7 @@
         exists <_sa: State> :: ((<_sa>) && (forall <_s: State> :: ((!(<_s>)) || ((_s[i]) == (0)))))
 */
 
-method RecursiveRuleFails() returns (out: Int)
+method ExistsSyncRuleErr() returns (out: Int)
     requires exists <_s> :: true
     ensures exists <_s> :: _s[out] == 2
 {
