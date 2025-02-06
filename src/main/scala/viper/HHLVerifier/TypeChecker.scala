@@ -277,6 +277,7 @@ object TypeChecker {
           res = checkIfTypeMatch(id.typ.asInstanceOf[MapType].kType, ind.typ)
           e.baseType = id.typ.asInstanceOf[MapType]
           e.typ = id.typ.asInstanceOf[MapType].kType
+          lookupAccesses = lookupAccesses :+ e
         } else if (id.typ.isInstanceOf[StateType]) {
           isHyperAssertion = true
           typeCheckExpr(id, hyperAssertionExpected)

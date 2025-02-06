@@ -128,7 +128,7 @@ object Generator {
     val extensions: Seq[vpr.ExtensionMember] = Seq.empty
 
     val preamble = generatePreamble()
-    allDomains = allDomains ++ preamble._1
+    allDomains = allDomains ++ preamble._1 ++ HHLSeq.getDomains() ++ HHLMap.getDomains()
     allMethods = allMethods ++ preamble._2
     translateProgram(input)
     val p = vpr.Program(allDomains, fields, allFuncs, predicates, allMethods, extensions)()
@@ -231,11 +231,6 @@ object Generator {
     val allVarsToAssign = translatedProgVars ++ auxiliaryVars ++ retVars // TODO: remove all the type set variables
     val assignToVars = allVarsToAssign.map(v => vpr.LocalVarAssign(v, vpr.IntLit(assignId())())())
 
-    // DEBUG
-    println(translatedProgVars)
-    println(auxiliaryVars)
-    println(retVars)
-
     val progVarDecls = translateMethodVariables(progVarsAsIds)
     val nonIntAuxVars = Seq(tempStates, tempFailedStates) ++ translatedContent._2.diff(auxiliaryVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
     val localVars = progVarDecls ++ auxiliaryVarDecls ++ nonIntAuxVars
@@ -278,27 +273,42 @@ object Generator {
       assertVar.typ = StateType()
       val assertVarDecl = AssertVarDecl(assertVar, StateType())
 
-      newStmts = newStmts ++ translateStmt(
-        AssertStmt(
-          BinaryExpr(
-            BinaryExpr(
-              Num(0),
-              "<=",
-              luExp.index
-            ),
-            "&&",
-            BinaryExpr(
+      if (luExp.id.typ.isInstanceOf[MapType]) {
+        newStmts = newStmts ++ translateStmt(
+          AssertStmt(
+            CombExpr(
               luExp.index,
-              "<",
-              LengthExpr(luExp.id)
+              luExp.id,
+              "in"
             )
-          )
-        ),
-        currStates, currFailureStates, isAutoSelected
-      )._1
+          ),
+          currStates, currFailureStates, isAutoSelected
+        )._1
+      } else if (luExp.id.typ.isInstanceOf[SeqType]) {
+        newStmts = newStmts ++ translateStmt(
+          AssertStmt(
+            BinaryExpr(
+              BinaryExpr(
+                Num(0),
+                "<=",
+                luExp.index
+              ),
+              "&&",
+              BinaryExpr(
+                luExp.index,
+                "<",
+                LengthExpr(luExp.id)
+              )
+            )
+          ),
+          currStates, currFailureStates, isAutoSelected
+        )._1
+      } else {
+        throw UnknownException("Unkown type for lookup discovered")
+      }
     }
 
-    println(f"Now there are ${newStmts.length} checks:")
+    // println(f"Now there are ${newStmts.length} checks:")
     if (newStmts.length > 0) println(newStmts(0))
 
     stmt match {

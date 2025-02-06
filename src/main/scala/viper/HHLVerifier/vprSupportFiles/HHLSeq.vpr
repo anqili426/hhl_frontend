@@ -1,5 +1,3 @@
-// import "./sequences.vpr"
-
 // Sequence axioms translated from Carbon release 22.07
 domain HHLSeq[E] {
     // Start basica

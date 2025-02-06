@@ -4,8 +4,6 @@ import viper.silver.{ast => vpr}
 
 
 object HHLMap {
-  private val filePath = "./src/main/scala/viper/HHLVerifier/vprSupportFiles/HHLMap.vpr"
-
   private val mapDomainName = "HHLMap"
   private val kTypeVarName = "K"
   private val vTypeVarName = "V"
@@ -20,6 +18,9 @@ object HHLMap {
 
   private val kTypeVar = vpr.TypeVar(kTypeVarName)
   private val vTypeVar = vpr.TypeVar(vTypeVarName)
+
+  private val filePath = "/Users/paulwinkler/Desktop/hhl_frontend/src/main/scala/viper/HHLVerifier/vprSupportFiles/HHLMap.vpr"
+  private val supportProgram = SupportFileParser.parseFile(filePath)
 
   private def typeVarMap(kType: vpr.Type, vType: vpr.Type): Map[vpr.TypeVar, vpr.Type] = Map(kTypeVar -> kType, vTypeVar -> vType)
   def domainType(kType: vpr.Type, vType: vpr.Type): vpr.DomainType = vpr.DomainType(mapDomainName, typeVarMap(kType, vType))(Seq(kTypeVar, vTypeVar))
@@ -48,4 +49,6 @@ object HHLMap {
     typ = retType,
     domainName = mapDomainName
   )
+
+  def getDomains(): Seq[vpr.Domain] = supportProgram.domains
 }

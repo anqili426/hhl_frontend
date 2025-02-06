@@ -13,8 +13,6 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
 
 object ViperRunner {
-
-
   def runSilicon(program: Program) = {
     val consistencyErrors = program.checkTransitively
     if (consistencyErrors.nonEmpty) {

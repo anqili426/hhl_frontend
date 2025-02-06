@@ -4,10 +4,8 @@ import viper.silver.{ast => vpr}
 
 
 object HHLSeq {
-  val filePath = "./src/main/scala/viper/HHLVerifier/vprSupportFiles/HHLSeq.vpr"
-
   val seqDomainName = "HHLSeq"
-  val typeVarName = "T"
+  val typeVarName = "E"
 
   private object FunctionIDs {
     val empty = "HHLSeq_empty"
@@ -18,7 +16,13 @@ object HHLSeq {
   }
 
   private val typeVar = vpr.TypeVar(typeVarName)
-  private def typeVarMap(typ: vpr.Type):Map[vpr.TypeVar, vpr.Type] = Map(typeVar -> typ)
+
+  val filePath = "/Users/paulwinkler/Desktop/hhl_frontend/src/main/scala/viper/HHLVerifier/vprSupportFiles/HHLSeq.vpr"
+  private val supportProgram = SupportFileParser.parseFile(filePath)
+
+  private def typeVarMap(typ: vpr.Type): Map[vpr.TypeVar, vpr.Type] = Map(typeVar -> typ)
+
+  // def domainType(typ: vpr.Type) = vpr.DomainType(seqDomainName, Map.empty)(Seq(typeVar))
   def domainType(typ: vpr.Type) = vpr.DomainType(seqDomainName, typeVarMap(typ))(Seq(typeVar))
 
   // creates a new sequence with arbitrary arguments
@@ -26,10 +30,13 @@ object HHLSeq {
     val singleton = apply(FunctionIDs.singleton, Seq(b), typeVarMap(typ), domainType(typ))
     append(a, singleton, typ)
   })
+
   // concatenates two sequences
   def append(left: vpr.Exp, right: vpr.Exp, typ: vpr.Type): vpr.DomainFuncApp = apply(FunctionIDs.append, Seq(left, right), typeVarMap(typ), domainType(typ))
+
   // accesses the element in obj at index ind
   def lookUp(obj: vpr.Exp, ind: vpr.Exp, typ: vpr.Type): vpr.DomainFuncApp = apply(FunctionIDs.lookUp, Seq(obj, ind), typeVarMap(typ), typ)
+
   // returns the length of the seq
   def length(obj: vpr.Exp, typ: vpr.Type): vpr.DomainFuncApp = apply(FunctionIDs.length, Seq(obj), typeVarMap(typ), vpr.Int)
 
@@ -44,4 +51,6 @@ object HHLSeq {
     typ = retType,
     domainName = seqDomainName
   )
+
+  def getDomains(): Seq[vpr.Domain] = supportProgram.domains
 }

@@ -4,7 +4,7 @@
 
 method testSequences(s1: Seq[Int]) returns ()
 requires forall <_s> :: |_s[s1]| == 1
-ensures forall <_s> ::
+ensures forall <_s> :: true
 {
     // Testing Sequences
     var s2: Seq[Int]
@@ -13,7 +13,7 @@ ensures forall <_s> ::
     var i: Int
     i := s2[1]
 
-
+    hyperAssert forall <<_s>> :: false
 
 
 

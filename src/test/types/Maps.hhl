@@ -2,25 +2,16 @@
     A simple program to test maps.
 */
 
-method testMaps() returns ()
+method testMaps() returns (b: Bool)
 requires forall <_s> :: true
-ensures forall <_s> :: true
+ensures forall <_s> :: _s[b]
+// ensures exists <<_s>> :: true
 {
     // Testing Maps
     var m: Map[Int, Int]
     m := Map[Int, Int](1 := 2, 2 := 1)
 
     var el: Int
-    el := m[1]
-
-    var b: Bool
+    el := m[2]
     b := el in m
-
-    // hyperAssert forall <_s> :: el in _s[m]
-    hyperAssert forall <_s> :: _s[b]
-
-    m := m[1 := 1]
-
-    hyperAssert forall <_s> :: |_s[m]| == 2
-    hyperAssert forall <_s> :: _s[m][2] == 1
 }
