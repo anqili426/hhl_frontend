@@ -176,11 +176,21 @@ object Generator {
     val inSetFailEq = inhaleInSetEqStmt(state, outputFailureStates.localVar)
 
     // Arguments of the input method
-    val args = method.params.map(id => vpr.LocalVarDecl(id.name, vpr.Int)()) // TODO: This might need to be changed, Int could be too restrictive
+    val args = method.params.map(id => vpr.LocalVarDecl(id.name, id.typ match {
+      case _: StateType => translateType(id.typ)
+      case _: StmtBlockType => translateType(id.typ)
+      case _: UnknownType => translateType(id.typ)
+      case _ => vpr.Int
+    })())
     val translatedArgs = args :+ inputStates
 
     // Return variables of the input method
-    val ret = method.res.map(id => vpr.LocalVarDecl(id.name, vpr.Int)()) // TODO: This might need to be changed, Int could be too restrictive
+    val ret = method.res.map(id => vpr.LocalVarDecl(id.name, id.typ match {
+      case _: StateType => translateType(id.typ)
+      case _: StmtBlockType => translateType(id.typ)
+      case _: UnknownType => translateType(id.typ)
+      case _ => vpr.Int
+    })())
     val retVars = ret.map(r => r.localVar)
 
     // Forming the preconditions
@@ -1008,7 +1018,13 @@ object Generator {
     // I
     val pre1 = getAllInvariantsWithTriggers(normalizedInv, inputStates.localVar, inputFailureStates.localVar)
     // All program variables are different
-    val allProgVarsInLoopBody = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))()).toSeq
+
+    val allProgVarsInLoopBody = body.allProgVars.map(v => vpr.LocalVar(v._1, v._2 match {
+      case _: StateType => translateType(v._2)
+      case _: StmtBlockType => translateType(v._2)
+      case _: UnknownType => translateType(v._2)
+      case _ => vpr.Int
+    })()).toSeq
     val (allIntVars, stateVars, allOtherVars, pre2) = separateVarsByType(allProgVarsInLoopBody)
 
     val args = (allIntVars ++ stateVars).map(v => vpr.LocalVarDecl(v.name, v.typ)())
@@ -1262,7 +1278,12 @@ object Generator {
     val tProgVar = Id(tViperVar.name)
     tProgVar.typ = IntType()
     val stmt = IfElseStmt(loopGuard, body, CompositeStmt(Seq.empty))
-    val varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))()).toSeq ++ Seq(tViperVar)
+    val varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, v._2 match {
+      case _: StateType => translateType(v._2)
+      case _: StmtBlockType => translateType(v._2)
+      case _: UnknownType => translateType(v._2)
+      case _ => vpr.Int
+    })()).toSeq ++ Seq(tViperVar)
     var pres: Seq[Expr] = Seq.empty
     var posts: Seq[(Expr, Option[Info])] = Seq.empty
 
@@ -1291,7 +1312,12 @@ object Generator {
 
   def translateExistsRuleCond2(normalizedInvs: Seq[Expr], loopGuard: Expr, body: CompositeStmt, decrExpr: Expr): vpr.Method = {
     val methodName = checkExistsRuleCond2MethodName + "_" +loopCounter
-    var varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))()).toSeq
+    var varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, v._2 match {
+      case _: StateType => translateType(v._2)
+      case _: StmtBlockType => translateType(v._2)
+      case _: UnknownType => translateType(v._2)
+      case _ => vpr.Int
+    })()).toSeq
     var pres: Seq[Expr] = Seq.empty
     var posts: Seq[(Expr, Option[Info])] = Seq.empty
 
@@ -1370,7 +1396,12 @@ object Generator {
       }
     }
 
-    val allVars = loopBody.allProgVars.map(v => vpr.LocalVar(v._1, translateType(v._2))()).toSeq
+    val allVars = loopBody.allProgVars.map(v => vpr.LocalVar(v._1, v._2 match {
+      case _: StateType => translateType(v._2)
+      case _: StmtBlockType => translateType(v._2)
+      case _: UnknownType => translateType(v._2)
+      case _ => vpr.Int
+    })()).toSeq
     val (_, _, otherVars, pre2) = separateVarsByType(allVars :+ t)
     methodArgs = methodArgs ++ allVars.map(v => vpr.LocalVarDecl(v.name, v.typ)())
     methodLocalVars = methodLocalVars ++ otherVars

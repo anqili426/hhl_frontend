@@ -2,72 +2,90 @@
     A simple program to test sequences.
 */
 
-method basicDeclarations(e1: Int, e2: Int, e3: Int) returns (res: Seq[Int])
+// TODO: Why do we support quantifiers in HyperAssertions, but not in regular assertions?
+
+method testBasicDeclarations(e1: Int, e2: Int, e3: Int) returns (res: Seq[Int])
 requires forall <_s> :: true
-ensures forall <_s> :: _s[res] == Seq[Int](e1)
+ensures forall <_s> :: _s[res] == Seq[Int](_s[e1], _s[e2], _s[e3])
 {
     var s: Seq[Int]
     s := Seq[Int](e1, e2, e3)
     res := s
 }
 
-/*
-method testSequences(s1: Seq[Int]) returns ()
+method testOutOfBounds(s1: Seq[Int]) returns ()
 requires forall <_s> :: |_s[s1]| == 1
+ensures forall <<_s>> :: true 
+{
+    var i: Int
+    i := s1[2]
+
+    assert false
+}
+
+method testMethods() returns ()
+requires forall <_s> :: true
 ensures forall <_s> :: true
 {
-    // Testing Sequences
     var s2: Seq[Int]
-    s2 := s1
+    s2 := Seq[Int](1, 2)
 
-    asdfasfd aaaaaa
+    hyperAssert forall <_s> :: |_s[s2]| == 2
+
+    var s3: Seq[Int]
+    s3 := s2 ++ s2
+    hyperAssert forall <_s> :: |_s[s3]| == 4
+    hyperAssert forall <_s> :: _s[s3][1] == _s[s3][3]
+}
+
+method findMaxInSeq(seq: Seq[Int], l: Int) returns (res: Int)
+requires forall <_s> :: _s[seq] != Seq[Int]() && _s[l] == |_s[seq]|
+ensures forall <_s> :: forall _i: Int :: (_i >= 0 && _i < _s[l]) ==> (_s[seq][_i] <= _s[res])
+{
+    var max: Int
+    max := seq[0]
 
     var i: Int
-    i := s2[2]
+    i := 1
 
-    hyperAssert exists <<_s>> :: true
+    while (i < l)
+        invariant forall <_s> :: forall _j: Int :: ((_j >= 0 && _j < _s[i]) ==> _s[seq][_j] <= _s[max])
+        invariant forall <_s> :: 0 <= _s[i] && _s[i] <= _s[l]
+        decreases l - i
+    {
+        if (seq[i] > max) {
+            max := seq[i]
+        }
+        i := i + 1
+    }
 
+    res := max
+}
 
+/* Why does this not work?
+method findMaxInSeq(seq: Seq[Int], l: Int) returns (res: Int)
+requires forall <_s> :: _s[seq] != Seq[Int]() && _s[l] == |_s[seq]|
+ensures forall <_s> :: forall _i: Int :: (_i >= 0 && _i < |_s[seq]|) ==> (_s[seq][_i] <= _s[res])
+{
+    var max: Int
+    max := seq[0]
 
+    var i: Int
+    i := 1
 
+    while (i < l)
+        invariant forall <_s> :: forall _j: Int :: ((_j >= 0 && _j < _s[i]) ==> _s[seq][_j] <= _s[max])
+        invariant forall <_s> :: 0 <= _s[i] && _s[i] <= _s[l]
+        decreases l - i
+    {
+        if (seq[i] > max) {
+            max := seq[i]
+        }
+        i := i + 1
+    }
 
+    res := max
+}
+*/
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-// hyperAssert forall <_s> :: _s[i] >= 0 && _s[i] < |_s[s1]|
-    // TODO: what's happening here: hyperAssert forall <_s> :: _s[i] >= 0 && _s[i] < |s1|
-
-
-    /* var s2: Seq[Int]
-    var s3: Seq[Int]
-
-    s1 := Seq[Int](1, 2)
-    s2 := Seq[Int](3, 4)
-
-    s3 := s1 ++ s2
-    hyperAssert forall <_s> :: _s[s3] == Seq[Int](1, 2, 3, 4)
-
-    var l: Int
-    l := |s3|
-    hyperAssert forall <_s2> :: _s2[l] == 4
-
-    hyperAssume forall <_s> :: |_s[s3]| == 4
-    var s3_1: Int
-    s3_1 := s3[1]
-    hyperAssert forall <_s> :: _s[s3_1] == 2
-
-    var ss: Seq[Seq[Int]]
-    ss := Seq[Seq[Int]](s1, s2, s3)
-    hyperAssert forall <_s> :: _s[ss] == Seq[Seq[Int]](Seq[Int](1,2), Seq[Int](3,4), Seq[Int](1,2, 3, 4)) 
-}*/
+// TODO: Fix error regarding hyperAssert in this statement
