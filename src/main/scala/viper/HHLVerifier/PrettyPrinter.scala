@@ -100,7 +100,7 @@ object PrettyPrinter {
 
   def getErrorMessage(expr: Expr, source: String): String = {
     // determine position
-    val (line, char) = findLineNumber(source, expr.pos)
+    val (line, char) = findLineNumber(source, expr.offsetLeft)
 
     f"[$line:$char] ${expr.toString()}"
   }

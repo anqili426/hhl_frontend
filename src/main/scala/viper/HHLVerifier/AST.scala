@@ -1,9 +1,19 @@
 package viper.HHLVerifier
 
 sealed class Expr() {
-  var pos: Int = -1
+  // typing of expressions
   var typ: Type = UnknownType() // Actual type of expression (i.e. type in viper)
   var baseType: Type = UnknownType() // Additional type information needed to generate (e.g. type of map from which value is accessed)
+
+  // offset of expressions
+  var offsetLeft = -1
+  var offsetRight = -1
+
+  def setOffsets(left: Int, right: Int): Expr = {
+    offsetLeft = left
+    offsetRight = right
+    this
+  }
 
   override def toString: String = {
     PrettyPrinter.formatExpr(this)
@@ -61,6 +71,16 @@ sealed trait Stmt {
   }
 
   var lookUpAccesses: Seq[LookupExpr] = Seq.empty
+
+  // offset of expressions
+  var offsetLeft = -1
+  var offsetRight = -1
+
+  def setOffsets(left: Int, right: Int): Stmt = {
+    offsetLeft = left
+    offsetRight = right
+    this
+  }
 }
 
 case class CompositeStmt(stmts: Seq[Stmt]) extends Stmt {
@@ -100,7 +120,7 @@ case class MethodCallStmt(methodName: String, args: Seq[Id]) extends Stmt {
 }
 
 sealed trait TopLevelDecl
-case class Method(mName: String, params: Seq[Id], res: Seq[Id], pre: Seq[Expr], post: Seq[Expr], body: CompositeStmt) extends TopLevelDecl {
+case class Method(mName: String, params: Seq[Id], res: Seq[Id], pre: Seq[Expr], post: Seq[Expr], body: CompositeStmt, offsetLeft: Int, offsetRight: Int) extends TopLevelDecl {
   val paramsMap: Map[String, Type] = params.map(arg => (arg.name -> arg.typ)).toMap
   val resMap: Map[String, Type] = res.map(res => (res.name -> res.typ)).toMap
   var allVars: Map[String, Type] = Map.empty

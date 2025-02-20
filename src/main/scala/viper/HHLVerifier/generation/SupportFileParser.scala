@@ -16,11 +16,9 @@ case object SupportFileParser {
     }
 
     frontend.execute(Seq(vpr_file_path))
-    println(frontend.appExitCode)
     if (!frontend.errors.isEmpty || frontend.program.isEmpty) {
       throw new UnknownError(f"Failed to parse Viper's support file with path $vpr_file_path!")
     }
-
 
     frontend.translationResult
   }

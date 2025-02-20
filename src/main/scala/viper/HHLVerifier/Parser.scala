@@ -12,13 +12,13 @@ object Parser {
   }
 
   // Methods and methods utils
-  def method[$: P]: P[Method] = P("method" ~~ spaces ~~ methodName ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")"  ~ ("returns" ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")").? ~ precondition.rep ~ postcondition.rep  ~"{" ~ stmts ~ "}").map{
+  def method[$: P]: P[Method] = P(Index ~ "method" ~~ spaces ~~ methodName ~ Index ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")"  ~ ("returns" ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")").? ~ precondition.rep ~ postcondition.rep  ~"{" ~ stmts ~ "}").map{
     items =>
-      val args = if (items._2 != Nil) items._2 else Seq.empty
-      val res = if (items._3 != None) items._3.get else Seq.empty
-      val pre = if (items._4 != Nil) items._4 else Seq.empty
-      val post = if (items._5 != Nil) items._5 else Seq.empty
-      Method(items._1, args, res, pre, post, items._6)
+      val args = if (items._4 != Nil) items._4 else Seq.empty
+      val res = if (items._5 != None) items._5.get else Seq.empty
+      val pre = if (items._6 != Nil) items._6 else Seq.empty
+      val post = if (items._7 != Nil) items._7 else Seq.empty
+      Method(items._2, args, res, pre, post, items._8, items._1, items._3)
   }
   def precondition[$: P]: P[Expr] = P("requires" ~~ spaces ~ expr)
   def postcondition[$: P]: P[Expr] = P("ensures" ~~ spaces ~ expr)
@@ -32,7 +32,7 @@ object Parser {
 
   // Handling variables ---------------------------------------------------------
   // Identifiers
-  def identifier[$: P]: P[Expr] = P(progVar | assertVar | proofVar)
+  def identifier[$: P]: P[Expr] = P(Index ~ (progVar | assertVar | proofVar) ~ Index).map { case (oL, id, oR) => id.setOffsets(oL, oR)}
   def progVar[$: P]: P[Id] = generalId.map(name => Id(name))
   def assertVar[$: P]: P[AssertVar] = P("_" ~~ CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => AssertVar(name))
   def proofVar[$: P]: P[ProofVar] = P("$" ~~ CharIn("a-mo-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(ProofVar)
@@ -66,7 +66,9 @@ object Parser {
 
   // Statements ---------------------------------------------------------
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
-  def stmt[$: P] : P[Stmt] = P(varDecl | assume | assert | ifElse | whileLoop | havoc | assign | multiAssign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt | methodCallStmt)
+  def stmt[$: P] : P[Stmt] = P(Index ~ (varDecl | assume | assert | ifElse | whileLoop | havoc | assign | multiAssign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt | methodCallStmt) ~ Index).map{
+    case (oL, stmt, oR) => stmt.setOffsets(oL, oR)
+  }
 
   // Basic Statements
   def methodCall[$: P]: P[(String, Seq[Id])] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")")
@@ -132,22 +134,21 @@ object Parser {
   // Syntax 2: assertVar is of type State -- forall <s1>: State :: P(s1)
   // Syntax 2 is translated to (forall s1: State :: <s1> ==> P)
   // This also means that <s> can only appear at this position (might affect proof var decl?)
-  def assertion[$: P]: P[Assertion] = P(hyperAssertionErr | hyperAssertion | normalAssertion)
-  def normalAssertion[$: P]: P[Assertion] = P(quantifier ~~ spaces ~ (normalAssertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
-  def hyperAssertion[$: P]: P[Assertion] = P(quantifier ~ ("<"  ~ assertVar ~ ">").rep(sep=",", min=1) ~ "::" ~ expr).map{
-    items =>
-      val quantifier = items._1
-      val assertVarDecl = items._2.map(i => AssertVarDecl(i, StateType()))
-      val allStatesExistSeq: Seq[Expr] = items._2.map(i => StateExistsExpr(i, false))
+  def assertion[$: P]: P[Expr] = P(hyperAssertionErr | hyperAssertion | normalAssertion)
+  def normalAssertion[$: P]: P[Expr] = P(quantifier ~~ spaces ~ (normalAssertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(items => Assertion(items._1, items._2, items._3))
+  def hyperAssertion[$: P]: P[Expr] = P(Index ~ quantifier ~ ("<"  ~ assertVar ~ ">").rep(sep=",", min=1) ~ "::" ~ expr ~ Index).map{
+    case (oL, quantifier, assertVars, expr, oR) =>
+      val assertVarDecl = assertVars.map(i => AssertVarDecl(i, StateType()))
+      val allStatesExistSeq: Seq[Expr] = assertVars.map(i => StateExistsExpr(i, false))
       val body = {
-        if (allStatesExistSeq.isEmpty) items._3
+        if (allStatesExistSeq.isEmpty) expr
         else {
           val allStatesExist = allStatesExistSeq.reduceLeft((e1, e2) => BinaryExpr(e1, "&&", e2))
-          if (quantifier == "forall") ImpliesExpr(allStatesExist, items._3)
-          else BinaryExpr(allStatesExist, "&&", items._3)
+          if (quantifier == "forall") ImpliesExpr(allStatesExist, expr)
+          else BinaryExpr(allStatesExist, "&&", expr)
         }
       }
-      Assertion(quantifier, assertVarDecl, body)
+      Assertion(quantifier, assertVarDecl, body).setOffsets(oL, oR)
   }
   def hyperAssertionErr[$: P]: P[Assertion] = P(quantifier ~ ("<<" ~ assertVar ~ ">>").rep(sep = ",", min = 1) ~ "::" ~ expr).map {
     items =>
@@ -168,55 +169,52 @@ object Parser {
   // Recursive Expression types
   // ranking and structure provides associativity and precedence
   // encapsulating expression class
-  def expr[$: P]: P[Expr] = P(Index ~ (assertion | implicationExpr)).map { case (pos, exp) =>
-    exp.pos = pos
-    exp
-  }
+  def expr[$: P]: P[Expr] = P(Index ~ (assertion | implicationExpr) ~ Index).map { case (oL, exp, oR) => exp.setOffsets(oL, oR) }
   // highest ranking expr, provides highest precedence for implications
-  def implicationExpr[$: P]: P[Expr] = P(booleanExpr ~ (impliesOp ~/ expr).?).map{
-    case (e, None) => e
-    case (e, Some(items)) => ImpliesExpr(e, items._2)
+  def implicationExpr[$: P]: P[Expr] = P(Index ~ booleanExpr ~ (impliesOp ~/ expr).? ~ Index).map{
+    case (_, e, None, _) => e
+    case (oL, e, Some(items), oR) => ImpliesExpr(e, items._2).setOffsets(oL, oR)
   }
   // second-highest ranking expr, provides precedence for || &&
-  def booleanExpr[$: P]: P[Expr] = P(booleanEqualityExpr ~ (boolOp1 ~/ booleanExpr).?).map{
-    case (e, None) => e
-    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
+  def booleanExpr[$: P]: P[Expr] = P(Index ~ booleanEqualityExpr ~ (boolOp1 ~/ booleanExpr).? ~ Index).map{
+    case (_, e, None, _) => e
+    case (oL, e, Some(items), oR) => BinaryExpr(e, items._1, items._2).setOffsets(oL, oR)
   }
   // third-highest ranking expr, provides precedence for ==
-  def booleanEqualityExpr[$: P]: P[Expr] = P(arithCompExpr ~ (boolOp2 ~/ booleanEqualityExpr).?).map {
-    case (e, None) => e
-    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
+  def booleanEqualityExpr[$: P]: P[Expr] = P(Index ~ arithCompExpr ~ (boolOp2 ~/ booleanEqualityExpr).? ~ Index).map {
+    case (_, e, None, _) => e
+    case (oL, e, Some(items), oR) => BinaryExpr(e, items._1, items._2).setOffsets(oL, oR)
   }
   // fourth-highest ranking expr, provides precedence for <,>,<=, ...
-  def arithCompExpr[$: P]: P[Expr] = P(arithExpr ~ (cmpOp ~/ arithCompExpr).?).map {
-    case (e, None) => e
-    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
+  def arithCompExpr[$: P]: P[Expr] = P(Index ~ arithExpr ~ (cmpOp ~/ arithCompExpr).? ~ Index).map {
+    case (_, e, None, _) => e
+    case (oL, e, Some(items), oR) => BinaryExpr(e, items._1, items._2).setOffsets(oL, oR)
   }
   // fifth-highest ranking expr, provides precedence for +,-
-  def arithExpr[$: P]: P[Expr] = P(arithTerm ~ (arithOp1 ~/ arithExpr).?).map{
-    case (e, None) => e
-    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
+  def arithExpr[$: P]: P[Expr] = P(Index ~ arithTerm ~ (arithOp1 ~/ arithExpr).? ~ Index).map{
+    case (_, e, None, _) => e
+    case (oL, e, Some(items), oR) => BinaryExpr(e, items._1, items._2).setOffsets(oL, oR)
   }
   // sixth-highest ranking expr, provides precedence for *, /, ...
-  def arithTerm[$: P]: P[Expr] = P(combinatorOpExpr ~ (arithOp2 ~/ arithTerm).?).map{
-    case (e, None) => e
-    case (e, Some(items)) => BinaryExpr(e, items._1, items._2)
+  def arithTerm[$: P]: P[Expr] = P(Index ~ combinatorOpExpr ~ (arithOp2 ~/ arithTerm).? ~ Index).map{
+    case (_, e, None, _) => e
+    case (oL, e, Some(items), oR) => BinaryExpr(e, items._1, items._2).setOffsets(oL, oR)
   }
   // seventh-highest ranking expr, containing all set operations
-  def combinatorOpExpr[$: P]: P[Expr] = P(accessValExpr ~ (combinatorOps ~/ combinatorOpExpr).?).map{
-    case (lhs, None) => lhs
-    case (lhs, Some(par)) => CombExpr(lhs, par._2, par._1)
+  def combinatorOpExpr[$: P]: P[Expr] = P(Index ~ accessValExpr ~ (combinatorOps ~/ combinatorOpExpr).? ~ Index).map{
+    case (_, lhs, None, _) => lhs
+    case (oL, lhs, Some(par), oR) => CombExpr(lhs, par._2, par._1).setOffsets(oL, oR)
   }
-  def accessValExpr[$: P]: P[Expr] = P(basicExpr ~ ("[" ~/ expr ~ "]").rep.?).map{
-    case (lhs, None) => lhs
-    case (lhs, Some(l)) => l.foldLeft(lhs)(LookupExpr)
+  def accessValExpr[$: P]: P[Expr] = P(Index ~ basicExpr ~ ("[" ~/ expr ~ "]").rep.? ~ Index).map{
+    case (_, lhs, None, _) => lhs
+    case (oL, lhs, Some(l), oR) => l.foldLeft(lhs)(LookupExpr).setOffsets(oL, oR)
   }
   // eigth-highest ranking expr, containing all usable elements..
   def basicExpr[$: P]: P[Expr] = P(compositeTypeExpr | loopIndex | proofVar | boolean | unaryExpr | /* getProgVarExpr | */ useHint | identifier | number | "(" ~ expr ~ ")")
 
   // Basic building components and utils
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
-  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ expr).map(e => UnaryExpr("!", e)) // Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
+  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ accessValExpr).map(e => UnaryExpr("!", e)) // Warning: Changed "!" ~ boolean to the following in notExpr without regression testing
   def negExpr[$: P]: P[UnaryExpr] = P("-" ~ number).map(e => UnaryExpr("-", e))
   def boolean[$: P] : P[BoolLit] = P(boolTrue | boolFalse)
   def boolTrue[$: P]: P[BoolLit] = P("true").!.map(_ => BoolLit(true))
@@ -225,7 +223,7 @@ object Parser {
   // def getProgVarExpr[$: P]: P[GetValExpr] = P((assertVar | proofVar) ~ "[" ~ progVar ~ "]").map(items => GetValExpr(items._1, items._2))
   def loopIndex[$: P]: P[LoopIndex] = P("$n").map(_ => LoopIndex())
   def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(value => Num(value))
-  def useHint[$: P]: P[Hint] = P(generalId ~ "(" ~ expr ~ ")").map { items => Hint(items._1, items._2) }
+  def useHint[$: P]: P[Expr] = P(Index ~ generalId ~ "(" ~ expr ~ ")" ~ Index).map { case (oL, id, expr, oR) => Hint(id, expr).setOffsets(oL, oR) }
 
   // Composite Type Expressions
   def compositeTypeExpr[$: P]: P[Expr] = P(compositeTypeAssign | updateMapExpr | lengthExpr)

@@ -16,7 +16,7 @@ object ViperRunner {
   def runSilicon(program: Program) = {
     val consistencyErrors = program.checkTransitively
     if (consistencyErrors.nonEmpty) {
-      consistencyErrors.foreach(err => printMsg(err.readableMessage))
+      consistencyErrors.foreach(err => Logger.error("Viper Error", err.readableMessage))
       sys.exit(1)
     } else {
       val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
@@ -30,7 +30,7 @@ object ViperRunner {
   def runCarbon(program: Program) = {
     val consistencyErrors = program.checkTransitively
     if (consistencyErrors.nonEmpty) {
-      consistencyErrors.foreach(err => printMsg(err.readableMessage))
+      consistencyErrors.foreach(err => Logger.error("Viper Error", err.readableMessage))
       sys.exit(1)
     } else {
       val carbon = CarbonVerifier(NoopReporter)
@@ -42,9 +42,11 @@ object ViperRunner {
   }
 
   def runSiliconAndCarbon(program: Program, singleTimeout: Int = 500, overallTimeout: Int = 800, checkSideCondition: Boolean = false) = {
+    // println(program)
+
     val consistencyErrors = program.checkTransitively
     if (consistencyErrors.nonEmpty) {
-      consistencyErrors.foreach(err => printMsg(err.readableMessage))
+      consistencyErrors.foreach(err => Logger.error("Viper Error", err.readableMessage))
       sys.exit(1)
     } else{
       val carbon = CarbonVerifier(NoopReporter)
@@ -52,8 +54,8 @@ object ViperRunner {
 
       try {
         val carbonRes = Future[VerificationResult] {
-          if (checkSideCondition) printMsg("Carbon has been started to check a side condition. ")
-          else printMsg("Carbon has been started to verify the program. ")
+          if (checkSideCondition) Logger.info("Carbon has been started to check a side condition. ")
+          else Logger.info("Carbon has been started to verify the program. ")
           carbon.start()
           val res = carbon.verify(program)
           carbon.stop()
@@ -61,8 +63,8 @@ object ViperRunner {
         }
 
         val siliconRes = Future[VerificationResult] {
-          if (checkSideCondition) printMsg("Silicon has been started to check a side condition. ")
-          else printMsg("Silicon has been started to verify the program. ")
+          if (checkSideCondition) Logger.info("Silicon has been started to check a side condition. ")
+          else Logger.info("Silicon has been started to verify the program. ")
           silicon.start()
           val res = silicon.verify(program)
           silicon.stop()
@@ -77,8 +79,8 @@ object ViperRunner {
               case ResSuccess =>
                 // If carbon verifies successfully, can terminate with success
                 if (!resPromise.isCompleted) {
-                  if (checkSideCondition) printMsg("Carbon succeeded in verifying the side condition")
-                  else printMsg("Carbon succeeded in verifying the program")
+                  if (checkSideCondition) Logger.info("Carbon succeeded in verifying the side condition")
+                  else Logger.info("Carbon succeeded in verifying the program")
                   resPromise.trySuccess(result)
                 }
               case ResFailure(err) =>
@@ -90,8 +92,8 @@ object ViperRunner {
                 //        then we complete resPromise with a verification failure
                 if (!resPromise.isCompleted) {
                   if (!checkSideCondition) {
-                    printMsg("Carbon failed to verify the program: ")
-                    err.foreach(e => printMsg(e.readableMessage))
+                    Logger.info("Carbon failed to verify the program: ")
+                    err.foreach(e => System.err.println(e.readableMessage))
                   }
                   if (!siliconRes.isCompleted) {
                     try {
@@ -116,15 +118,15 @@ object ViperRunner {
             result match {
               case ResSuccess =>
                 if (!resPromise.isCompleted) {
-                  if (checkSideCondition) printMsg("Silicon succeeded in verifying the side condition")
-                  else printMsg("Silicon succeeded in verifying the program")
+                  if (checkSideCondition) Logger.info("Silicon succeeded in verifying the side condition")
+                  else Logger.info("Silicon succeeded in verifying the program")
                   resPromise.trySuccess(result)
                 }
               case ResFailure(err) =>
                 if (!resPromise.isCompleted) {
                   if (!checkSideCondition) {
-                    printMsg("Silicon failed to verify the program: ")
-                    err.foreach(e => printMsg(e.readableMessage))
+                    Logger.info("Silicon failed to verify the program: ")
+                    err.foreach(e => System.err.println(e.readableMessage))
                   }
                   if (!carbonRes.isCompleted) {
                     try {
@@ -159,9 +161,4 @@ object ViperRunner {
       case _ => false
     }
   }
-
-  private def printMsg(msg: String): Unit = {
-    Main.printMsg(msg)
-  }
-
 }

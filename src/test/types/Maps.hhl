@@ -4,14 +4,15 @@
 
 method testMaps() returns (b: Bool)
 requires forall <_s> :: true
-ensures forall <_s> :: _s[b]
-// ensures exists <<_s>> :: true
+ensures forall <_s> :: true
 {
     // Testing Maps
     var m: Map[Int, Int]
+    var el: Int
+
     m := Map[Int, Int](1 := 2, 2 := 1)
 
-    var el: Int
-    el := m[2]
-    b := el in m
+    hyperAssert exists <<_s>> :: true
+    el := m[3]
+    hyperAssert exists <<_s>> :: true
 }

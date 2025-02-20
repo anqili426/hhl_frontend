@@ -58,7 +58,7 @@ object Normalizer {
         }
         Assertion(newQuantifier, assertVarDecls, normalizedBody)
       // TODO: Adapt this case
-      case e@LookupExpr(_, _) => e
+      case e@LookupExpr(_, _) => if (negate) UnaryExpr("!", e) else e
       case _ => throw UnknownException("Normalizer: expression " + e + " is not expected. Typ is " + e.getClass())
     }
   }

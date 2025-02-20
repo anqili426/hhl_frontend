@@ -1,82 +1,50 @@
-/*
-    A simple program to test booleans.
-*/
-
-method testBooleans(b1: Bool, b2: Bool) returns (bf: Bool)
-requires forall <_s> :: _s[b1] && _s[b2] == true
-ensures forall <_s> :: _s[bf] == false
+method basicFunctionality(b: Bool) returns (res: Bool)
+requires forall <_s> :: !_s[b]
+ensures forall <_s> :: _s[res]
 {
-    var b3: Bool
-    b3 := (b1 || !b2) || (true && false)
-    bf := !b3
+    res := !b
+}
+
+method moreComplex(b1: Bool, b2: Bool) returns (res: Bool)
+requires forall <_s> :: !(_s[b1] && _s[b2]) && (_s[b1] || _s[b2])
+ensures forall <_s> :: _s[res]
+{
+    var t1: Bool
+    t1 := b1 && true
+    var t2: Bool
+    t2 := b2 && true
+
+    res := t1 || t2
+}
+
+method nonDeterministic(b1: Bool, b2: Bool, i: Int) returns (res: Bool)
+requires exists <_s> :: (_s[b1] && _s[b2]) && (_s[i] == 0 || _s[i] == 1)
+ensures exists <_s> :: _s[res]
+{
+    if (i == 0) {
+        res := b1
+    } else {
+        res := b2
+    }
 }
 
 
-/*
-    var s1: Set[Int]
-    var s2: Set[Int]
-    var s3: Set[Int]
+method whileLoops() returns (res: Bool)
+requires exists <_s> :: true
+ensures exists <_s> :: _s[res]
+{
+    res := false
 
-    s1 := Set[Int](1,2)
-    s2 := Set[Int](2,3)
+    var i: Int
 
-    s3 := s1 union s2
-    s3 := s1 intersection s2
-    s3 := s1 setminus s2
+    havoc i {hint}
+    use hint(10)
+    use hint(11)
 
-    var test: Bool
-    test := 1 in s3
+    while (i > 0) 
+    invariant exists <_s> :: (_s[res] && _s[i] % 0 == 0)
+    {
 
-    hyperAssert forall <_s> :: _s[s3] == Set[Int](1,2,3)
 
-    // Testing Booleans
-    var b1: Bool
-    var b2: Bool
-    var b3: Bool
-
-    b1 := true
-    b2 := false
-
-    b3 := (true && false) || b1 && !b2
-    hyperAssert forall <_s> :: _s[b3] == true
-
-    // Testing Sequences
-    var s1: Seq[Int]
-    var s2: Seq[Int]
-    var s3: Seq[Int]
-
-    s1 := Seq[Int](1, 2)
-    s2 := Seq[Int](3, 4)
-
-    s3 := s1 ++ s2
-    hyperAssert forall <_s> :: _s[s3] == Seq[Int](1, 2, 3, 4)
-
-    var l: Int
-    l := |s3|
-    hyperAssert forall <_s> :: _s[l] == 4
-
-    hyperAssume forall <_s> :: |_s[s3]| == 4
-    var s3_1: Int
-    s3_1 := s3[1]
-    hyperAssert forall <_s> :: _s[s3_1] == 2
-
-    var ss: Seq[Seq[Int]]
-    ss := Seq[Seq[Int]](s1, s2, s3)
-    hyperAssert forall <_s> :: _s[ss] == Seq[Seq[Int]](Seq[Int](1,2), Seq[Int](3,4), Seq[Int](1,2, 3, 4))
-
-    // Testing Sets
-    var set: Set[Seq[Int]]
-    set := Set[Seq[Int]]()
-    hyperAssert forall <_s> :: |_s[set]| == 0
-
-    set := Set[Seq[Int]](s1, s2, s1)
-    hyperAssert forall <_s> :: |_s[set]| == 2
-
-    // Testing Maps
-    var m: Map[Int, Int]
-    m := Map[Int, Int](1 := 2, 2 := 1)
-    var el: Int
-    el := m[1]
-    hyperAssert forall <_s> :: |_s[m]| == 2
-    // How to hanlde this? hyperAssert forall <_s> :: _s[el][1] == 2
-} */
+    }
+}

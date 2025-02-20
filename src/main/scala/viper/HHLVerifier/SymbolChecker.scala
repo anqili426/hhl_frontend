@@ -1,5 +1,7 @@
 package viper.HHLVerifier
 
+import viper.HHLVerifier.comm.SymbolCheckerError
+
 object SymbolChecker {
   // This map is used to keep track of the declared program variables + assertion variables for each method
   var allVars: Map[String, Type] = Map.empty  // All variables used in one method (including method arguments, block names), used to collect all identifiers defined
@@ -25,7 +27,11 @@ object SymbolChecker {
     allMethods = p.content
     allMethodNames = p.content.map(m => m.mName)
     val dupMethodNames = allMethodNames.diff(allMethodNames.distinct)
-    if (dupMethodNames.size > 0) throw DuplicateIdentifierException("Duplicate method name " + dupMethodNames)
+    if (dupMethodNames.size > 0) {
+      val m = allMethods.filter(m => m.mName == dupMethodNames(0))(0)
+
+      throw SymbolCheckerError("Duplicate method name", m.offsetLeft, m.offsetRight)
+    }
     p.content.foreach(checkSymbolsMethod)
   }
 
@@ -86,42 +92,43 @@ object SymbolChecker {
         allVarsInCurrScope = allVarsInCurrScope + (id.name -> typ)
         (Seq((id.name, typ)), Seq.empty)
 
-      case ProofVarDecl(pv, p) =>
+      case ex@ProofVarDecl(pv, p) =>
         checkIdDup(pv)
         allVars = allVars + (pv.name -> pv.typ)
         allVarsInCurrScope = allVarsInCurrScope + (pv.name -> pv.typ)
         val allVarsInP = checkSymbolsExpr(p, false, false)
-        if (allVarsInP.filter(v => pv.name == v._1).isEmpty)
-          throw UnknownException("The proof variable " + pv.name + " must appear on the right-hand side of the statement")
+        if (allVarsInP.filter(v => pv.name == v._1).isEmpty) {
+          throw SymbolCheckerError("The proof variable " + pv.name + " must appear on the right-hand side of the statement", pv.offsetLeft, pv.offsetRight)
+        }
         (allVarsInP, Seq.empty)
 
-      case AssignStmt(id, exp) =>
+      case stmt@AssignStmt(id, exp) =>
         // Do not allow assignment to method arguments
-        if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
+        if (allArgNames.contains(id.name)) throw SymbolCheckerError("Cannot reassign to method argument " + id.name, stmt.offsetLeft, stmt.offsetRight)
         val rightVars = checkSymbolsExpr(exp, false, false)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo ++ rightVars, idAssignedTo)
 
-      case MultiAssignStmt(left, right) =>
+      case stmt@MultiAssignStmt(left, right) =>
         val idAssignedTo = left.map(id => checkSymbolsExpr(id, false, false)).flatten
         val idAssignedToNames = left.map(id => id.name)
-        if (idAssignedToNames.toSet.size != idAssignedToNames.length) throw UnknownException("A variable cannot appear on the RHS of an assignment more than once")
+        if (idAssignedToNames.toSet.size != idAssignedToNames.length) throw SymbolCheckerError("A variable cannot appear on the RHS of an assignment more than once", stmt.offsetLeft, stmt.offsetRight) //throw SymbolCheckerError("A variable cannot appear on the RHS of an assignment more than once", stmt)
         val args = checkSymbolsExpr(right, false, false)
         val argNames = right.args.map(a => a.name)
         idAssignedToNames.foreach(
           id => {
-            if (allArgNames.contains(id)) throw IllegalAssignmentException("Cannot reassign to method argument " + id)
-            if (argNames.contains(id)) throw IllegalAssignmentException("Cannot assign to variables that are used as arguments in a method call in the same statement")
+            if (allArgNames.contains(id)) throw SymbolCheckerError("Cannot reassign to method argument " + id, stmt.offsetLeft, stmt.offsetRight) //throw IllegalAssignmentException("Cannot reassign to method argument " + id)
+            if (argNames.contains(id)) throw SymbolCheckerError("Cannot assign to variables that are used as arguments in a method call in the same statement", stmt.offsetLeft, stmt.offsetRight) // throw IllegalAssignmentException("Cannot assign to variables that are used as arguments in a method call in the same statement")
           }
         )
         val numRet = right.method.res.length
-        if (left.length != numRet) throw UnknownException("The call to method " + right.methodName + " should be assigned to exactly " + numRet + " variables. ")
+        if (left.length != numRet) throw SymbolCheckerError("The call to method " + right.methodName + " should be assigned to exactly " + numRet + " variables.", stmt.offsetLeft, stmt.offsetRight)// throw UnknownException("The call to method " + right.methodName + " should be assigned to exactly " + numRet + " variables. ")
         val resNames = right.method.res.map(r => r.name)
         right.paramsToArgs = right.paramsToArgs ++ resNames.zip(idAssignedToNames).toMap
         (idAssignedTo, args)
 
       case HavocStmt(id, hintDecl) =>
-        if (allArgNames.contains(id.name)) throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
+        if (allArgNames.contains(id.name)) throw SymbolCheckerError("Cannot reassign to method argument " + id.name, stmt.offsetLeft, stmt.offsetRight) // throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         if (!hintDecl.isEmpty) checkHintDecl(hintDecl.get)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
         (idAssignedTo, idAssignedTo)
@@ -138,14 +145,14 @@ object SymbolChecker {
       case HyperAssertStmt(e) =>
         (checkSymbolsExpr(e, false, false), Seq.empty)
 
-      case IfElseStmt(cond, ifBlock, elseBlock) =>
+      case stmt@IfElseStmt(cond, ifBlock, elseBlock) =>
         val declareStmts = ifBlock.stmts.filter(s => s.isInstanceOf[DeclareStmt])
         val reuseStmts = elseBlock.stmts.filter(s => s.isInstanceOf[ReuseStmt])
         val numOfDeclareStmts = declareStmts.size
         val numOfReuseStmts = reuseStmts.size
-        if (numOfDeclareStmts > 1) throw UnknownException("There can be at most 1 declare statement in an if-block")
-        if (numOfReuseStmts > 1) throw UnknownException("There can be at most 1 reuse statement in an else-block")
-        if (numOfDeclareStmts != numOfReuseStmts) throw UnknownException("Declare & reuse statements must both exist")
+        if (numOfDeclareStmts > 1) throw SymbolCheckerError("There can be at most 1 declare statement in an if-block", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("There can be at most 1 declare statement in an if-block")
+        if (numOfReuseStmts > 1) throw SymbolCheckerError("There can be at most 1 reuse statement in an else-block", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("There can be at most 1 reuse statement in an else-block")
+        if (numOfDeclareStmts != numOfReuseStmts) throw SymbolCheckerError("Declare & reuse statements must both exist", stmt.offsetLeft, stmt.offsetRight) //throw UnknownException("Declare & reuse statements must both exist")
 
         // Check that the reuse statement is using the identifier of the matching declare statement
         if (numOfDeclareStmts == 1) {
@@ -153,8 +160,8 @@ object SymbolChecker {
           val reuseStmt = reuseStmts(0).asInstanceOf[ReuseStmt]
           checkIdDup(declareStmt.blockName)
           allVars = allVars + (declareStmt.blockName.name -> declareStmt.blockName.typ)
-          if (declareStmt.stmts.stmts.size == 0) throw UnknownException("Declare statement block cannot be empty")
-          if (reuseStmt.blockName.name != declareStmt.blockName.name) throw UnknownException("Reuse statement must refer to the matching declare statement")
+          if (declareStmt.stmts.stmts.size == 0) throw SymbolCheckerError("Declare statement block cannot be empty", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("Declare statement block cannot be empty")
+          if (reuseStmt.blockName.name != declareStmt.blockName.name) throw SymbolCheckerError("Reuse statement must refer to the matching declare statement", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("Reuse statement must refer to the matching declare statement")
           reuseStmt.reusedBlock = declareStmt.stmts
         }
 
@@ -186,12 +193,12 @@ object SymbolChecker {
         body.allProgVars = allVarsOfLoop.distinct.toMap
         (allVarsOfLoop, bodyVars._2)
 
-      case FrameStmt(framedAssertion, body) =>
+      case stmt@FrameStmt(framedAssertion, body) =>
         val framedVars = checkSymbolsExpr(framedAssertion, false, true)
         val allBodyVars = checkSymbolsStmt(body)
         val framedVarsModified = framedVars.intersect(allBodyVars._2)
         // Make sure that the program variables in the frame are not modified in the body
-        if (framedVarsModified.size > 0) throw UnknownException("Variables " + framedVarsModified + " in framed assertions cannot be modified. ")
+        if (framedVarsModified.size > 0) throw SymbolCheckerError("Variables " + framedVarsModified + " in framed assertions cannot be modified.", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("Variables " + framedVarsModified + " in framed assertions cannot be modified. ")
         (framedVars ++ allBodyVars._1, allBodyVars._2)
 
       case UseHintStmt(hint) =>
@@ -199,19 +206,18 @@ object SymbolChecker {
         val varsInHint = checkSymbolsExpr(hint, false, false)
         (varsInHint, Seq.empty)
 
-      case call@MethodCallStmt(name, args) =>
-        if (!allMethodNames.contains(name)) throw UnknownException("Method " + name + " is undefined, so it cannot be called")
-        call.method = allMethods.find(m => m.mName == name).get
-        if (call.method.params.length != args.length) throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
+      case stmt@MethodCallStmt(name, args) =>
+        if (!allMethodNames.contains(name)) throw SymbolCheckerError("Method " + name + " is undefined, so it cannot be called", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("Method " + name + " is undefined, so it cannot be called")
+        stmt.method = allMethods.find(m => m.mName == name).get
+        if (stmt.method.params.length != args.length) throw SymbolCheckerError("Call to method " + name + " has an unexpected number of arguments", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
         val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
-        if (call.method.res.length > 0) throw UnknownException("The call to method " + name + " should be assigned to exactly " + call.method.res.length + " variables. ")
+        if (stmt.method.res.length > 0) throw SymbolCheckerError("The call to method " + name + " should be assigned to exactly " + stmt.method.res.length + " variables.", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("The call to method " + name + " should be assigned to exactly " + stmt.method.res.length + " variables. ")
         val argNames = args.map(a => a.name)
-        val paramNames = call.method.params.map(p => p.name)
-        call.paramsToArgs = paramNames.zip(argNames).toMap
+        val paramNames = stmt.method.params.map(p => p.name)
+        stmt.paramsToArgs = paramNames.zip(argNames).toMap
         (varsInArgs, Seq.empty)
 
-      case _ =>
-        throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)
+      case stmt => throw SymbolCheckerError("Statement " + stmt + " is of unexpected type " + stmt.getClass(), stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("Statement " + stmt + " is of unexpected type " + stmt.getClass)
     }
   }
 
@@ -253,8 +259,6 @@ object SymbolChecker {
           allVars = originalAllVars
           allVarsInCurrScope = originalAllVarsInScope
           varsInBody
-          // TODO: ADAPT THIS
-        // TODO: Ask Anqi what happens here
         /*case GetValExpr(state, id) =>
             checkIdDefined(state)
             checkIdDefined(id)
@@ -262,27 +266,29 @@ object SymbolChecker {
           if (state.isInstanceOf[ProofVar]) varsInExpr = varsInExpr :+ (state.idName, allVarsInCurrScope.get(state.idName).get)
           varsInExpr*/
         case LookupExpr(id, ind) =>
-          checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(ind, isInLoopInv, isFrame)
-        case StateExistsExpr(state, _) =>
-            if (isFrame) throw UnknownException("Framed assertion cannot include state-exists-expression")
+          var varsInExpr = checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(ind, isInLoopInv, isFrame)
+          if (id.isInstanceOf[ProofVar]) varsInExpr = varsInExpr :+ (id.asInstanceOf[ProofVar].idName, allVarsInCurrScope.get(id.asInstanceOf[ProofVar].idName).get)
+          varsInExpr
+        case expr@StateExistsExpr(state, _) =>
+            if (isFrame) throw SymbolCheckerError("Framed assertion cannot include state-exists-expression", expr.offsetLeft, expr.offsetRight) // throw UnknownException("Framed assertion cannot include state-exists-expression")
             checkIdDefined(state)
             if (state.isInstanceOf[ProofVar]) Seq((state.idName, allVarsInCurrScope.get(state.idName).get))
             else Seq.empty  // No need to return anything if it's an assertion variable
-        case LoopIndex() =>
-            if (!isInLoopInv) throw UnknownException("Loop index $n can only appear in the invariant of a loop that does not use the sync rule")
+        case expr@LoopIndex() =>
+            if (!isInLoopInv) throw SymbolCheckerError("Loop index $n can only appear in the invariant of a loop that does not use the sync rule", expr.offsetLeft, expr.offsetRight) // throw UnknownException("Loop index $n can only appear in the invariant of a loop that does not use the sync rule")
             Seq.empty
         case h@Hint(_, arg) =>
             checkHintDefined(h)
             val varsInArg = checkSymbolsExpr(arg, isInLoopInv, isFrame)
             varsInArg
-        case callExpr@MethodCallExpr(name, args) =>
-            if (!allMethodNames.contains(name)) throw UnknownException("Method " + name + " is undefined, so it cannot be called")
-            callExpr.method = allMethods.find(m => m.mName == name).get
-            if (callExpr.method.params.length != args.length) throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
+        case expr@MethodCallExpr(name, args) =>
+            if (!allMethodNames.contains(name)) throw SymbolCheckerError("Method " + name + " is undefined, so it cannot be called", expr.offsetLeft, expr.offsetRight) // throw UnknownException("Method " + name + " is undefined, so it cannot be called")
+            expr.method = allMethods.find(m => m.mName == name).get
+            if (expr.method.params.length != args.length) throw SymbolCheckerError("Call to method " + name + " has an unexpected number of arguments", expr.offsetLeft, expr.offsetRight) // throw UnknownException("Call to method " + name + " has an unexpected number of arguments")
             val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
             val argNames = args.map(a => a.name)
-            val paramNames = callExpr.method.params.map(p => p.name)
-            callExpr.paramsToArgs = paramNames.zip(argNames).toMap
+            val paramNames = expr.method.params.map(p => p.name)
+            expr.paramsToArgs = paramNames.zip(argNames).toMap
             varsInArgs
         case SeqAssignExpr(elements) =>
           elements.foldRight(Seq.empty[(String, Type)]) {
@@ -296,32 +302,27 @@ object SymbolChecker {
           elements.foldRight(Seq.empty[(String, Type)]) {
             case (l, r) => r ++ checkSymbolsExpr(l.k, isInLoopInv, isFrame) ++ checkSymbolsExpr(l.v, isInLoopInv, isFrame)
           }
-        case LengthExpr(id) =>
-          checkSymbolsExpr(id, isInLoopInv, isFrame)
-        case UpdateMapExpr(id, update) =>
-          checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(update, isInLoopInv, isFrame)
-        case MapTupleExpr(k, v) =>
-          checkSymbolsExpr(k, isInLoopInv, isFrame) ++ checkSymbolsExpr(v, isInLoopInv, isFrame)
-        case CombExpr(lhs, rhs, _) =>
-          checkSymbolsExpr(lhs, isInLoopInv, isFrame) ++ checkSymbolsExpr(rhs, isInLoopInv, isFrame)
-        case _ =>
-          throw UnknownException("Symbol checker: Expression " + exp + " is of unexpected type " + exp.getClass)
+        case LengthExpr(id) => checkSymbolsExpr(id, isInLoopInv, isFrame)
+        case UpdateMapExpr(id, update) => checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(update, isInLoopInv, isFrame)
+        case MapTupleExpr(k, v) => checkSymbolsExpr(k, isInLoopInv, isFrame) ++ checkSymbolsExpr(v, isInLoopInv, isFrame)
+        case CombExpr(lhs, rhs, _) => checkSymbolsExpr(lhs, isInLoopInv, isFrame) ++ checkSymbolsExpr(rhs, isInLoopInv, isFrame)
+        case expr => throw SymbolCheckerError("Symbol checker: Expression " + exp + " is of unexpected type " + exp.getClass(), expr.offsetLeft, expr.offsetRight) // throw UnknownException("Symbol checker: Expression " + exp + " is of unexpected type " + exp.getClass)
       }
     }
 
     def checkIdDup(id: Expr): Unit = {
       val idName = getIdName(id)
       val allNames = allVars.keySet ++ allMethodNames ++ allHintNames
-      if (allNames.contains(idName)) throw DuplicateIdentifierException("Duplicate identifier " + idName)
+      if (allNames.contains(idName)) throw SymbolCheckerError("Duplicate identifier " + idName, id.offsetLeft, id.offsetRight) // throw DuplicateIdentifierException("Duplicate identifier " + idName)
     }
 
     def checkHintDefined(hint: Hint): Unit = {
-      if (!allHintsInMethod.contains(hint.name)) throw IdentifierNotFoundException("Hint " + hint.name + " not found")
+      if (!allHintsInMethod.contains(hint.name)) throw SymbolCheckerError("Hint " + hint.name + " not found", hint.offsetLeft, hint.offsetRight) // throw IdentifierNotFoundException("Hint " + hint.name + " not found")
     }
 
     def checkIdDefined(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (!allVarsInCurrScope.contains(idName)) throw IdentifierNotFoundException("Identifier " + idName + " not found")
+      if (!allVarsInCurrScope.contains(idName)) throw SymbolCheckerError("Identifier " + idName + " not found", id.offsetLeft, id.offsetRight) // throw SymbolCheckerError("Identifier not found", id.offsetLeft, id.offsetRight) // throw IdentifierNotFoundException("Identifier " + idName + " not found")
     }
 
     def getIdName(id: Expr): String = {
@@ -332,8 +333,7 @@ object SymbolChecker {
         case ProofVar(name) => name
         case HintDecl(name) => name
         case Hint(name, _) => name
-        case _ =>
-          throw UnknownException("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass)
+        case _ => throw SymbolCheckerError("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass, id.offsetLeft, id.offsetRight) // throw UnknownException("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass)
       }
     }
 
@@ -364,7 +364,6 @@ object SymbolChecker {
             checkIfHintOnly(body.asInstanceOf[ImpliesExpr].right))
         case _ =>
       }
-      if (!res) throw UnknownException("The expression in the use statement is not well-formed:\n " +
-        hint + "\nExpected syntax: use <hints> or use forall: ... ==> <hints>")
+      if (!res) throw SymbolCheckerError("The expression in the use statement is not well-formed:\n " + hint + "\nExpected syntax: use <hints> or use forall: ... ==> <hints>", hint.offsetLeft, hint.offsetRight) // throw UnknownException("The expression in the use statement is not well-formed:\n " +
     }
 }

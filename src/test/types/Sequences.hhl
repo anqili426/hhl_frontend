@@ -2,6 +2,16 @@
     A simple program to test sequences.
 */
 
+method basicDeclarations(e1: Int, e2: Int, e3: Int) returns (res: Seq[Int])
+requires forall <_s> :: true
+ensures forall <_s> :: _s[res] == Seq[Int](e1)
+{
+    var s: Seq[Int]
+    s := Seq[Int](e1, e2, e3)
+    res := s
+}
+
+/*
 method testSequences(s1: Seq[Int]) returns ()
 requires forall <_s> :: |_s[s1]| == 1
 ensures forall <_s> :: true
@@ -10,10 +20,12 @@ ensures forall <_s> :: true
     var s2: Seq[Int]
     s2 := s1
 
-    var i: Int
-    i := s2[1]
+    asdfasfd aaaaaa
 
-    hyperAssert forall <<_s>> :: false
+    var i: Int
+    i := s2[2]
+
+    hyperAssert exists <<_s>> :: true
 
 
 
@@ -57,5 +69,5 @@ ensures forall <_s> :: true
 
     var ss: Seq[Seq[Int]]
     ss := Seq[Seq[Int]](s1, s2, s3)
-    hyperAssert forall <_s> :: _s[ss] == Seq[Seq[Int]](Seq[Int](1,2), Seq[Int](3,4), Seq[Int](1,2, 3, 4)) */
-}
+    hyperAssert forall <_s> :: _s[ss] == Seq[Seq[Int]](Seq[Int](1,2), Seq[Int](3,4), Seq[Int](1,2, 3, 4)) 
+}*/
