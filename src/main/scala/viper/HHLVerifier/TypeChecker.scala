@@ -265,20 +265,22 @@ object TypeChecker {
           res = res && checkIfTypeMatch(e.typ.asInstanceOf[MapType].kType, el.k.typ) && checkIfTypeMatch(e.typ.asInstanceOf[MapType].vType, el.v.typ)
         })
       case e@LookupExpr(id, ind) =>
-        typeCheckExpr(id, isHyperAssertion)
-        typeCheckExpr(ind, false)
+        typeCheckExpr(id, hyperAssertionExpected)
 
         if (id.typ.isInstanceOf[SeqType]) {
+          typeCheckExpr(ind, hyperAssertionExpected)
           res = ind.typ.isInstanceOf[IntType]
           e.baseType = id.typ.asInstanceOf[SeqType]
           e.typ = id.typ.asInstanceOf[SeqType].sType
           lookupAccesses = lookupAccesses :+ e
         } else if (id.typ.isInstanceOf[MapType]) {
+          typeCheckExpr(ind, hyperAssertionExpected)
           res = checkIfTypeMatch(id.typ.asInstanceOf[MapType].kType, ind.typ)
           e.baseType = id.typ.asInstanceOf[MapType]
           e.typ = id.typ.asInstanceOf[MapType].kType
           lookupAccesses = lookupAccesses :+ e
         } else if (id.typ.isInstanceOf[StateType]) {
+          typeCheckExpr(ind, false)
           isHyperAssertion = true
           e.typ = ind.typ
         } else throw TypeCheckerError("Lookup can only be applied to SeqType, MapType or StateType", e.offsetLeft, e.offsetRight) // throw TypeException("Lookup can only be applied to SeqType, MapType or StateType")
