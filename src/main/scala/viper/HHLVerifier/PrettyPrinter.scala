@@ -81,6 +81,8 @@ object PrettyPrinter {
       case LookupExpr(id, ind) => f"${formatExpr(id)}[${formatExpr(ind)}]"
       case LengthExpr(id) => f"|${formatExpr(id)}|"
       case CombExpr(lhs, rhs, op) => f"${formatExpr(lhs)} ${op} ${formatExpr(rhs)}"
+      case UpdateMapExpr(base, update) => f"${formatExpr(base)}[${formatExpr(update)}]"
+      case MapTupleExpr(k, v) => f"$k := $v"
     }
   }
 

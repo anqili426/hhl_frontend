@@ -2,17 +2,44 @@
     A simple program to test maps.
 */
 
-method testMaps() returns (b: Bool)
+method basicTests() returns ()
 requires forall <_s> :: true
 ensures forall <_s> :: true
 {
-    // Testing Maps
     var m: Map[Int, Int]
-    var el: Int
+    m := Map[Int, Int]()
 
-    m := Map[Int, Int](1 := 2, 2 := 1)
+    hyperAssert forall <_s> :: |_s[m]| == 0
 
-    hyperAssert exists <<_s>> :: true
-    el := m[3]
-    hyperAssert exists <<_s>> :: true
+    m := Map[Int, Int](1 := 2, 2 := 3, 3 := 4)
+
+    hyperAssert forall <_s> :: |_s[m]| == 3
+
+    hyperAssert forall <_s> :: 1 in _s[m]
+    hyperAssert forall <_s> :: 2 in _s[m]
+    hyperAssert forall <_s> :: 3 in _s[m]
+
+    hyperAssert forall <_s> :: (_s[m])[1] == 2
+    hyperAssert forall <_s> :: (_s[m])[2] == 3
+    hyperAssert forall <_s> :: (_s[m])[3] == 4
+
+    var m1: Map[Int, Int]
+    var m2: Map[Int, Int]
+
+    m1 := m[1 := 5]
+    m2 := m[1 := 6]
+
+    hyperAssert forall <_s> :: (_s[m1])[1] == 5
+    hyperAssert forall <_s> :: (_s[m2])[1] == 6
+}
+
+
+method addElement(m: Map[Int, Int], k: Int, v: Int) returns (res: Map[Int, Int])
+requires forall <_s> :: true
+ensures forall <_s> :: true
+{
+    var s1: Seq[Map[Int, Int]]
+    s1 := Seq[Map[Int, Int]](m)
+
+    res := s1[0][k := v]
 }

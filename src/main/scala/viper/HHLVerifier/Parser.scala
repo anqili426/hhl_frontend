@@ -4,6 +4,7 @@ import fastparse._
 import JavaWhitespace._
 import viper.HHLVerifier.generation.Generator
 
+
 object Parser {
   // Program Structure ---------------------------------------------------------
   def program[$: P]: P[HHLProgram] = P(Start ~ method.rep ~ End).map{
@@ -201,16 +202,24 @@ object Parser {
     case (oL, e, Some(items), oR) => BinaryExpr(e, items._1, items._2).setOffsets(oL, oR)
   }
   // seventh-highest ranking expr, containing all set operations
-  def combinatorOpExpr[$: P]: P[Expr] = P(Index ~ accessValExpr ~ (combinatorOps ~/ combinatorOpExpr).? ~ Index).map{
+  def combinatorOpExpr[$: P]: P[Expr] = P(Index ~ mapUpdate ~ (combinatorOps ~/ combinatorOpExpr).? ~ Index).map{
     case (_, lhs, None, _) => lhs
     case (oL, lhs, Some(par), oR) => CombExpr(lhs, par._2, par._1).setOffsets(oL, oR)
   }
-  def accessValExpr[$: P]: P[Expr] = P(Index ~ basicExpr ~ ("[" ~/ expr ~ "]").rep.? ~ Index).map{
-    case (_, lhs, None, _) => lhs
-    case (oL, lhs, Some(l), oR) => l.foldLeft(lhs)(LookupExpr).setOffsets(oL, oR)
+//  def accessValExpr[$: P]: P[Expr] = P(Index ~ basicExpr ~ ("[" ~/ expr ~ "]").rep.? ~ Index).map{
+//    case (_, lhs, None, _) => lhs
+//    case (oL, lhs, Some(l), oR) => l.foldLeft(lhs)(LookupExpr).setOffsets(oL, oR)
+//  }
+  def mapUpdate[$: P]: P[Expr] = P(Index ~ accessValExpr ~ ("[" ~ expr ~ ":=" ~ expr ~ "]").? ~ Index).map{
+    case (_, base, None, _) => base
+    case (oL, base, Some((k, v)), oR) => UpdateMapExpr(base, MapTupleExpr(k, v)).setOffsets(oL, oR)
   }
-  // eigth-highest ranking expr, containing all usable elements..
-  def basicExpr[$: P]: P[Expr] = P(compositeTypeExpr | loopIndex | proofVar | boolean | unaryExpr | /* getProgVarExpr | */ useHint | identifier | number | "(" ~ expr ~ ")")
+  def accessValExpr[$: P]: P[Expr] = P(Index ~ basicExpr ~ ("[" ~ expr ~ "]").? ~ Index).map{
+    case (_, lhs, None, _) => lhs
+    case (oL, lhs, Some(l), oR) => LookupExpr(lhs, l).setOffsets(oL, oR)
+  }
+  // eigth-highest ranking expr, containing all usable elements
+  def basicExpr[$: P]: P[Expr] = P(compositeTypeAssign  | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | useHint | identifier | number | "(" ~ expr ~ ")")
 
   // Basic building components and utils
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
@@ -224,9 +233,6 @@ object Parser {
   def loopIndex[$: P]: P[LoopIndex] = P("$n").map(_ => LoopIndex())
   def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(value => Num(value))
   def useHint[$: P]: P[Expr] = P(Index ~ generalId ~ "(" ~ expr ~ ")" ~ Index).map { case (oL, id, expr, oR) => Hint(id, expr).setOffsets(oL, oR) }
-
-  // Composite Type Expressions
-  def compositeTypeExpr[$: P]: P[Expr] = P(compositeTypeAssign | updateMapExpr | lengthExpr)
 
   // Initialisation
   def compositeTypeAssign[$: P]: P[Expr] = P(seqAssignExpr | setAssignExpr | mapAssignExpr)
@@ -248,11 +254,7 @@ object Parser {
       exp.typ = MapType(kTyp, pTyp)
       exp
   }
-  def mapTupleExpr[$: P]: P[MapTupleExpr] = P(expr ~ ":=" ~ expr).map(items => MapTupleExpr(items._1, items._2))
-
-  // Lookup and membership
-  // TODO: Modify this in type checker / symbol checker: Var s3: Int // Forall <_s> :: _s[s3][0] this must be forbidden
-  def updateMapExpr[$: P]: P[UpdateMapExpr] = P(identifier ~~ "[" ~ mapTupleExpr ~ "]").map(items => UpdateMapExpr(items._1, items._2))
+  def mapTupleExpr[$: P]: P[MapTupleExpr] = P(basicExpr ~ ":=" ~ expr).map(items => MapTupleExpr(items._1, items._2))
 
   // Special operations
   def lengthExpr[$: P]: P[LengthExpr] = P("|" ~ expr ~ "|").map(expr => LengthExpr(expr))
