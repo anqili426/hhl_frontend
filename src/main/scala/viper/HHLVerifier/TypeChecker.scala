@@ -161,7 +161,7 @@ object TypeChecker {
     var isHyperAssertion = false
 
     e match {
-      case id@Id(_) => // TODO: This is not working
+      case id@Id(_) =>
         if (hyperAssertionExpected)  throw TypeCheckerError("Program variables cannot appear in a hyper assertion or a hint", id.offsetLeft, id.offsetRight) // throw TypeException("Program variables cannot appear in a hyper assertion or a hint")
         if (currMethod.allVars.contains(id.name)) id.typ = currMethod.allVars.get(id.name).get
         else res = false
@@ -265,7 +265,7 @@ object TypeChecker {
           res = res && checkIfTypeMatch(e.typ.asInstanceOf[MapType].kType, el.k.typ) && checkIfTypeMatch(e.typ.asInstanceOf[MapType].vType, el.v.typ)
         })
       case e@LookupExpr(id, ind) =>
-        typeCheckExpr(id, false)
+        typeCheckExpr(id, isHyperAssertion)
         typeCheckExpr(ind, false)
 
         if (id.typ.isInstanceOf[SeqType]) {
@@ -280,31 +280,28 @@ object TypeChecker {
           lookupAccesses = lookupAccesses :+ e
         } else if (id.typ.isInstanceOf[StateType]) {
           isHyperAssertion = true
-          typeCheckExpr(id, hyperAssertionExpected)
-          typeCheckExpr(ind, false)
           e.typ = ind.typ
         } else throw TypeCheckerError("Lookup can only be applied to SeqType, MapType or StateType", e.offsetLeft, e.offsetRight) // throw TypeException("Lookup can only be applied to SeqType, MapType or StateType")
       case e@LengthExpr(id) =>
-        typeCheckExpr(id, false)
+        typeCheckExpr(id, hyperAssertionExpected)
         if (!id.typ.isInstanceOf[SeqType] && !id.typ.isInstanceOf[SetType] && !id.typ.isInstanceOf[MapType]) throw TypeCheckerError("|.| can only be applied to composite types", e.offsetLeft, e.offsetRight) // throw TypeException("|.| can only be applied to composite types")
         e.typ = IntType()
       case e@UpdateMapExpr(id, update) =>
-        typeCheckExpr(id, false)
-        typeCheckExpr(update.k, false)
-        typeCheckExpr(update.v, false)
+        typeCheckExpr(id, hyperAssertionExpected)
+        typeCheckExpr(update.k, hyperAssertionExpected)
+        typeCheckExpr(update.v, hyperAssertionExpected)
         if (!id.typ.isInstanceOf[MapType]) throw TypeCheckerError("Map update can only be applied to variables of type Map", e.offsetLeft, e.offsetRight) // throw TypeException("Map update can only be applied to variables of type Map!")
         val t = id.typ.asInstanceOf[MapType]
         res = checkIfTypeMatch(t.kType, update.k.typ) && checkIfTypeMatch(t.vType, update.v.typ)
         e.typ = t
       case e@CombExpr(lhs, rhs, op) =>
-        typeCheckExpr(lhs, false)
-        typeCheckExpr(rhs, false)
+        typeCheckExpr(lhs, hyperAssertionExpected)
+        typeCheckExpr(rhs, hyperAssertionExpected)
 
         if (op == "in") {
           if (rhs.typ.isInstanceOf[SetType]) res = checkIfTypeMatch(lhs.typ, rhs.typ.asInstanceOf[SetType].sType)
           else if (rhs.typ.isInstanceOf[MapType]) res = checkIfTypeMatch(lhs.typ, rhs.typ.asInstanceOf[MapType].kType)
           else throw TypeCheckerError("in operation can only be applied to maps or sets", e.offsetLeft, e.offsetRight) // throw TypeException("in operation can only be applied to maps or sets!")
-          // print("I was here")
           e.typ = BoolType()
         } else if (op == "++") {
           if (!rhs.typ.isInstanceOf[SeqType] || !lhs.typ.isInstanceOf[SeqType]) throw TypeCheckerError("++ operation can only be applied to seqs", e.offsetLeft, e.offsetRight) // throw TypeException("++ operation can only be applied to seqs!")
