@@ -988,7 +988,12 @@ object Generator {
       )()
     } else {
       // modifiedVarsVpr is guaranteed to be non-empty
-      val modifiedVarsVpr = modifiedVars.map(v => vpr.LocalVar(v._1, translateType(v._2))())
+      val modifiedVarsVpr = modifiedVars.map(v => vpr.LocalVar(v._1, v._2 match {
+        case _: StateType => translateType(v._2)
+        case _: StmtBlockType => translateType(v._2)
+        case _: UnknownType => translateType(v._2)
+        case _ => vpr.Int
+      })()) // TODO: Fix this like before
       vpr.Exists(Seq(s_prime), Seq.empty,
         vpr.And(SetState.getInSetApp(Seq(s_prime.localVar, S2), useForAll),
           vpr.Forall(Seq(vVar), Seq.empty,
@@ -1820,6 +1825,7 @@ object Generator {
 
   // translate type to vpr type
   def translateType(typ: Type): vpr.Type = {
+    // println("translating type:" + typ)
     typ match {
       case t: IntType => vpr.Int
       case t: BoolType => vpr.Bool

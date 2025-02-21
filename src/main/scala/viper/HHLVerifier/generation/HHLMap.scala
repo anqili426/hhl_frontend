@@ -19,6 +19,7 @@ object HHLMap {
   private val kTypeVar = vpr.TypeVar(kTypeVarName)
   private val vTypeVar = vpr.TypeVar(vTypeVarName)
 
+  // TODO: There should be function for dynmacially get path, check documentation for how to parse
   private val filePath = "/Users/paulwinkler/Desktop/hhl_frontend/src/main/scala/viper/HHLVerifier/vprSupportFiles/HHLMap.vpr"
   private val supportProgram = SupportFileParser.parseFile(filePath)
 

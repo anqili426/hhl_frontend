@@ -2,11 +2,10 @@
     A simple program to test sets.
 */
 
-method testSets() returns ()
+method testSets(in: Int) returns ()
 requires forall <_s> :: true
 ensures forall <_s> :: true
 {
-    // Testing Sets
     var set: Set[Int]
     set := Set[Int]()
     hyperAssert forall <_s> :: |_s[set]| == 0
@@ -18,12 +17,27 @@ ensures forall <_s> :: true
 
     var s1: Set[Int]
     var s2: Set[Int]
-    var s3: Set[Int]
 
     s1 := Set[Int](1,2)
     s2 := Set[Int](2,3)
 
-    s3 := s1 union s2
-    s3 := s1 intersection s2
-    s3 := s1 setminus s2
+    var sun: Set[Int]
+    var sin: Set[Int]
+    var sdiff: Set[Int]
+
+    sun := s1 union s2
+    sin := s1 intersection s2
+    sdiff := s1 setminus s2
+
+    hyperAssert forall <_s> :: _s[sun] == Set[Int](1,2,3)
+    hyperAssert forall <_s> :: _s[sin] == Set[Int](2)
+    hyperAssert forall <_s> :: _s[sdiff] == Set[Int](1)
+
+    var s3: Set[Set[Int]]
+    s3 := Set[Set[Int]](sun, sin)
+
+    hyperAssert forall <_s> :: |_s[s3]| == 2
+    hyperAssert forall <_s> :: _s[sun] in _s[s3]
+    hyperAssert forall <_s> :: _s[sin] in _s[s3]
+    hyperAssert forall <_s> :: !(_s[sdiff] in _s[s3])
 }
