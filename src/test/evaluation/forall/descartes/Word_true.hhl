@@ -1,0 +1,64 @@
+/*
+ * Based on http://codedbot.com/questions/5112702/comparison-method-violates-its-general-contractarraylist-comprasion 
+ * 
+ */
+
+// P1
+method compare1(arr1: Seq[Int], arr2: Seq[Int], count1: Int, count2: Int, i: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[arr1] == _s2[arr2] && _s1[arr2] == _s2[arr1] &&
+    _s1[count1] == _s2[count2] && _s1[count2] == _s2[count1]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[res] == -1 * _s2[res]
+{
+    if (count1 == count2) {
+        var index: Int
+        index := 0
+
+        var exit: Bool
+        exit := false
+
+        res := 0
+
+        while ((index < |arr1|) && (index < |arr2|) && (!exit))
+        invariant forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+                                      _s1[arr1] == _s2[arr2] && _s1[arr2] == _s2[arr1] && _s1[index] == _s2[index]
+        invariant forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+                                     ((_s1[arr1])[_s1[index]] == (_s2[arr2])[_s2[index]] && (_s1[arr2])[_s1[index]] == (_s2[arr1])[_s2[index]])
+        invariant forall <_s> :: (_s[exit] == true) ==> ((_s[arr1])[_s[index]] > (_s[arr2])[_s[index]] && _s[res] == 1) ||
+                                                         ((_s[arr1])[_s[index]] < (_s[arr2])[_s[index]] && _s[res] == -1)
+        invariant forall <_s> :: (_s[exit] == false) ==> (((_s[arr1])[_s[index]] != (_s[arr2])[_s[index]] && _s[res] == 0 && _s[index] == 0)) ||
+                                                         (((_s[arr1])[_s[index-1]] == (_s[arr2])[_s[index-1]] && _s[res] == 0 && _s[index] > 0))
+        {
+            if (arr1[index] < arr2[index]) {
+                res := -1
+                exit := true
+            } else {
+                if (arr1[index] > arr2[index]) {
+                    res := 1
+                    exit := true
+                } else {
+                    index := index + 1
+                }
+            }
+        }
+
+        if (!exit) {
+            if (|arr1| < |arr2|) {
+                res := -1
+            } else {
+                if (|arr1| > |arr2|) {
+                    res := 1
+                } else {
+                    res := 0
+                }
+            }
+        }
+    } else {
+        if (count1 > count2) {
+            res := 1
+        } else {
+            res := -1
+        }
+    }
+}

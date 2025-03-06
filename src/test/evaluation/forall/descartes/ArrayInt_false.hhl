@@ -1,0 +1,51 @@
+/*
+ * Based on http://stackoverflow.com/questions/23907134/comparing-two-arrays-using-dictionary-order-in-an-array-of-arrays-java
+ * 
+ */
+
+
+// P1
+method compare1(arr1: Seq[Int], arr2: Seq[Int], i: Int) returns (res: Int)
+requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[arr1] == _s2[arr2] && _s1[arr2] == _s2[arr1]
+ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[res] == -1 * _s2[res]
+{
+    var index: Int
+    index := 0
+
+    var aEntry: Int
+    var bEntry: Int
+
+    var exit: Bool
+    exit := false
+
+    res := 0
+    aEntry := 0
+    bEntry := 0
+
+    while ((index < |arr1|) && (index < |arr2|) && (!exit))
+    invariant forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+                                      _s1[arr1] == _s2[arr2] && _s1[arr2] == _s2[arr1] && _s1[index] == _s2[index]
+    invariant forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+                                     (_s1[aEntry] == _s2[bEntry] && _s1[bEntry] == _s2[aEntry])
+    invariant forall <_s> :: (_s[exit] == false) ==> (_s[aEntry] == _s[bEntry] && _s[res] == 0)
+    invariant forall <_s> :: (_s[exit] == true) ==> ((_s[aEntry] > _s[bEntry] && _s[res] == 1) ||
+                                                     (_s[aEntry] < _s[bEntry] && _s[res] == -1))
+    {
+        aEntry := arr1[index]
+        bEntry := arr2[index]
+        
+        if (aEntry < bEntry) {
+            res := -1
+            exit := true
+        } else {
+            if (aEntry > bEntry) {
+                res := 1
+                exit := true
+            } else {
+                index := index + 1
+            }
+        }
+    }
+}
