@@ -5,6 +5,7 @@
 method basicTests() returns ()
 requires forall <_s> :: true
 ensures forall <_s> :: true
+ensures forall <<_s>> :: false
 {
     var m: Map[Int, Int]
     m := Map[Int, Int]()
@@ -42,4 +43,7 @@ ensures forall <_s> :: true
     s1 := Seq[Map[Int, Int]](m)
 
     res := s1[0][k := v]
+
+    hyperAssert forall <_s> :: (_s[res])[_s[k]] == _s[v]
 }
+

@@ -1,9 +1,6 @@
 package viper.HHLVerifier
 
-import viper.HHLVerifier.comm.TypeCheckerError
 import viper.HHLVerifier.generation.Generator
-
-// TODO: How to hanlde accesses in pre/postconditions
 
 object TypeChecker {
   val boolOp = List("==", "!=", "&&", "||", "forall", "exists", "==>")
@@ -36,9 +33,9 @@ object TypeChecker {
     isPre = true
     m.pre.foreach(p => isHyperAssertion = isHyperAssertion && typeCheckExpr(p, true))
     isPre = false
-    if (!isHyperAssertion) throw TypeCheckerError("At least one precondition of method " + m.mName + " is not a hyper assertion", m.pre(0).offsetLeft, m.pre.last.offsetRight) //  throw TypeException("At least one precondition of method " + m.mName + " is not a hyper assertion")
+    if (!isHyperAssertion) throw new Logger("At least one precondition of method " + m.mName + " is not a hyper assertion").addTitle("Type Checker Error").addOffset((m.pre(0).offsetLeft, m.pre.last.offsetRight))
     m.post.foreach(p => isHyperAssertion = isHyperAssertion && typeCheckExpr(p, true))
-    if (!isHyperAssertion) throw TypeCheckerError("At least one postcondition of method " + m.mName + " is not a hyper assertion", m.post(0).offsetLeft, m.post.last.offsetRight)
+    if (!isHyperAssertion) throw new Logger("At least one postcondition of method " + m.mName + " is not a hyper assertion").addTitle("Type Checker Error").addOffset((m.post(0).offsetLeft, m.post.last.offsetRight))
     typeCheckStmt(m.body, false)
 
     // add types
@@ -77,11 +74,11 @@ object TypeChecker {
         res = checkIfTypeMatch(e.typ, boolType)
       case stmt@HyperAssumeStmt(e) =>
         val isHyperAssertion = exprContainsHyperAssertionAndExtractLookups(s, e, true)
-        if (!isHyperAssertion) throw TypeCheckerError("Only hyper assertions can be used in a hyper-assume statement", stmt.offsetLeft, stmt.offsetRight) // throw UnknownException("Only hyper assertions can be used in a hyper-assume statement")
+        if (!isHyperAssertion) throw new Logger("Only hyper assertions can be used in a hyper-assume statement").addTitle("Type Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
         res = checkIfTypeMatch(e.typ, boolType)
       case stmt@HyperAssertStmt(e) =>
         val isHyperAssertion = exprContainsHyperAssertionAndExtractLookups(s, e, true)
-        if (!isHyperAssertion)  throw TypeCheckerError("Only hyper assertions can be used in a hyper-assert statement", stmt.offsetLeft, stmt.offsetRight) //throw UnknownException("Only hyper assertions can be used in a hyper-assert statement")
+        if (!isHyperAssertion)  throw new Logger("Only hyper assertions can be used in a hyper-assert statement").addTitle("Type Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
         res = checkIfTypeMatch(e.typ, boolType)
       case IfElseStmt(cond, ifStmt, elseStmt) =>
         exprContainsHyperAssertionAndExtractLookups(s, cond, false)
@@ -103,9 +100,9 @@ object TypeChecker {
           isHyperAssertion = isHyperAssertion && exprContainsHyperAssertionAndExtractLookups(s, i, true)
           res = res && checkIfTypeMatch(i.typ, boolType)
         })
-        if (!isHyperAssertion)  throw TypeCheckerError("At least one loop invariant is not a hyper assertion", loop.offsetLeft, loop.offsetRight) // throw TypeException("At least one loop invariant is not a hyper assertion")
-        if (rule == "existsRule" && decr.isEmpty)  throw TypeCheckerError("To use the exists rule, the loop itself must have a decreases clause", loop.offsetLeft, loop.offsetRight) // throw UnknownException("To use the exists rule, the loop itself must have a decreases clause")
-        if (rule == "existsRule" && !Generator.autoSelectRules)  throw TypeCheckerError("To use the exists rule, users must enable auto-selection of loop rules", loop.offsetLeft, loop.offsetRight) // throw UnknownException("To use the exists rule, users must enable auto-selection of loop rules")
+        if (!isHyperAssertion)  throw new Logger("At least one loop invariant is not a hyper assertion").addTitle("Type Checker Error").addOffset((loop.offsetLeft, loop.offsetRight))
+        if (rule == "existsRule" && decr.isEmpty)  throw new Logger("To use the exists rule, the loop itself must have a decreases clause").addTitle("Type Checker Error").addOffset((loop.offsetLeft, loop.offsetRight))
+        if (rule == "existsRule" && !Generator.autoSelectRules)  throw new Logger("To use the exists rule, users must enable auto-selection of loop rules").addTitle("Type Checker Error").addOffset((loop.offsetLeft, loop.offsetRight))
         if (!decr.isEmpty) {
           exprContainsHyperAssertionAndExtractLookups(s, decr.get, false)
           res = res && checkIfTypeMatch(decr.get.typ, intType)
@@ -114,10 +111,10 @@ object TypeChecker {
         loop.isTotal = !decr.isEmpty && loopBodyIsTotal
         isTotal = isTotal && loop.isTotal
         if (!loop.isTotal && rule == "syncTotRule")
-          throw TypeCheckerError("To use the syncTot rule, the loop itself must have a decreases clause, and its body must not contain any assume statements or nested loops without decreases clauses", loop.offsetLeft, loop.offsetRight) // throw UnknownException("To use the syncTot rule, the loop itself must have a decreases clause," +
+          throw new Logger("To use the syncTot rule, the loop itself must have a decreases clause, and its body must not contain any assume statements or nested loops without decreases clauses").addTitle("Type Checker Error").addOffset((loop.offsetLeft, loop.offsetRight))
       case FrameStmt(framedAssertion, body) =>
         val isHyperAssertion = exprContainsHyperAssertionAndExtractLookups(s, framedAssertion, true)
-        if (!isHyperAssertion)  throw TypeCheckerError("Only hyper assertions can be framed", framedAssertion.offsetLeft, framedAssertion.offsetRight) // throw TypeException("Only hyper assertions can be framed")
+        if (!isHyperAssertion)  throw new Logger("Only hyper assertions can be framed").addTitle("Type Checker Error").addOffset((framedAssertion.offsetLeft, framedAssertion.offsetRight))
         res = checkIfTypeMatch(framedAssertion.typ, boolType)
         val bodyIsTotal = typeCheckStmt(body, isInLoop)
         isTotal = isTotal && bodyIsTotal
@@ -139,10 +136,10 @@ object TypeChecker {
           exprContainsHyperAssertionAndExtractLookups(s, a, false)
           res = res && checkIfTypeMatch(a.typ, call.method.params(args.indexOf(a)).typ)
         })
-        if (!res) throw TypeCheckerError("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters", call.offsetLeft, call.offsetRight) //throw TypeException("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters")
-      case _ => throw TypeCheckerError("Unkown statement detected", s.offsetLeft, s.offsetRight) //throw TypeException("Unkown statement detected")
+        if (!res) throw new Logger("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters").addTitle("Type Checker Error").addOffset((call.offsetLeft, call.offsetRight))
+      case _ => throw new Logger("Unkown statement detected").addTitle("Type Checker Error").addOffset((s.offsetLeft, s.offsetRight))
     }
-    if (!res) throw TypeCheckerError("The statement has a type error: " + s, s.offsetLeft, s.offsetRight) // throw TypeException("The statement has a type error: " + s)
+    if (!res) throw new Logger("The statement has a type error: " + s).addTitle("Type Checker Error").addOffset((s.offsetLeft, s.offsetRight))
     else isTotal
   }
 
@@ -162,7 +159,7 @@ object TypeChecker {
 
     e match {
       case id@Id(_) =>
-        if (hyperAssertionExpected)  throw TypeCheckerError("Program variables cannot appear in a hyper assertion or a hint", id.offsetLeft, id.offsetRight) // throw TypeException("Program variables cannot appear in a hyper assertion or a hint")
+        if (hyperAssertionExpected)  throw new Logger("Program variables cannot appear in a hyper assertion or a hint").addTitle("Type Checker Error").addOffset((id.offsetLeft, id.offsetRight))
         if (currMethod.allVars.contains(id.name)) id.typ = currMethod.allVars.get(id.name).get
         else res = false
       case be@BinaryExpr(e1, op, e2) =>
@@ -201,7 +198,7 @@ object TypeChecker {
         if (assertVars.keySet.contains(name)) av.typ = assertVars.get(name).get
         else res = false
       case e@AssertVarDecl(vName, vType) =>
-        if (!hyperAssertionExpected && vType.isInstanceOf[StateType])  throw TypeCheckerError("Variables of type State" + vName +" can only appear in a hyper assertion. ", e.offsetLeft, e.offsetRight) // throw TypeException("Variables of type State" + vName +" can only appear in a hyper assertion. ")
+        if (!hyperAssertionExpected && vType.isInstanceOf[StateType])  throw new Logger("Variables of type State" + vName +" can only appear in a hyper assertion.").addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
         vName.typ = vType
       // AssertVarDecl expression itself doesn't have a concrete type
       case ie@ImpliesExpr(left, right) =>
@@ -228,7 +225,7 @@ object TypeChecker {
         typeCheckExpr(state, hyperAssertionExpected)
         res = checkIfTypeMatch(state.typ, stateType)
         se.typ = boolType
-        if (se.err && isPre)  throw TypeCheckerError("Preconditions cannot refer to failure states", se.offsetLeft, se.offsetRight) // throw UnknownException("Preconditions cannot refer to failure states")
+        if (se.err && isPre)  throw new Logger("Preconditions cannot refer to failure states").addTitle("Type Checker Error").addOffset((se.offsetLeft, se.offsetRight))
       case li@LoopIndex() =>
         li.typ = intType
       case pv@ProofVar(name) =>
@@ -237,7 +234,7 @@ object TypeChecker {
           pv.typ = currMethod.allVars.get(name).get
         } else res = false
       case h@Hint(name, arg) =>
-        if (!hyperAssertionExpected)  throw TypeCheckerError("Hint" + name + " can only appear in a hyper assertion or a use hint statement", h.offsetLeft, h.offsetRight) // throw UnknownException("Hint" + name + " can only appear in a hyper assertion or a use hint statement")
+        if (!hyperAssertionExpected)  throw new Logger("Hint" + name + " can only appear in a hyper assertion or a use hint statement").addTitle("Type Checker Error").addOffset((h.offsetLeft, h.offsetRight))
         typeCheckExpr(arg, hyperAssertionExpected)
         // At the moment, we only allow hints to take 1 argument of type Int
         res = checkIfTypeMatch(arg.typ, intType)
@@ -247,7 +244,7 @@ object TypeChecker {
           typeCheckExpr(a, false)
           res = res && checkIfTypeMatch(a.typ, call.method.params(args.indexOf(a)).typ)
         })
-        if (!res)  throw TypeCheckerError("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters", call.offsetLeft, call.offsetRight) // throw TypeException("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters")
+        if (!res)  throw new Logger("The types of the arguments in the call to method " + name + " do not match with the types of the method parameters").addTitle("Type Checker Error").addOffset((call.offsetLeft, call.offsetRight))
       case SeqAssignExpr(elements) =>
         elements.foreach(el => {
           typeCheckExpr(el, hyperAssertionExpected)
@@ -283,16 +280,16 @@ object TypeChecker {
           typeCheckExpr(ind, false)
           isHyperAssertion = true
           e.typ = ind.typ
-        } else throw TypeCheckerError("Lookup can only be applied to SeqType, MapType or StateType", e.offsetLeft, e.offsetRight) // throw TypeException("Lookup can only be applied to SeqType, MapType or StateType")
+        } else throw new Logger("Lookup can only be applied to SeqType, MapType or StateType").addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
       case e@LengthExpr(id) =>
         typeCheckExpr(id, hyperAssertionExpected)
-        if (!id.typ.isInstanceOf[SeqType] && !id.typ.isInstanceOf[SetType] && !id.typ.isInstanceOf[MapType]) throw TypeCheckerError("|.| can only be applied to composite types", e.offsetLeft, e.offsetRight) // throw TypeException("|.| can only be applied to composite types")
+        if (!id.typ.isInstanceOf[SeqType] && !id.typ.isInstanceOf[SetType] && !id.typ.isInstanceOf[MapType]) throw new Logger("|.| can only be applied to composite types").addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
         e.typ = IntType()
       case e@UpdateMapExpr(id, update) =>
         typeCheckExpr(id, hyperAssertionExpected)
         typeCheckExpr(update.k, hyperAssertionExpected)
         typeCheckExpr(update.v, hyperAssertionExpected)
-        if (!id.typ.isInstanceOf[MapType]) throw TypeCheckerError("Map update can only be applied to variables of type Map", e.offsetLeft, e.offsetRight) // throw TypeException("Map update can only be applied to variables of type Map!")
+        if (!id.typ.isInstanceOf[MapType]) throw new Logger("Map update can only be applied to variables of type Map").addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
         val t = id.typ.asInstanceOf[MapType]
         res = checkIfTypeMatch(t.kType, update.k.typ) && checkIfTypeMatch(t.vType, update.v.typ)
         e.typ = t
@@ -303,20 +300,20 @@ object TypeChecker {
         if (op == "in") {
           if (rhs.typ.isInstanceOf[SetType]) res = checkIfTypeMatch(lhs.typ, rhs.typ.asInstanceOf[SetType].sType)
           else if (rhs.typ.isInstanceOf[MapType]) res = checkIfTypeMatch(lhs.typ, rhs.typ.asInstanceOf[MapType].kType)
-          else throw TypeCheckerError("in operation can only be applied to maps or sets", e.offsetLeft, e.offsetRight) // throw TypeException("in operation can only be applied to maps or sets!")
+          else throw new Logger("in operation can only be applied to maps or sets").addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
           e.typ = BoolType()
         } else if (op == "++") {
-          if (!rhs.typ.isInstanceOf[SeqType] || !lhs.typ.isInstanceOf[SeqType]) throw TypeCheckerError("++ operation can only be applied to seqs", e.offsetLeft, e.offsetRight) // throw TypeException("++ operation can only be applied to seqs!")
+          if (!rhs.typ.isInstanceOf[SeqType] || !lhs.typ.isInstanceOf[SeqType]) throw new Logger("++ operation can only be applied to seqs").addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
           res = checkIfTypeMatch(rhs.typ, lhs.typ)
           e.typ = rhs.typ
         } else {
-          if (!rhs.typ.isInstanceOf[SetType] || !lhs.typ.isInstanceOf[SetType]) throw TypeCheckerError("Set operation can only be applied to sets", e.offsetLeft, e.offsetRight) // throw TypeException("set operation can only be applied to sets!")
+          if (!rhs.typ.isInstanceOf[SetType] || !lhs.typ.isInstanceOf[SetType]) throw new Logger("Set operation can only be applied to sets").addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
           res = checkIfTypeMatch(lhs.typ, rhs.typ)
           e.typ = lhs.typ
         }
-      case _ => throw TypeCheckerError("Unkown type detected in Expression" + e.getClass(), e.offsetLeft, e.offsetRight) // throw TypeException("Unkown type detected in Expression" + e.getClass())
+      case _ => throw new Logger("Unkown type detected in Expression" + e.getClass()).addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
     }
-    if (!res) throw TypeCheckerError(f"The expression has a type error: $e is of type ${e.getClass()}", e.offsetLeft, e.offsetRight) // throw TypeException(f"The expression has a type error: $e is of type ${e.getClass}")
+    if (!res) throw new Logger(f"The expression has a type error: $e is of type ${e.getClass()}").addTitle("Type Checker Error").addOffset((e.offsetLeft, e.offsetRight))
     isHyperAssertion
   }
 
@@ -329,7 +326,7 @@ object TypeChecker {
     assertVars = assertVars ++ assertVarDecls.map(decl => decl.vName.name -> decl.vType).toMap
     val bodyIsHyperAssertion = typeCheckExpr(body, hyperAssertionExpected, polarity)
     isHyperAssertion = isHyperAssertion || bodyIsHyperAssertion
-    if (!checkIfTypeMatch(body.typ, boolType)) throw TypeCheckerError("The expression " + body + " should have type Bool", body.offsetLeft, body.offsetRight) // throw TypeException("The expression " + body + " should have type Bool")
+    if (!checkIfTypeMatch(body.typ, boolType)) throw new Logger("The expression " + body + " should have type Bool").addTitle("Type Checker Error").addOffset((body.offsetLeft, body.offsetRight))
     assertVars = originalAssertVars
     isHyperAssertion
   }

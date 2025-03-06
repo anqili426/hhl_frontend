@@ -1,8 +1,7 @@
 package viper.HHLVerifier.generation
 
 import viper.HHLVerifier._
-import viper.HHLVerifier.comm.{VerificationError, VerificationErrors}
-import viper.silver.ast.{DomainType, Info, NoInfo}
+import viper.silver.ast.{Info, NoInfo}
 import viper.silver.{ast => vpr}
 
 // TODO: Check if the filter works correctly when verifying loops => generateViperMethod might filter for Ints as well
@@ -207,11 +206,11 @@ object Generator {
       val normalizedPost = Normalizer.normalize(exp, negate = false)
       Normalizer.detQuantifier(normalizedPost, underForAll = false)
 
-      translateExp(normalizedPost, null, outputStates.localVar, outputFailureStates.localVar, info = VerificationError(
-        VerificationErrors.Postcondition(exp),
-        exp.offsetLeft,
-        exp.offsetRight
-      ).annotationInfo())
+      translateExp(normalizedPost, null, outputStates.localVar, outputFailureStates.localVar, info =
+        new Logger(VerificationErrors.Postcondition(exp), Logger.ERR)
+          .addTitle("Verification Error")
+          .addOffset((exp.offsetLeft, exp.offsetRight))
+          .toAnnotationInfo())
     }
     isPostcondition = false
 
@@ -416,11 +415,10 @@ object Generator {
         (newStmts, Seq.empty)
 
       case stmt@HyperAssertStmt(e) =>
-        val assert = vpr.Assert(translateExp(e, null, currStates, currFailureStates))(info = VerificationError(
-          VerificationErrors.HyperAssertion(e),
-          stmt.offsetLeft,
-          stmt.offsetRight
-        ).annotationInfo())
+        val assert = vpr.Assert(translateExp(e, null, currStates, currFailureStates))(info = new Logger(VerificationErrors.HyperAssertion(e), Logger.ERR)
+          .addTitle("Verification Error")
+          .addOffset((stmt.offsetLeft, stmt.offsetRight))
+          .toAnnotationInfo())
         newStmts = newStmts ++ Seq(assert)
         (newStmts, Seq.empty)
 
@@ -680,15 +678,15 @@ object Generator {
           if (!inline) {
             // Check whether sync(Tot) rule can be applied with a separate Viper program
             val canUseSyncRule = checkSyncCondModular(normalizedInvariants, body, cond)
-            Logger.info("Can use sync rule? " + canUseSyncRule)
+            new Logger("Can use sync rule? " + canUseSyncRule)
             if (canUseSyncRule) {
               val useSyncRule = if (loop.isTotal) {
-                Logger.info("Applying syncTotRule")
+                new Logger("Applying syncTotRule")
                 val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncTotRule")
                 dupLoop.isTotal = true
                 translateStmt(dupLoop, currStates, currFailureStates, true)
               } else {
-                Logger.info("Applying syncRule")
+                new Logger("Applying syncRule")
                 val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncRule")
                 dupLoop.isTotal = false
                 translateStmt(dupLoop, currStates, currFailureStates, true)
@@ -700,13 +698,13 @@ object Generator {
               val invHasTopExists = normalizedInvWithHints.map(i => checkHasTopExists(i._2)).contains(true)
               val useNotSyncRule = if (invHasTopExists) {
                 // exists rule
-                Logger.info("Applying existsRule")
+                new Logger("Applying existsRule")
                 val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "existsRule")
                 dupLoop.isTotal = loop.isTotal
                 translateStmt(dupLoop, currStates, currFailureStates, true)
               } else {
                 // forall-exists rule
-                Logger.info("Applying forAllExistsRule")
+                new Logger("Applying forAllExistsRule")
                 val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "forAllExistsRule")
                 dupLoop.isTotal = loop.isTotal
                 translateStmt(dupLoop, currStates, currFailureStates, true)
@@ -767,11 +765,11 @@ object Generator {
         } else {
           // A rule has been determined, either automatically or by the user
           if (!isAutoSelected && !syncTotWarningPrinted && postIsTopExists && rule != "syncTotRule" && rule != "existsRule") {
-            Logger.info("Warning: method " + currMethod.mName + " has a postcondition " +
+            new Logger("Warning: method " + currMethod.mName + " has a postcondition " +
               "which has a top-level existential quantifier over states, \n " +
               "        but syncTotRule or existsRule is not chosen for at least one of the loops in the method. \n " +
               "        Please make sure that every non-nested loop uses syncTotRule. \n" +
-              "         Ignore this warning if you have already done so. ")
+              "         Ignore this warning if you have already done so. ", Logger.WARN)
             syncTotWarningPrinted = true
           }
 
@@ -800,11 +798,10 @@ object Generator {
           // Assert I(0)
           if (normalizedInvariants.nonEmpty) {
             for ((normalizedInv, i) <- normalizedInvariants.zipWithIndex) {
-              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = VerificationError(
-                VerificationErrors.MethodCall(invariants(i)),
-                invariants(i).offsetLeft,
-                invariants(i).offsetRight
-              ).annotationInfo())
+              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = new Logger(VerificationErrors.MethodCall(invariants(i)), Logger.ERR)
+                .addTitle("Verification Error")
+                .addOffset((invariants(i).offsetLeft, invariants(i).offsetRight))
+                .toAnnotationInfo())
             }
           }
 
@@ -871,11 +868,10 @@ object Generator {
 
       case FrameStmt(exp, body) =>
         val framedExpr = translateExp(exp, state, currStates, currFailureStates)
-        val assertFrame = vpr.Assert(framedExpr)(info = VerificationError(
-          VerificationErrors.HyperAssertion(exp),
-          exp.offsetLeft,
-          exp.offsetRight
-        ).annotationInfo())
+        val assertFrame = vpr.Assert(framedExpr)(info = new Logger(VerificationErrors.HyperAssertion(exp), Logger.ERR)
+          .addTitle("Verification Error")
+          .addOffset((exp.offsetLeft, exp.offsetRight))
+          .toAnnotationInfo())
         val translatedBody = translateStmt(body, currStates, currFailureStates)
         val inhaleFrame = vpr.Inhale(framedExpr)()
         (Seq(assertFrame) ++ translatedBody._1 ++ Seq(inhaleFrame), translatedBody._2)
@@ -890,11 +886,10 @@ object Generator {
           useParamsToArgsMap = true
           currParamsToArgsMap = call.paramsToArgs
           call.method.pre.foreach{ precondition =>
-            newStmts :+ vpr.Assert(translateExp(precondition, state, currStates, currFailureStates))(info = VerificationError(
-              VerificationErrors.MethodCall(precondition),
-              precondition.offsetLeft,
-              stmt.offsetRight
-            ).annotationInfo())
+            newStmts :+ vpr.Assert(translateExp(precondition, state, currStates, currFailureStates))(info = new Logger(VerificationErrors.MethodCall(precondition), Logger.ERR)
+              .addTitle("Verification Error")
+              .addOffset((precondition.offsetLeft, stmt.offsetRight))
+              .toAnnotationInfo())
           }
           useParamsToArgsMap = false
         }
@@ -1038,11 +1033,11 @@ object Generator {
     val sameGuardValue = vpr.Forall(Seq(s1, s2), Seq.empty, vpr.Implies(
       vpr.And(SetState.getInSetApp(Seq(s1.localVar, outputStates.localVar)), SetState.getInSetApp(Seq(s2.localVar, outputStates.localVar)))(),
       vpr.EqCmp(translateExp(loopGuard, s1.localVar, outputStates.localVar, outputFailureStates.localVar), translateExp(loopGuard, s2.localVar, outputStates.localVar, outputFailureStates.localVar))()
-    )())(info = VerificationError(
-      VerificationErrors.LoopSyncGuard(loopGuard),
-      loopGuard.offsetLeft,
-      loopGuard.offsetRight
-    ).annotationInfo())
+    )())(info = new Logger(VerificationErrors.LoopSyncGuard(loopGuard), Logger.ERR)
+      .addTitle("Verification Error")
+      .addOffset((loopGuard.offsetLeft,
+      loopGuard.offsetRight))
+      .toAnnotationInfo())
 
     val method = createViperMethod(checkSyncCondMethodName, // no update needed
       args, // Args
@@ -1295,21 +1290,19 @@ object Generator {
     // Find the first invariant that contains a top-level existential quantifier
     val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i) == true).get
     pres = normalizedInvs.diff(Seq(firstExistsInv))
-    posts = pres.map(inv => (inv, Option(VerificationError(
-      VerificationErrors.LoopInvariant(inv, 0),
-      inv.offsetLeft,
-      inv.offsetRight
-    ).annotationInfo())))
+    posts = pres.map(inv => (inv, Option(new Logger(VerificationErrors.LoopInvariant(inv, 0), Logger.ERR)
+      .addTitle("Verification Error")
+      .addOffset((inv.offsetLeft, inv.offsetRight))
+      .toAnnotationInfo())))
 
     val exprAddedToPre = BinaryExpr(loopGuard, "&&", BinaryExpr(tProgVar, "==", decrExpr))
     pres = pres :+ addToTopExists(firstExistsInv, exprAddedToPre)
 
     val exprAddedToPost = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
-    val temp = (addToTopExists(firstExistsInv, exprAddedToPost), Option(VerificationError(
-      VerificationErrors.LoopVariant(decrExpr),
-      decrExpr.offsetLeft,
-      decrExpr.offsetRight
-    ).annotationInfo()))
+    val temp = (addToTopExists(firstExistsInv, exprAddedToPost), Option(new Logger(VerificationErrors.LoopVariant(decrExpr), Logger.ERR)
+      .addTitle("Verification Error")
+      .addOffset((decrExpr.offsetLeft, decrExpr.offsetRight))
+      .toAnnotationInfo()))
     posts = posts :+ temp
 
     verifyStmtModular(methodName, stmt, varsInStmt, pres, posts)
@@ -1375,16 +1368,15 @@ object Generator {
     methodPres = methodPres :+ getAllInvariantsWithTriggers(normalizedInv, inputStates, inputFailureStates)
 
     for ((normInv, i) <- normalizedInv.zipWithIndex) {
-      methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = VerificationError(
-        VerificationErrors.LoopInvariant(invs(i), 0),
-        invs(i).offsetLeft,
-        invs(i).offsetRight
-      ).annotationInfo())
+      methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = new Logger(VerificationErrors.LoopInvariant(invs(i), 0), Logger.ERR)
+        .addTitle("Verification Error")
+        .addOffset((invs(i).offsetLeft, invs(i).offsetRight))
+        .toAnnotationInfo())
     }
 
     if (decrExpr.isDefined) {
       if (rule == "syncRule" || rule == "forAllExistsRule") {
-        if (!isAutoSelected) Logger.info("Warning: the decreases clause is disgarded by the verifier when syncRule or forAllExistsRule is used")
+        if (!isAutoSelected) new Logger("Warning: the decreases clause is disgarded by the verifier when syncRule or forAllExistsRule is used", Logger.WARN)
       } else {
         //  t == decrExpr for all states
         val translatedDecr = translateExp(decrExpr.get, state.localVar, inputStates, inputFailureStates)
@@ -1392,11 +1384,10 @@ object Generator {
         val decrPre = vpr.Forall(Seq(state), trigger,
           vpr.Implies(SetState.getInSetApp(Seq(state.localVar, inputStates), useLimited = true),
             vpr.EqCmp(translatedDecr, State.get(state.localVar, tId))()
-          )())(info = VerificationError(
-          VerificationErrors.LoopVariant(decrExpr.get),
-          decrExpr.get.offsetLeft,
-          decrExpr.get.offsetRight
-        ).annotationInfo())
+          )())(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
+            .addTitle("Verification Error")
+            .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
+            .toAnnotationInfo())
         methodPres = methodPres :+ decrPre
       }
     }
@@ -1424,11 +1415,10 @@ object Generator {
     )())()
 
     if (rule == "syncRule" || rule == "syncTotRule") {
-      if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)(info = VerificationError(
-        VerificationErrors.LoopSyncGuard(loopGuard),
-        loopGuard.offsetLeft,
-        loopGuard.offsetRight
-      ).annotationInfo())
+      if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)(info = new Logger(VerificationErrors.LoopSyncGuard(loopGuard), Logger.ERR)
+        .addTitle("Verification Error")
+        .addOffset((loopGuard.offsetLeft, loopGuard.offsetRight))
+        .toAnnotationInfo())
       methodBody = methodBody :+ vpr.Inhale(loopGuardHoldsForAll)()
     }
 
@@ -1451,11 +1441,10 @@ object Generator {
             vpr.LtCmp(translatedDecr, State.get(state.localVar, tId))()
           )()
         )()
-      )(info = VerificationError(
-        VerificationErrors.LoopVariant(decrExpr.get),
-        decrExpr.get.offsetLeft,
-        decrExpr.get.offsetRight
-      ).annotationInfo())
+      )(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
+        .addTitle("Verification Error")
+        .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
+        .toAnnotationInfo())
       methodPosts = methodPosts :+ decrPost
     }
 
@@ -1498,7 +1487,7 @@ object Generator {
 
     if (!decrExpr.isEmpty) {
       if (rule == "syncRule" || rule == "forAllExistsRule") {
-        if (!isAutoSelected) Logger.info("Warning: the decreases clause is disgarded by the verifier when syncRule or forAllExistsRule is used")
+        if (!isAutoSelected) new Logger("Warning: the decreases clause is disgarded by the verifier when syncRule or forAllExistsRule is used", Logger.WARN)
       } else {
         // Inhale t == decrExpr for all states
         val translatedDecr = translateExp(decrExpr.get, state.localVar, currStates, currFailureStates)
@@ -1521,11 +1510,10 @@ object Generator {
         translateExp(loopGuard, s2.localVar, currStates, currFailureStates))()
     )())()
     if (rule == "syncRule" || rule == "syncTotRule") {
-      if (!isAutoSelected) ifBodyStmts = ifBodyStmts :+ vpr.Assert(sameGuardValue)(info = VerificationError(
-        VerificationErrors.LoopSyncGuard(loopGuard),
-        loopGuard.offsetLeft,
-        loopGuard.offsetRight
-      ).annotationInfo())
+      if (!isAutoSelected) ifBodyStmts = ifBodyStmts :+ vpr.Assert(sameGuardValue)(info = new Logger(VerificationErrors.LoopSyncGuard(loopGuard), Logger.ERR)
+        .addTitle("Verification Error")
+        .addOffset((loopGuard.offsetLeft, loopGuard.offsetRight))
+        .toAnnotationInfo())
       ifBodyStmts = ifBodyStmts :+ vpr.Inhale(loopGuardHoldsForAll)()
     } else if (rule == "desugaredRule") {
       val assumeLoopGuard = translateStmt(AssumeStmt(loopGuard), currStates, currFailureStates)._1
@@ -1552,11 +1540,10 @@ object Generator {
       val translatedDecr = translateExp(decrExpr.get, state.localVar, currStates, currFailureStates)
       // Assert that the current value of decrExpr is in the range of [0, t)
       val tf_decr_exp = vpr.Forall(Seq(state), Seq.empty, vpr.Implies(SetState.getInSetApp(Seq(state.localVar, currStates)), vpr.And(vpr.GeCmp(translatedDecr, zero)(), vpr.LtCmp(translatedDecr, State.get(state.localVar, tId))())())())()
-      val assert_variant = vpr.Assert(tf_decr_exp)(info = VerificationError(
-        VerificationErrors.LoopVariant(decrExpr.get),
-        decrExpr.get.offsetLeft,
-        decrExpr.get.offsetRight
-      ).annotationInfo())
+      val assert_variant = vpr.Assert(tf_decr_exp)(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
+        .addTitle("Verification Error")
+        .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
+        .toAnnotationInfo())
       ifBodyStmts = ifBodyStmts :+ assert_variant
     }
 

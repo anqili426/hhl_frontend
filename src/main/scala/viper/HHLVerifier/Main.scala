@@ -2,9 +2,6 @@ package viper.HHLVerifier
 
 import fastparse.Parsed
 import viper.HHLVerifier.generation.Generator
-import viper.HHLVerifier.TypeChecker
-import viper.HHLVerifier.comm.{CodeError, ParserError}
-
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
 
@@ -15,7 +12,7 @@ object Main {
   var runtime = 0.0
   var test = false
   var testWithLogs = false
-  var errMessages = Seq("")
+  var errMessages: Seq[String] = Seq("")
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -23,7 +20,7 @@ object Main {
 
     // [DOC] Read Files
     if (args.length == 0) {
-      Logger.error("Invalid arguments", "Please provide the program to verify.")
+      new Logger("Please provide the program to verify.", Logger.ERR).addTitle("Invalid Arguments").log()
       sys.exit(1)
     }
 
@@ -35,10 +32,10 @@ object Main {
     // [DOC] Handle command line arguments
     val outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
     if (args.contains("--noframe")) Generator.forAllFrame = false
-    if (args.contains("--ext")) Logger.inExtension = true
+    if (args.contains("--ext")) Logger.setExtensionToTrue()
     if (args.contains("--existsframe")) {
       Generator.existsFrame = true
-      Logger.warn("Existsframe", "Turning on existential framing might cause non-termination.")
+      new Logger("Turning on existential framing might cause non-termination.", Logger.WARN).addTitle("ExistsFrame").log()
     }
     if (args.contains("--inline")) Generator.inline = true
     if (args.contains("--auto")) Generator.autoSelectRules = true
@@ -46,7 +43,8 @@ object Main {
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
     else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
 
-    Logger.info(f"The input program is read from $programAbsPath.")
+    Logger.setFilePath(programAbsPath)
+    new Logger(f"The input program is read from $programAbsPath.").log()
 
     try {
       // [DOC] parse program
@@ -54,17 +52,17 @@ object Main {
       val res = fastparse.parse(program, Parser.program(_))
 
       if (res.isSuccess) {
-        Logger.info("Parsing successful.")
+        new Logger("Parsing successful.").log()
 
         val parsedProgram: HHLProgram = res.get.value
 
         // Symbol table
         SymbolChecker.checkSymbolsProg(parsedProgram)
-        Logger.info("Symbol checking successful.")
+        new Logger("Symbol checking successful.").log()
 
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
-        Logger.info("Type checking successful.")
+        new Logger("Type checking successful.").log()
 
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram, program, TypeChecker.declaredTypes)
@@ -74,7 +72,7 @@ object Main {
         // Optionally save the Viper program to some provided file
         if (outputPath != "unspecified") {
           val fw = new FileWriter(outputPath, false)
-          Logger.info(f"The translated program is written to $outputPath.")
+          new Logger(f"The translated program is written to $outputPath.").log()
           try fw.write(viperProgram.toString())
           finally fw.close()
         }
@@ -83,38 +81,36 @@ object Main {
         //We check whether the program is well-defined (i.e., has no consistency errors such as ill-typed expressions)
         if (consistencyErrors.nonEmpty) {
           verified = 1
-          consistencyErrors.foreach(err => Logger.error("Consistency Error", err.readableMessage))
+          consistencyErrors.foreach(err => new Logger(err.readableMessage, Logger.ERR).addTitle("Consistency Error").log())
         } else {
-          Logger.info("Translated program is being verified by Viper.")
+          new Logger("Translated program is being verified by Viper.").log()
           val result = ViperRunner.runSiliconAndCarbon(viperProgram)
           val t1 = System.nanoTime()
           runtime = (t1 - t0) / 1E9
           result match {
             case ResSuccess =>
               verified = 2
-              Logger.info(f"Verification succeeded in ${runtime}s")
+              new Logger(f"Verification succeeded in ${runtime}s").log()
             case ResFailure(err) =>
               verified = 1
-              Logger.error("Verification failed", f"The provided program could not be verified. Runtime: ${runtime}s")
-              err.foreach(e => System.err.println(e.readableMessage))
-              // err.foreach(e => Logger.error("Reason", e.readableMessage))
+              new Logger(f"The provided program could not be verified. Runtime: ${runtime}s", Logger.ERR).addTitle("Verification failed").log()
+              err.foreach(e => println(e)) // AnnotationInfos are already correctly formatted, they just need to be printed
           }
         }
       } else {
         val Parsed.Failure(expc, pos, extra) = res
-        Logger.error(ParserError(extra.trace().msg, pos))
+        println(extra.trace().longMsg)
+        new Logger(extra.trace().msg, Logger.ERR).addTitle("Parser Error").addOffset((pos, pos+10)).log()
       }
     } catch {
       case e: VerifierException =>
         verified = 1
-        errMessages = Seq(e.errMsg)
         println(e.errMsg)
-      case e: CodeError =>
-        Logger.error(e)
+      case e: Logger =>
+        e.log()
       case e: Exception =>
         verified = 1
-        errMessages = Seq(e.getMessage)
-        Logger.error("Unkown Exception", e.getMessage)
+        new Logger(e.getMessage, Logger.ERR).addTitle("Unkown Exception").log()
     }
   }
 }

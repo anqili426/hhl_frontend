@@ -1,6 +1,5 @@
 package viper.HHLVerifier
 
-import requests.TimeoutException
 import viper.carbon.CarbonVerifier
 import viper.silicon.Silicon
 import viper.silver.ast.Program
@@ -8,15 +7,15 @@ import viper.silver.reporter.NoopReporter
 import viper.silver.verifier.{TimeoutOccurred, VerificationResult, Failure => ResFailure, Success => ResSuccess}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
 
 object ViperRunner {
-  def runSilicon(program: Program) = {
+  def runSilicon(program: Program): VerificationResult = {
     val consistencyErrors = program.checkTransitively
     if (consistencyErrors.nonEmpty) {
-      consistencyErrors.foreach(err => Logger.error("Viper Error", err.readableMessage))
+      consistencyErrors.foreach(err => new Logger(err.readableMessage, Logger.ERR).addTitle("Consistency Error").log())
       sys.exit(1)
     } else {
       val silicon = Silicon.fromPartialCommandLineArguments(Seq.empty, NoopReporter)
@@ -27,10 +26,10 @@ object ViperRunner {
     }
   }
 
-  def runCarbon(program: Program) = {
+  def runCarbon(program: Program): VerificationResult = {
     val consistencyErrors = program.checkTransitively
     if (consistencyErrors.nonEmpty) {
-      consistencyErrors.foreach(err => Logger.error("Viper Error", err.readableMessage))
+      consistencyErrors.foreach(err => new Logger(err.readableMessage, Logger.ERR).addTitle("Consistency Error").log())
       sys.exit(1)
     } else {
       val carbon = CarbonVerifier(NoopReporter)
@@ -46,7 +45,7 @@ object ViperRunner {
 
     val consistencyErrors = program.checkTransitively
     if (consistencyErrors.nonEmpty) {
-      consistencyErrors.foreach(err => Logger.error("Viper Error", err.readableMessage))
+      consistencyErrors.foreach(err => new Logger(err.readableMessage, Logger.ERR).addTitle("Consistency Error").log())
       sys.exit(1)
     } else{
       val carbon = CarbonVerifier(NoopReporter)
@@ -54,8 +53,8 @@ object ViperRunner {
 
       try {
         val carbonRes = Future[VerificationResult] {
-          if (checkSideCondition) Logger.info("Carbon has been started to check a side condition. ")
-          else Logger.info("Carbon has been started to verify the program. ")
+          if (checkSideCondition) new Logger("Carbon has been started to check a side condition.").log()
+          else new Logger("Carbon has been started to verify the program.").log()
           carbon.start()
           val res = carbon.verify(program)
           carbon.stop()
@@ -63,8 +62,8 @@ object ViperRunner {
         }
 
         val siliconRes = Future[VerificationResult] {
-          if (checkSideCondition) Logger.info("Silicon has been started to check a side condition. ")
-          else Logger.info("Silicon has been started to verify the program. ")
+          if (checkSideCondition) new Logger("Silicon has been started to check a side condition.").log()
+          else new Logger("Silicon has been started to verify the program.").log()
           silicon.start()
           val res = silicon.verify(program)
           silicon.stop()
@@ -79,8 +78,8 @@ object ViperRunner {
               case ResSuccess =>
                 // If carbon verifies successfully, can terminate with success
                 if (!resPromise.isCompleted) {
-                  if (checkSideCondition) Logger.info("Carbon succeeded in verifying the side condition")
-                  else Logger.info("Carbon succeeded in verifying the program")
+                  if (checkSideCondition) new Logger("Carbon succeeded in verifying the side condition.").log()
+                  else new Logger("Carbon succeeded in verifying the program.").log()
                   resPromise.trySuccess(result)
                 }
               case ResFailure(err) =>
@@ -92,8 +91,8 @@ object ViperRunner {
                 //        then we complete resPromise with a verification failure
                 if (!resPromise.isCompleted) {
                   if (!checkSideCondition) {
-                    Logger.info("Carbon failed to verify the program: ")
-                    err.foreach(e => System.err.println(e.readableMessage))
+                    new Logger("Carbon failed to verify the program.").log()
+                    err.foreach(e => println(e.readableMessage))
                   }
                   if (!siliconRes.isCompleted) {
                     try {
@@ -118,15 +117,15 @@ object ViperRunner {
             result match {
               case ResSuccess =>
                 if (!resPromise.isCompleted) {
-                  if (checkSideCondition) Logger.info("Silicon succeeded in verifying the side condition")
-                  else Logger.info("Silicon succeeded in verifying the program")
+                  if (checkSideCondition) new Logger("Silicon succeeded in verifying the side condition.").log()
+                  else new Logger("Silicon succeeded in verifying the program").log()
                   resPromise.trySuccess(result)
                 }
               case ResFailure(err) =>
                 if (!resPromise.isCompleted) {
                   if (!checkSideCondition) {
-                    Logger.info("Silicon failed to verify the program: ")
-                    err.foreach(e => System.err.println(e.readableMessage))
+                    new Logger("Silicon failed to verify the program.").log()
+                    err.foreach(e => println(e.readableMessage))
                   }
                   if (!carbonRes.isCompleted) {
                     try {

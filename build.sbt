@@ -7,7 +7,8 @@ ThisBuild / scalaVersion := "2.13.10"
 
 val fastParse = "com.lihaoyi" %% "fastparse" % "2.2.2"
 val csvWriter = "au.com.bytecode" % "opencsv" % "2.4"
-val playJson = "com.typesafe.play" %% "play-json" % "2.10.6"
+val play = "com.typesafe.play" %% "play-json" % "2.10.0"
+
 lazy val silicon = (project in file("silicon"))
   .settings(assembly / mainClass := None)
 lazy val carbon = (project in file("carbon"))
@@ -24,7 +25,7 @@ lazy val impcon_frontend = (project in file("."))
 
     libraryDependencies += fastParse,
     libraryDependencies += csvWriter,
-    libraryDependencies += playJson,
+    libraryDependencies += play,
 
     Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-reports", "-oD"),
 
@@ -36,6 +37,7 @@ lazy val impcon_frontend = (project in file("."))
       case PathList("META-INF", _*) => MergeStrategy.discard
       case _                        => MergeStrategy.first
     },
+    // Compile / resourceDirectory := baseDirectory.value / "src" / "main" / "resources",
     fork := true //if forking is not set to true, there are classloader issues in Silver
   )
   .enablePlugins(BuildInfoPlugin)

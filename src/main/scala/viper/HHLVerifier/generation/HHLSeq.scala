@@ -17,8 +17,8 @@ object HHLSeq {
 
   private val typeVar = vpr.TypeVar(typeVarName)
 
-  val filePath = "/Users/paulwinkler/Desktop/hhl_frontend/src/main/scala/viper/HHLVerifier/vprSupportFiles/HHLSeq.vpr"
-  private val supportProgram = SupportFileParser.parseFile(filePath)
+  val axiomName = "HHLSeq"
+  def getDomains(): Seq[vpr.Domain] = AxiomParser.parseAxioms(axiomName).domains
 
   private def typeVarMap(typ: vpr.Type): Map[vpr.TypeVar, vpr.Type] = Map(typeVar -> typ)
 
@@ -51,6 +51,4 @@ object HHLSeq {
     typ = retType,
     domainName = seqDomainName
   )
-
-  def getDomains(): Seq[vpr.Domain] = supportProgram.domains
 }

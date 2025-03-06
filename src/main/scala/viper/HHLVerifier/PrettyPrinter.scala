@@ -80,7 +80,7 @@ object PrettyPrinter {
       case MapAssignExpr(elements) => "Map(" + elements.foldLeft("")((a, b) => f"$a${formatExpr(b.k)} := ${formatExpr(b.v)}, ") + ")"
       case LookupExpr(id, ind) => f"${formatExpr(id)}[${formatExpr(ind)}]"
       case LengthExpr(id) => f"|${formatExpr(id)}|"
-      case CombExpr(lhs, rhs, op) => f"${formatExpr(lhs)} ${op} ${formatExpr(rhs)}"
+      case CombExpr(lhs, rhs, op) => f"${formatExpr(lhs)} $op ${formatExpr(rhs)}"
       case UpdateMapExpr(base, update) => f"${formatExpr(base)}[${formatExpr(update)}]"
       case MapTupleExpr(k, v) => f"$k := $v"
     }
@@ -89,11 +89,11 @@ object PrettyPrinter {
   // prints type by simple case distinction
   def formatType(typ: Type): String = {
     typ match {
-      case t: UnknownType => "unknown"
-      case t: IntType => "int"
-      case t: BoolType => "bool"
-      case t: StateType => "state"
-      case t: StmtBlockType => "StmtBlock"
+      case _: UnknownType => "unknown"
+      case _: IntType => "int"
+      case _: BoolType => "bool"
+      case _: StateType => "state"
+      case _: StmtBlockType => "StmtBlock"
       case t: SetType => f"set_${formatType(t.sType)}_"
       case t: SeqType => f"seq_${formatType(t.sType)}_"
       case t: MapType => f"map_${formatType(t.kType)}1${formatType(t.vType)}_"
