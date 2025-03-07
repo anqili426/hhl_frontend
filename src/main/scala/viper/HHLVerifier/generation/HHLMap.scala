@@ -13,7 +13,7 @@ object HHLMap {
     val lookUp = "HHLMap_apply"
     val create = "HHLMap_empty"
     val update = "HHLMap_update"
-    val disjoint = "HHLMap_disjoint"
+    val domain = "HHLMap_domain"
   }
 
   private val kTypeVar = vpr.TypeVar(kTypeVarName)
@@ -41,7 +41,7 @@ object HHLMap {
   // returns the cardinality of the Map
   def cardinality(map: vpr.Exp, kType: vpr.Type, vType: vpr.Type): vpr.DomainFuncApp = apply(FunctionIDs.cardinality, Seq(map), typeVarMap(kType, vType), vpr.Int)
 
-  def disjoint(map1: vpr.Exp, map2: vpr.Exp, kType: vpr.Type, vType: vpr.Type): vpr.DomainFuncApp = apply(FunctionIDs.disjoint, Seq(map1, map2), typeVarMap(kType, vType), vpr.Bool)
+  def domain(map: vpr.Exp, kType: vpr.Type, vType: vpr.Type): vpr.DomainFuncApp = apply(FunctionIDs.domain, Seq(map), typeVarMap(kType, vType), vpr.Bool)
 
   private def apply(name: String, args: Seq[vpr.Exp], typVarMap: Map[vpr.TypeVar, vpr.Type], retType: vpr.Type): vpr.DomainFuncApp = vpr.DomainFuncApp(
     name,

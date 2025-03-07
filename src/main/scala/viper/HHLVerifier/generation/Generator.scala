@@ -4,10 +4,6 @@ import viper.HHLVerifier._
 import viper.silver.ast.{Info, NoInfo}
 import viper.silver.{ast => vpr}
 
-// TODO: Check if the filter works correctly when verifying loops => generateViperMethod might filter for Ints as well
-// TODO: All auxilary variables must be checked
-// TODO: Search for vpr.Method and do this
-
 object Generator {
   // source code
   var program_source = ""
@@ -283,52 +279,15 @@ object Generator {
     val forAllTriggers = Seq(vpr.Trigger(Seq(SetState.getInSetApp(Seq(state, STmp))))())
     val existsTriggers = Seq(vpr.Trigger(Seq(SetState.getInSetApp(Seq(state, currStates), useForAll=false, useLimited=true)))())
 
-    // Handle accesses for lookup expressions
+    // Create safety checks for lookup expressions
     stmt.lookUpAccesses.foreach { luExp =>
-      // // println("Translating check for lookup expression.")
-      val assertVar = AssertVar("s")
-      assertVar.typ = StateType()
-      val assertVarDecl = AssertVarDecl(assertVar, StateType())
-
-      if (luExp.id.typ.isInstanceOf[MapType]) {
-        // // println("Added check for map")
-        newStmts = newStmts ++ translateStmt(
-          AssertStmt(
-            CombExpr(
-              luExp.index,
-              luExp.id,
-              "in"
-            )
-          ),
-          currStates, currFailureStates, isAutoSelected
-        )._1
-
-      } else if (luExp.id.typ.isInstanceOf[SeqType]) {
-        newStmts = newStmts ++ translateStmt(
-          AssertStmt(
-            BinaryExpr(
-              BinaryExpr(
-                Num(0),
-                "<=",
-                luExp.index
-              ),
-              "&&",
-              BinaryExpr(
-                luExp.index,
-                "<",
-                LengthExpr(luExp.id)
-              )
-            )
-          ),
-          currStates, currFailureStates, isAutoSelected
-        )._1
-      } else {
+      if (luExp.id.typ.isInstanceOf[MapType])
+        newStmts = newStmts ++ translateStmt(generateMapAccessCheck(luExp), currStates, currFailureStates, isAutoSelected)._1
+      else if (luExp.id.typ.isInstanceOf[SeqType])
+        newStmts = newStmts ++ translateStmt(generateSeqAccessCheck(luExp), currStates, currFailureStates, isAutoSelected)._1
+      else
         throw UnknownException("Unkown type for lookup discovered")
-      }
     }
-
-    // println(f"Now there are ${newStmts.length} checks:")
-    // if (newStmts.length > 0) println(newStmts(0))
 
     stmt match {
       case CompositeStmt(stmts) =>
@@ -952,6 +911,32 @@ object Generator {
       case _ => e
     }
   }
+
+  // Manual access check before looking up objects in Maps
+  def generateMapAccessCheck(luExp: LookupExpr): Stmt = AssertStmt(
+    CombExpr(
+      luExp.index,
+      luExp.id,
+      "in"
+    )
+  )
+
+  // Manual access check before looking up objects in Sequences
+  def generateSeqAccessCheck(luExp: LookupExpr): Stmt = AssertStmt(
+    BinaryExpr(
+      BinaryExpr(
+        Num(0),
+        "<=",
+        luExp.index
+      ),
+      "&&",
+      BinaryExpr(
+        luExp.index,
+        "<",
+        LengthExpr(luExp.id)
+      )
+    )
+  )
 
   def getExprInState(e: Expr, state: SpecialId): Expr = {
     e match {
@@ -1697,9 +1682,8 @@ object Generator {
               val kType = translateType(rhs.typ.asInstanceOf[MapType].kType)
               val vType = translateType(rhs.typ.asInstanceOf[MapType].vType)
 
-              val map2 = HHLMap.create(Seq((translatedLhs, vpr.IntLit(0)())), kType, vType)
-              HHLMap.disjoint(translatedRhs, map2, kType, vType)
-              // vpr.MapContains(translatedLhs, translatedRhs)()
+              val mapDomain = HHLMap.domain(translatedRhs, kType, vType)
+              vpr.AnySetContains(translatedLhs, mapDomain)()
             }
           case "++" =>
             HHLSeq.append(translatedLhs, translatedRhs, translateType(lhs.typ.asInstanceOf[SeqType].sType))
