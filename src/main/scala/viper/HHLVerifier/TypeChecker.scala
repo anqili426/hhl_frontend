@@ -17,6 +17,14 @@ object TypeChecker {
   var isPre: Boolean = false
 
   var declaredTypes: Set[Type] = Set.empty
+  var hasSeqs: Boolean = false
+  var hasMaps: Boolean = true
+
+  def addToDeclaredTypes(typ: Type): Unit = {
+    declaredTypes += typ
+    if (typ.isInstanceOf[SeqType] && !hasSeqs) hasSeqs = true
+    else if (typ.isInstanceOf[MapType] && !hasMaps) hasMaps = true
+  }
 
   def reset(): Unit = {
     currMethod = null
@@ -39,8 +47,8 @@ object TypeChecker {
     typeCheckStmt(m.body, false)
 
     // add types
-    m.params.foreach(id => declaredTypes += id.typ)
-    m.res.foreach(id => declaredTypes += id.typ)
+    m.params.foreach(id => addToDeclaredTypes(id.typ))
+    m.res.foreach(id => addToDeclaredTypes(id.typ))
   }
 
   def typeCheckStmt(s: Stmt, isInLoop: Boolean): Boolean = {
@@ -120,7 +128,7 @@ object TypeChecker {
         isTotal = isTotal && bodyIsTotal
       case PVarDecl(vName, vType) =>
         vName.typ = vType
-        declaredTypes += vType
+        addToDeclaredTypes(vType)
         res = true
       case ProofVarDecl(_, p) =>
         // hyperAssertionExpected set to true so that program variables can't occur in p

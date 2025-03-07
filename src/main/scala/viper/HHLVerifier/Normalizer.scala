@@ -7,7 +7,7 @@ object Normalizer {
   // It is either a method precondition or a loop invariant
   // When negate = true, the returned expression is (not (normalized(e)))
   def normalize(e: Expr, negate: Boolean): Expr = {
-    e match {
+    val ret = e match {
       case BoolLit(value) => if (negate) BoolLit(!value) else e
       case StateExistsExpr(_, _) => if (negate) UnaryExpr("!", e) else e
       case Hint(_, _) => if (negate) UnaryExpr("!", e) else e
@@ -57,10 +57,12 @@ object Normalizer {
           else quantifier
         }
         Assertion(newQuantifier, assertVarDecls, normalizedBody)
-      // TODO: Adapt this case
       case e@LookupExpr(_, _) => if (negate) UnaryExpr("!", e) else e
       case _ => throw UnknownException("Normalizer: expression " + e + " is not expected. Typ is " + e.getClass())
     }
+    // update positioning of expressions
+    ret.setOffsets(e.offsetLeft, e.offsetRight)
+    ret
   }
 
   // This method determines:

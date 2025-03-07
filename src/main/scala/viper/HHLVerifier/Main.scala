@@ -25,8 +25,11 @@ object Main {
     }
 
     val programAbsPath = args(0)
+    Logger.setFilePath(programAbsPath)
+    new Logger(f"The input program is read from $programAbsPath.").log()
     val programSource = scala.io.Source.fromFile(programAbsPath)
     val program = programSource.mkString
+    Logger.setSourceCode(program)
     programSource.close()
 
     // [DOC] Handle command line arguments
@@ -42,9 +45,6 @@ object Main {
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
     else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
-
-    Logger.setFilePath(programAbsPath)
-    new Logger(f"The input program is read from $programAbsPath.").log()
 
     try {
       // [DOC] parse program

@@ -48,8 +48,10 @@ class Logger(val message: String, val level: String = Logger.INFO) extends Throw
 object Logger {
   private var isVSCodeExtension = false
   private var filePath = ""
+  private var sourceCode = ""
   def setExtensionToTrue(): Unit = { isVSCodeExtension = true }
   def setFilePath(path: String): Unit = { filePath = path }
+  def setSourceCode(source: String): Unit = { sourceCode = source }
 
   val INFO = "INF"
   val WARN = "WRN"
@@ -63,10 +65,28 @@ object Logger {
     val level = Logger.translateLevel(entry.level)
 
     var out = f"[$time] [$level]"
-    if (entry.extra.contains("offsetLeft")) out += f" in $filePath:${entry.extra.get("offsetLeft").get}-${entry.extra.get("offsetRight").get}"
+    if (entry.extra.contains("offsetLeft")) {
+      val (line, offset) = getLineAndOffset(entry.extra.get("offsetLeft").get.toString().toInt)
+      out += f" in $filePath:$line:$offset"
+    }
     if (entry.extra.contains("title")) out += " " + entry.extra.get("title").get + ":"
     out += " " + entry.message
     out
+  }
+
+  def getLineAndOffset(offset: Int): (Int, Int) = {
+    val lines = sourceCode.split("\n", -1) // Keep empty lines
+    var currentOffset = 0
+
+    for ((line, index) <- lines.zipWithIndex) {
+      val lineLength = line.length + 1 // +1 for the newline character
+      if (offset < currentOffset + lineLength) {
+        return (index + 1, offset - currentOffset) // Line numbers start from 1
+      }
+      currentOffset += lineLength
+    }
+
+    (lines.length, 0)
   }
 
   def translateLevel(level: String): String = level match {
@@ -80,9 +100,9 @@ object Logger {
 object VerificationErrors {
   def Postcondition(expr: Expr) = f"The post condition ${expr.toString()} might not hold"
   def HyperAssertion(expr: Expr) = f"The hyper assertion ${expr.toString()} might not hold"
-  def Deprecated(expr: Expr) = f"The expression ${expr.toString()} caused an error, but this should be deprecated"
+  // def Deprecated(expr: Expr) = f"The expression ${expr.toString()} caused an error, but this should be deprecated"
   def MethodCall(expr: Expr) = f"The precondtion ${expr.toString()} might not hold"
-  def LoopEntryPoint(expr: Expr, quantifiers: Int) = f"${ if (quantifiers > 0) f"($quantifiers stripped)" else "" }The loop invariant ${expr.toString()} might not hold at entry point"
+  def LoopEntryPoint(expr: Expr) = f"The loop invariant ${expr.toString()} might not hold at entry point"
   def LoopSyncGuard(expr: Expr) = f"The loop guard ${expr.toString()} might not be identical for all states"
   def LoopVariant(expr: Expr) = f"The variant ${expr.toString()} might not strictly decrease"
   def LoopInvariant(expr: Expr, quantifiers: Int) = f"${ if (quantifiers > 0) f"($quantifiers stripped)" else "" }The invariant ${expr.toString()} might not hold"

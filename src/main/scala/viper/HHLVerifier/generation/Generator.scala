@@ -5,9 +5,6 @@ import viper.silver.ast.{Info, NoInfo}
 import viper.silver.{ast => vpr}
 
 object Generator {
-  // source code
-  var program_source = ""
-
   // Frequently used constants
   // State domain
   val stateDomainName = "State"
@@ -113,8 +110,6 @@ object Generator {
   // - creates preamble containing all necessary base functions
   // - translates actual program
   def generate(input: HHLProgram, source: String): vpr.Program = {
-    program_source = source
-
     val fields: Seq[vpr.Field] = Seq.empty
     val predicates: Seq[vpr.Predicate] = Seq.empty
     val extensions: Seq[vpr.ExtensionMember] = Seq.empty
@@ -624,7 +619,6 @@ object Generator {
 
         val normalizedInvariants = if (isAutoSelected) invariants else invariants.map(i => Normalizer.normalize(i, negate = false))
         if (!isAutoSelected) normalizedInvariants.foreach(i => Normalizer.detQuantifier(i, underForAll = false))
-        // println("NormalizedInvs: " + normalizedInvariants)
 
         if (autoSelectRules && rule == "unspecified") {
           // finding correct loop rule
@@ -633,15 +627,15 @@ object Generator {
           if (!inline) {
             // Check whether sync(Tot) rule can be applied with a separate Viper program
             val canUseSyncRule = checkSyncCondModular(normalizedInvariants, body, cond)
-            new Logger("Can use sync rule? " + canUseSyncRule)
+            new Logger("Can use sync rule? " + canUseSyncRule).log()
             if (canUseSyncRule) {
               val useSyncRule = if (loop.isTotal) {
-                new Logger("Applying syncTotRule")
+                new Logger("Applying syncTotRule").log()
                 val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncTotRule")
                 dupLoop.isTotal = true
                 translateStmt(dupLoop, currStates, currFailureStates, true)
               } else {
-                new Logger("Applying syncRule")
+                new Logger("Applying syncRule").log()
                 val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "syncRule")
                 dupLoop.isTotal = false
                 translateStmt(dupLoop, currStates, currFailureStates, true)
@@ -653,13 +647,13 @@ object Generator {
               val invHasTopExists = normalizedInvWithHints.map(i => checkHasTopExists(i._2)).contains(true)
               val useNotSyncRule = if (invHasTopExists) {
                 // exists rule
-                new Logger("Applying existsRule")
+                new Logger("Applying existsRule").log()
                 val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "existsRule")
                 dupLoop.isTotal = loop.isTotal
                 translateStmt(dupLoop, currStates, currFailureStates, true)
               } else {
                 // forall-exists rule
-                new Logger("Applying forAllExistsRule")
+                new Logger("Applying forAllExistsRule").log()
                 val dupLoop = WhileLoopStmt(loop.cond, loop.body, normalizedInvWithHints, decr, "forAllExistsRule")
                 dupLoop.isTotal = loop.isTotal
                 translateStmt(dupLoop, currStates, currFailureStates, true)
@@ -753,7 +747,7 @@ object Generator {
           // Assert I(0)
           if (normalizedInvariants.nonEmpty) {
             for ((normalizedInv, i) <- normalizedInvariants.zipWithIndex) {
-              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = new Logger(VerificationErrors.MethodCall(invariants(i)), Logger.ERR)
+              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = new Logger(VerificationErrors.LoopEntryPoint(invariants(i)), Logger.ERR)
                 .addTitle("Verification Error")
                 .addOffset((invariants(i).offsetLeft, invariants(i).offsetRight))
                 .toAnnotationInfo())
