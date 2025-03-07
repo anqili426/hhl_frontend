@@ -957,6 +957,7 @@ object Generator {
     val vVar = vpr.LocalVarDecl(progVarName, vpr.Int)()
     val vVarId = Id(progVarName)
     vVarId.typ = IntType()
+
     val rightExpr = if (modifiedVars.isEmpty) {
       vpr.Exists(Seq(s_prime), Seq.empty,
         vpr.And(SetState.getInSetApp(Seq(s_prime.localVar, S2), useForAll),
@@ -967,6 +968,7 @@ object Generator {
         )()
       )()
     } else {
+
       // modifiedVarsVpr is guaranteed to be non-empty
       val modifiedVarsVpr = modifiedVars.map(v => vpr.LocalVar(v._1, v._2 match {
         case _: StateType => translateType(v._2)
@@ -974,18 +976,29 @@ object Generator {
         case _: UnknownType => translateType(v._2)
         case _ => vpr.Int
       })()) // TODO: Fix this like before
+
       vpr.Exists(Seq(s_prime), Seq.empty,
         vpr.And(SetState.getInSetApp(Seq(s_prime.localVar, S2), useForAll),
           vpr.Forall(Seq(vVar), Seq.empty,
             vpr.Implies(
-              getAndOfExps(modifiedVarsVpr.map(t => vpr.NeCmp(vVar.localVar, t)()).toList),
-              vpr.EqCmp(State.get(s_prime.localVar, vVarId),
-                State.get(state, vVarId))()
+              getAndOfExps(
+                modifiedVarsVpr.map(t => vpr.NeCmp(vVar.localVar, t)()).toList
+              ),
+              getAndOfExps(
+                declaredTypes.map(typ => {
+                  vVarId.typ = typ
+                  vpr.EqCmp(
+                    State.get(s_prime.localVar, vVarId),
+                    State.get(state, vVarId)
+                  )()
+                }).toList
+              )
             )()
           )()
         )()
       )()
     }
+
     val trigger = vpr.Trigger(Seq(SetState.getInSetApp(Seq(state, S1), useForAll = useForAll, useLimited = (!useForAll))))()
     translateAssumeWithViperExpr(state, S1, rightExpr, triggers = Seq(trigger), useForAll = useForAll)
   }
