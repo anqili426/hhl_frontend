@@ -20,7 +20,7 @@ object HHLMap {
   private val vTypeVar = vpr.TypeVar(vTypeVarName)
 
   val axiomName = "HHLMap"
-  def getDomains(): Seq[vpr.Domain] = AxiomParser.parseAxioms(axiomName).domains
+  lazy val domains: Seq[vpr.Domain] = AxiomParser.parseAxioms(axiomName).domains
 
   private def typeVarMap(kType: vpr.Type, vType: vpr.Type): Map[vpr.TypeVar, vpr.Type] = Map(kTypeVar -> kType, vTypeVar -> vType)
 

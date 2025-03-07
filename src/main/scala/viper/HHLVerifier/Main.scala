@@ -65,7 +65,7 @@ object Main {
         new Logger("Type checking successful.").log()
 
         // Generate the Viper program
-        val viperProgram = Generator.generate(parsedProgram, program, TypeChecker.declaredTypes)
+        val viperProgram = Generator.generate(parsedProgram, program)
         SymbolChecker.reset()
         TypeChecker.reset()
         Generator.reset()

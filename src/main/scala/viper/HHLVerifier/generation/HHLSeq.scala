@@ -18,7 +18,7 @@ object HHLSeq {
   private val typeVar = vpr.TypeVar(typeVarName)
 
   val axiomName = "HHLSeq"
-  def getDomains(): Seq[vpr.Domain] = AxiomParser.parseAxioms(axiomName).domains
+  lazy val domains: Seq[vpr.Domain] = AxiomParser.parseAxioms(axiomName).domains
 
   private def typeVarMap(typ: vpr.Type): Map[vpr.TypeVar, vpr.Type] = Map(typeVar -> typ)
 

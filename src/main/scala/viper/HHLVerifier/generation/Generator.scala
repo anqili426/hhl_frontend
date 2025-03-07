@@ -107,17 +107,13 @@ object Generator {
   // error messages
   var countQuantifiersRemoved = 0
 
-  // additional types 1
-  var declaredTypes: Set[Type] = Set.empty
-
   // Main generate method
   // - saves program source and used types
   // - creates all aspects necessary for generating a vpr program
   // - creates preamble containing all necessary base functions
   // - translates actual program
-  def generate(input: HHLProgram, source: String, types: Set[Type]): vpr.Program = {
+  def generate(input: HHLProgram, source: String): vpr.Program = {
     program_source = source
-    declaredTypes = types
 
     val fields: Seq[vpr.Field] = Seq.empty
     val predicates: Seq[vpr.Predicate] = Seq.empty
@@ -985,7 +981,7 @@ object Generator {
                 modifiedVarsVpr.map(t => vpr.NeCmp(vVar.localVar, t)()).toList
               ),
               getAndOfExps(
-                declaredTypes.map(typ => {
+                TypeChecker.declaredTypes.map(typ => {
                   vVarId.typ = typ
                   vpr.EqCmp(
                     State.get(s_prime.localVar, vVarId),
@@ -1780,17 +1776,22 @@ object Generator {
 
   def generatePreamble(): (Seq[vpr.Domain], Seq[vpr.Method]) = {
     // Create domains
-    val stateDomain = State.domain(declaredTypes)
-    val setStateDomain = SetState.domain()
+    var domains = Seq(
+      State.domain(TypeChecker.declaredTypes),
+      SetState.domain()
+    )
+    if (TypeChecker.hasSeqs) domains = domains ++ HHLSeq.domains
+    if (TypeChecker.hasMaps) domains = domains ++ HHLMap.domains
 
     // Create additional methods
     val SS = SetState.localVarDecl("SS")
     val k = vpr.LocalVarDecl(kVarName, vpr.Int)()
+    val methods = Seq(
+      vpr.Method(havocSetMethodName, Seq.empty, Seq(SS), Seq.empty, Seq.empty, Option.empty)(),
+      vpr.Method(havocIntMethodName, Seq.empty, Seq(k), Seq.empty, Seq.empty, Option.empty)()
+    )
 
-    val havocSetMethod = vpr.Method(havocSetMethodName, Seq.empty, Seq(SS), Seq.empty, Seq.empty, Option.empty)()
-    val havocIntMethod = vpr.Method(havocIntMethodName, Seq.empty, Seq(k), Seq.empty, Seq.empty, Option.empty)()
-
-    (Seq(stateDomain, setStateDomain) ++ HHLSeq.getDomains() ++ HHLMap.getDomains(), Seq(havocSetMethod, havocIntMethod))
+    (domains, methods)
   }
 
   // Connects all expressions in the input with "&&"
