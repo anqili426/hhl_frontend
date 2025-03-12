@@ -1,7 +1,11 @@
 package viper.HHLVerifier.parser
 
 import viper.HHLVerifier.generation.Generator
-import viper.HHLVerifier.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BinaryExpr, BoolLit, BoolType, CombExpr, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, Hint, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, ImpliesExpr, IntType, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, MapTupleExpr, MapType, Method, MethodCallExpr, MethodCallStmt, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SeqType, SetAssignExpr, SetType, StateExistsExpr, StateType, Stmt, Type, UnaryExpr, UnknownException, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
+import viper.HHLVerifier.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BinaryExpr, BoolLit, BoolType, CombExpr, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, Hint, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, ImpliesExpr, IntType, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, MapTupleExpr, MapType, Method, MethodCallExpr, MethodCallStmt, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SeqType, SetAssignExpr, SetType, StateExistsExpr, StateType, Stmt, Type, TypeInstance, UnaryExpr, UnknownException, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
+
+// This file contains all the actual mappings from parsing rules to object. As those are not very important and
+// mostly tedious work, they were shifted into this file.
+// To understand this, look at the parsing rule, and then at the mapping rule.
 
 object Mappings {
   def mapProgram(methods: Seq[Method]): HHLProgram = methods match {
@@ -23,6 +27,12 @@ object Mappings {
   }
 
   def mapIdentifier(oL: Int, id: Expr, oR: Int): Expr = id.setOffsets(oL, oR)
+
+  def mapBlockId(name: String): Id = {
+      val blockId = Id(name)
+      blockId.typ = TypeInstance.stmtBlockType
+      blockId
+  }
 
   def mapNormalProofVarDecl(items: (ProofVar, Type, Expr)): ProofVarDecl = {
     items._1.typ = items._2

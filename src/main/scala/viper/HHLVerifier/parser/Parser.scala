@@ -1,33 +1,34 @@
-package viper.HHLVerifier
+package viper.HHLVerifier.parser
 
+import fastparse.JavaWhitespace._
 import fastparse._
-import JavaWhitespace._
 import viper.HHLVerifier.parser.Mappings._
+import viper.HHLVerifier._
 
 object Parser {
-  // Program Structure ---------------------------------------------------------
+  // Program Structure
   def program[$: P]: P[HHLProgram] = P(Start ~ method.rep ~ End).map(mapProgram)
 
   // Methods and methods utils
   def method[$: P]: P[Method] = P(Index ~ "method" ~~ spaces ~~ methodName ~ Index ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")"  ~ ("returns" ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")").? ~ precondition.rep ~ postcondition.rep  ~"{" ~ stmts ~ "}").map(mapMethod)
   def precondition[$: P]: P[Expr] = P("requires" ~~ spaces ~ expr)
   def postcondition[$: P]: P[Expr] = P("ensures" ~~ spaces ~ expr)
-  def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ notStateTypeName).map(mapMethodVarDecl)
   def methodName[$: P]: P[String] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
+  def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ notStateTypeName).map(mapMethodVarDecl)
 
-  // Handling variables ---------------------------------------------------------
-  // Identifiers
+  // Variables and Declarations
   def identifier[$: P]: P[Expr] = P(Index ~ (progVar | assertVar | proofVar) ~ Index).map { case (oL, id, oR) => mapIdentifier(oL, id, oR) }
-  def progVar[$: P]: P[Id] = generalId.map(name => Id(name))
-  def assertVar[$: P]: P[AssertVar] = P("_" ~~ CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => AssertVar(name))
-  def proofVar[$: P]: P[ProofVar] = P("$" ~~ CharIn("a-mo-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(ProofVar)
-
-  // Declaration
+  
   // programming variables
+  def progVar[$: P]: P[Id] = generalId.map(name => Id(name))
   def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ notStateTypeName).map(mapVarDecl)
+
   // assert variables (start with _..., occur in assertions)
+  def assertVar[$: P]: P[AssertVar] = P("_" ~~ CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(name => AssertVar(name))
   def normalAssertVarDecl[$: P] : P[AssertVarDecl] = P(assertVar ~ ":" ~ notStateTypeName).map(mapNormalAssertVarDecl)
+
   // proof variables (declared with let ..., start with $, used in statements)
+  def proofVar[$: P]: P[ProofVar] = P("$" ~~ CharIn("a-mo-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(ProofVar)
   def proofVarDecl[$: P]: P[ProofVarDecl] = P(stateProofVarDeclErr | stateProofVarDecl | normalProofVarDecl)
   def normalProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ proofVar ~ ":" ~ notStateTypeName ~ "::" ~ expr).map(mapNormalProofVarDecl)
   def stateProofVarDecl[$: P]: P[ProofVarDecl] = P("let" ~~ spaces ~ "<" ~ proofVar ~ ">" ~ ("::" ~ expr).?).map(mapStateProofVarDecl)
@@ -35,15 +36,19 @@ object Parser {
 
   // Statements ---------------------------------------------------------
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
-  def stmt[$: P] : P[Stmt] = P(Index ~ (varDecl | assume | assert | ifElse | whileLoop | havoc | assign | multiAssign | frame | hyperAssume | hyperAssert | proofVarDecl | useHintStmt | methodCallStmt) ~ Index).map { case (oL, stmt, oR) => mapStmt(oL, stmt, oR) }
+  def stmt[$: P] : P[Stmt] = P(Index ~ (
+    varDecl | proofVarDecl |
+    assign | multiAssign | methodCallStmt |
+    ifElse | whileLoop |
+    assume | assert | havoc | frame | hyperAssume | hyperAssert | useHintStmt
+  ) ~ Index).map { case (oL, stmt, oR) => mapStmt(oL, stmt, oR) }
 
-  // Basic Statements
   def methodCall[$: P]: P[(String, Seq[Id])] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")")
   def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map(mapMultiAssign)
   def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ implicationExpr).map(mapAssign)
   def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar ~ hintDecl.?).map { case (v, hintDecl) => mapHavoc(v, hintDecl) }
-  def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ implicationExpr).map(mapAssume)
-  def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ implicationExpr).map(mapAssert)
+  def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ normalAssertion).map(mapAssume)
+  def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ normalAssertion).map(mapAssert)
   def hyperAssume[$: P]: P[HyperAssumeStmt] = P("hyperAssume" ~~ spaces ~ expr).map(mapHyperAssume)
   def hyperAssert[$: P]: P[HyperAssertStmt] = P("hyperAssert" ~~ spaces ~ expr).map(mapHyperAssert)
   def declareStmt[$: P]: P[DeclareStmt] = P("declare" ~~ spaces ~ blockId ~ "{" ~ stmts ~ "}").map(mapDeclareStmt)
@@ -60,17 +65,11 @@ object Parser {
 
   // Utils for statements
   def loopInv[$: P]: P[(Option[HintDecl], Expr)] = P(hintDecl.? ~ "invariant" ~~ spaces ~ expr)
-  def blockId[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map {
-    name =>
-      val blockId = Id(name)
-      blockId.typ = TypeInstance.stmtBlockType
-      blockId
-  }
+  def blockId[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(mapBlockId)
   def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "}").map(HintDecl)
 
-  // Expressions ---------------------------------------------------------
-  // Operations in expressions
-  // ranking provides precedence
+  // Expressions
+  // operations in expressions
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
   def impliesOp[$: P]: P[String] = P("==>").!
@@ -80,34 +79,48 @@ object Parser {
   def cmpOp[$: P]: P[String] = P(">=" | "<=" | ">" | "<").!
   def quantifier[$: P]: P[String] = P("forall" | "exists").!
 
-  // Assertions
+  // Note regarding assertions:
   // Syntax 1: assertVar is NOT of type State -- forall n: Int :: P(n)
   // Syntax 2: assertVar is of type State -- forall <s1>: State :: P(s1)
   // Syntax 2 is translated to (forall s1: State :: <s1> ==> P)
   // This also means that <s> can only appear at this position (might affect proof var decl?)
+ 
+  def expr[$: P]: P[Expr] = P(Index ~ (assertion | implicationExpr) ~ Index).map { case (oL, exp, oR) => mapExpr(oL, exp, oR) }
+
+  // expressions
   def assertion[$: P]: P[Expr] = P(hyperAssertionErr | hyperAssertion | normalAssertion)
   def normalAssertion[$: P]: P[Expr] = P(quantifier ~~ spaces ~ (normalAssertVarDecl).rep(sep=",", min=1) ~ "::" ~ expr).map(mapNormalAssertion)
   def hyperAssertion[$: P]: P[Expr] = P(Index ~ quantifier ~ ("<"  ~ assertVar ~ ">").rep(sep=",", min=1) ~ "::" ~ expr ~ Index).map { case (oL, quantifier, assertVars, expr, oR) => mapHyperAssertion(oL, quantifier, assertVars, expr, oR) }
   def hyperAssertionErr[$: P]: P[Assertion] = P(quantifier ~ ("<<" ~ assertVar ~ ">>").rep(sep = ",", min = 1) ~ "::" ~ expr).map(mapHyperAssertionErr)
 
-  // Recursive Expression types
-  // ranking and structure provides associativity and precedence
-  // encapsulating expression class
-  def expr[$: P]: P[Expr] = P(Index ~ (assertion | implicationExpr) ~ Index).map { case (oL, exp, oR) => mapExpr(oL, exp, oR) }
+  // this expression should be used when no logical statements are expected
   def implicationExpr[$: P]: P[Expr] = P(Index ~ booleanExpr ~ (impliesOp ~/ expr).? ~ Index).map { case (oL, e, items, oR) => mapImplicationExpr(oL, e, items, oR) }
+
   def booleanExpr[$: P]: P[Expr] = P(Index ~ booleanEqualityExpr ~ (boolOp1 ~/ booleanExpr).? ~ Index).map { case (oL, e, items, oR) => mapBooleanExpr(oL, e, items, oR) }
   def booleanEqualityExpr[$: P]: P[Expr] = P(Index ~ arithCompExpr ~ (boolOp2 ~/ booleanEqualityExpr).? ~ Index).map { case (oL, e, items, oR) => mapBooleanEqualityExpr(oL, e, items, oR) }
   def arithCompExpr[$: P]: P[Expr] = P(Index ~ arithExpr ~ (cmpOp ~/ arithCompExpr).? ~ Index).map { case (oL, e, items, oR) => mapArithCompExpr(oL, e, items, oR) }
   def arithExpr[$: P]: P[Expr] = P(Index ~ arithTerm ~ (arithOp1 ~/ arithExpr).? ~ Index).map { case (oL, e, items, oR) => mapArithExpr(oL, e, items, oR) }
   def arithTerm[$: P]: P[Expr] = P(Index ~ combinatorOpExpr ~ (arithOp2 ~/ arithTerm).? ~ Index).map { case (oL, e, items, oR) => mapArithTerm(oL, e, items, oR) }
-  def combinatorOpExpr[$: P]: P[Expr] = P(Index ~ mapUpdate ~ (combinatorOps ~/ combinatorOpExpr).? ~ Index).map { case (oL, lhs, par, oR) => mapCombinatorOpExpr(oL, lhs, par, oR) }
-  def mapUpdate[$: P]: P[Expr] = P(Index ~ accessValExpr ~ ("[" ~ expr ~ ":=" ~ expr ~ "]").? ~ Index).map { case (oL, base, items, oR) => mapMapUpdate(oL, base, items, oR) }
-  def accessValExpr[$: P]: P[Expr] = P(Index ~ basicExpr ~ ("[" ~ expr ~ "]").? ~ Index).map { case (oL, lhs, l, oR) => mapAccessValExpr(oL, lhs, l, oR) }
-  def basicExpr[$: P]: P[Expr] = P(compositeTypeAssign  | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | useHint | identifier | number | "(" ~ expr ~ ")")
+
+  def combinatorOpExpr[$: P]: P[Expr] = P(Index ~ bracketExpr ~ (combinatorOps ~/ combinatorOpExpr).? ~ Index).map { case (oL, lhs, par, oR) => mapCombinatorOpExpr(oL, lhs, par, oR) }
+
+  def bracketExpr[$: P]: P[Expr] = P(Index ~ basicExpr ~ ("[" ~ (lookupExpr | updateExpr) ~ "]").rep(0) ~ Index).map{
+    case (_, base, Nil, _) => base
+    case (oL, base, list, oR) =>
+      list.foldLeft(base){
+        case (prev, (e1, null)) => LookupExpr(prev, e1)
+        case (prev, (e1, e2)) => UpdateMapExpr(prev, MapTupleExpr(e1, e2))
+      }.setOffsets(oL, oR)
+  }
+
+  def lookupExpr[$: P]: P[(Expr, Expr)] = P(implicationExpr).map{ case(expr) => (expr, null)}
+  def updateExpr[$: P]: P[(Expr, Expr)] = P(implicationExpr ~ ":=" ~ implicationExpr)
+
+  def basicExpr[$: P]: P[Expr] = P(compositeTypeAssign | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | useHint | identifier | number | "(" ~ expr ~ ")")
 
   // Basic building components and utils
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
-  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ accessValExpr).map(mapNotExpr)
+  def notExpr[$: P]: P[UnaryExpr] = P("!" ~ bracketExpr).map(mapNotExpr)
   def negExpr[$: P]: P[UnaryExpr] = P("-" ~ number).map(mapNegExpr)
   def boolean[$: P]: P[BoolLit] = P(boolTrue | boolFalse)
   def boolTrue[$: P]: P[BoolLit] = P("true").!.map(_ => mapBoolTrue())
@@ -121,10 +134,13 @@ object Parser {
   def seqAssignExpr[$: P]: P[SeqAssignExpr] = P("Seq[" ~~ notStateTypeName ~~ "]" ~~ "(" ~ expr.rep(sep=",").? ~ ")").map { case (typ, params) => mapSeqAssignExpr(typ, params) }
   def setAssignExpr[$: P]: P[SetAssignExpr] = P("Set[" ~~ notStateTypeName ~~ "]" ~~ "(" ~ expr.rep(sep=",").? ~ ")").map { case (typ, params) => mapSetAssignExpr(typ, params) }
   def mapAssignExpr[$: P]: P[MapAssignExpr] = P("Map[" ~~ notStateTypeName ~~ "," ~ notStateTypeName ~~ "]" ~~ "(" ~ mapTupleExpr.rep(sep=",").? ~ ")").map { case (kTyp, pTyp, params) => mapMapAssignExpr(kTyp, pTyp, params) }
-  def mapTupleExpr[$: P]: P[MapTupleExpr] = P(basicExpr ~ ":=" ~ expr).map(mapMapTupleExpr)
-  def lengthExpr[$: P]: P[LengthExpr] = P("|" ~ expr ~ "|").map(mapLengthExpr)
+  def mapTupleExpr[$: P]: P[MapTupleExpr] = P(implicationExpr ~ ":=" ~ implicationExpr).map(mapMapTupleExpr)
+
+  def lengthExpr[$: P]: P[LengthExpr] = P("|" ~ implicationExpr ~ "|").map(mapLengthExpr)
+
   def notStateTypeName[$: P] : P[Type] = P(primitiveTypeName | seqOrSetType | mapType)
   def primitiveTypeName[$: P] : P[Type] = P("Int" | "Bool").!.map(mapPrimitiveTypeName)
+
   def seqOrSetType[$: P] : P[Type] = P(("Seq" | "Set").! ~~ "[" ~ notStateTypeName ~ "]").map { case (name, t) => mapSeqOrSetType(name, t) }
   def mapType[$: P] : P[Type] = P("Map[" ~ notStateTypeName ~~ "," ~ notStateTypeName ~ "]").map { case (t1, t2) => mapMapType(t1, t2) }
   def spaces[$: P]: P[Unit] = P(CharIn(" \r\n\t").rep(1))
