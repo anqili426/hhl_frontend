@@ -2,6 +2,8 @@ package viper.HHLVerifier
 
 import fastparse.Parsed
 import viper.HHLVerifier.generation.Generator
+import viper.HHLVerifier.parser.Parser
+
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
 

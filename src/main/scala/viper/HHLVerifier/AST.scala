@@ -50,6 +50,7 @@ case class StateExistsExpr(state: SpecialId, err: Boolean) extends Expr {
 case class LoopIndex() extends Expr
 case class HintDecl(name: String) extends Expr
 case class Hint(name: String, arg: Expr) extends Expr
+
 case class MethodCallExpr(methodName: String, args: Seq[Id]) extends Expr {
   var method: Method = null
   var paramsToArgs: Map[String, String] = Map.empty
@@ -71,6 +72,7 @@ sealed trait Stmt {
   }
 
   var lookUpAccesses: Seq[LookupExpr] = Seq.empty
+  var methodCalls: Seq[MethodCallExpr] = Seq.empty
 
   // offset of expressions
   var offsetLeft = -1

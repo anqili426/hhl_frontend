@@ -13,14 +13,14 @@ object Parser {
   def method[$: P]: P[Method] = P(Index ~ "method" ~~ spaces ~~ methodName ~ Index ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")"  ~ ("returns" ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")").? ~ precondition.rep ~ postcondition.rep  ~"{" ~ stmts ~ "}").map(mapMethod)
   def precondition[$: P]: P[Expr] = P("requires" ~~ spaces ~ expr)
   def postcondition[$: P]: P[Expr] = P("ensures" ~~ spaces ~ expr)
-  def methodName[$: P]: P[String] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
+  def methodName[$: P]: P[String] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.log
   def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ notStateTypeName).map(mapMethodVarDecl)
 
   // Variables and Declarations
   def identifier[$: P]: P[Expr] = P(Index ~ (progVar | assertVar | proofVar) ~ Index).map { case (oL, id, oR) => mapIdentifier(oL, id, oR) }
   
   // programming variables
-  def progVar[$: P]: P[Id] = generalId.map(name => Id(name))
+  def progVar[$: P]: P[Id] = generalId.map(name => Id(name)).log
   def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ notStateTypeName).map(mapVarDecl)
 
   // assert variables (start with _..., occur in assertions)
@@ -38,17 +38,16 @@ object Parser {
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
   def stmt[$: P] : P[Stmt] = P(Index ~ (
     varDecl | proofVarDecl |
-    assign | multiAssign | methodCallStmt |
+    assign | multiAssign |
     ifElse | whileLoop |
     assume | assert | havoc | frame | hyperAssume | hyperAssert | useHintStmt
   ) ~ Index).map { case (oL, stmt, oR) => mapStmt(oL, stmt, oR) }
 
-  def methodCall[$: P]: P[(String, Seq[Id])] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")")
-  def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map(mapMultiAssign)
-  def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ implicationExpr).map(mapAssign)
+  def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map(mapMultiAssign).log
+  def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ implicationExpr).map(mapAssign).log
   def havoc[$: P] : P[HavocStmt] = P("havoc" ~~ spaces ~ progVar ~ hintDecl.?).map { case (v, hintDecl) => mapHavoc(v, hintDecl) }
-  def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ normalAssertion).map(mapAssume)
-  def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ normalAssertion).map(mapAssert)
+  def assume[$: P] : P[AssumeStmt] = P("assume" ~~ spaces ~ (normalAssertion | implicationExpr)).map(mapAssume)
+  def assert[$: P] : P[AssertStmt] = P("assert" ~~ spaces ~ (normalAssertion | implicationExpr)).map(mapAssert)
   def hyperAssume[$: P]: P[HyperAssumeStmt] = P("hyperAssume" ~~ spaces ~ expr).map(mapHyperAssume)
   def hyperAssert[$: P]: P[HyperAssertStmt] = P("hyperAssert" ~~ spaces ~ expr).map(mapHyperAssert)
   def declareStmt[$: P]: P[DeclareStmt] = P("declare" ~~ spaces ~ blockId ~ "{" ~ stmts ~ "}").map(mapDeclareStmt)
@@ -60,13 +59,13 @@ object Parser {
   def ifElse[$: P] : P[IfElseStmt] = P("if" ~ "(" ~ implicationExpr ~ ")" ~ "{" ~ stmtsInIf ~ "}" ~ ("else" ~ "{" ~ stmtsInElse ~ "}").?).map { case (e, s1, s2) => mapIfElse(e, s1, s2) }
   def whileLoop[$: P] : P[WhileLoopStmt] = P("while" ~~ spaces ~ ("syncRule" | "forAllExistsRule" | "existsRule" | "syncTotRule" | "desugaredRule").?.! ~ "(" ~ implicationExpr ~ ")"  ~ loopInv.rep ~ ("decreases" ~ arithExpr).? ~ "{" ~ stmts ~ "}").map(mapWhileLoop)
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ expr ~ "{" ~ stmts ~ "}").map(mapFrame)
-  def useHintStmt[$: P]: P[UseHintStmt] = P("use" ~~ spaces ~ expr).map(mapUseHintStmt)
-  def methodCallStmt[$: P]: P[MethodCallStmt] = P(methodCall).map(mapMethodCallStmt)
+  def useHintStmt[$: P]: P[UseHintStmt] = P("use" ~~ spaces ~ useHint).map(mapUseHintStmt)
 
   // Utils for statements
   def loopInv[$: P]: P[(Option[HintDecl], Expr)] = P(hintDecl.? ~ "invariant" ~~ spaces ~ expr)
   def blockId[$: P]: P[Id] = P(CharIn("a-zA-Z") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.map(mapBlockId)
   def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "}").map(HintDecl)
+  def useHint[$: P]: P[Expr] = P(Index ~ generalId ~ "(" ~ expr ~ ")" ~ Index).map { case (oL, id, expr, oR) => mapUseHint(oL, id, expr, oR) }
 
   // Expressions
   // operations in expressions
@@ -116,7 +115,7 @@ object Parser {
   def lookupExpr[$: P]: P[(Expr, Expr)] = P(implicationExpr).map{ case(expr) => (expr, null)}
   def updateExpr[$: P]: P[(Expr, Expr)] = P(implicationExpr ~ ":=" ~ implicationExpr)
 
-  def basicExpr[$: P]: P[Expr] = P(compositeTypeAssign | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | useHint | identifier | number | "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(compositeTypeAssign | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | methodCall | identifier | number  | "(" ~ expr ~ ")")
 
   // Basic building components and utils
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
@@ -127,7 +126,9 @@ object Parser {
   def boolFalse[$: P]: P[BoolLit] = P("false").!.map(_ => mapBoolFalse())
   def loopIndex[$: P]: P[LoopIndex] = P("$n").map(_ => mapLoopIndex())
   def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(mapNumber)
-  def useHint[$: P]: P[Expr] = P(Index ~ generalId ~ "(" ~ expr ~ ")" ~ Index).map { case (oL, id, expr, oR) => mapUseHint(oL, id, expr, oR) }
+  def methodCall[$: P]: P[MethodCallExpr] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")").map{
+    case (name, vars) => MethodCallExpr(name, vars)
+  }.log
 
   // Initialisation
   def compositeTypeAssign[$: P]: P[Expr] = P(seqAssignExpr | setAssignExpr | mapAssignExpr)

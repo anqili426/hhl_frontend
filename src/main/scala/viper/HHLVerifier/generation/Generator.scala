@@ -280,6 +280,10 @@ object Generator {
         throw UnknownException("Unkown type for lookup discovered")
     }
 
+    if (stmt.methodCalls.size > 0) {
+
+    }
+
     stmt match {
       case CompositeStmt(stmts) =>
         // Translate each statement in the sequence
@@ -1816,16 +1820,6 @@ object Generator {
         throw UnknownException("Cannot translate type " + typ)
     }
   }
-
-  private var variablesIdCounter = 0
-
-  // assigns unique ids to vpr variables
-  def assignId(): Int = {
-    val r = variablesIdCounter
-    variablesIdCounter += 1
-    r
-  }
-  // TODO: Undo this and reverse this to the original standard
 
   def translateMethodVariables(params: Seq[Id]): Seq[vpr.LocalVarDecl] = params.map(id => vpr.LocalVarDecl(id.name, vpr.Int)())
 
