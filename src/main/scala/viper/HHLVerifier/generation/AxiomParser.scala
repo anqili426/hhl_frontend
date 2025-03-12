@@ -17,9 +17,9 @@ case object AxiomParser {
     if (inpStream == null)
       throw new FileNotFoundException(f"Axioms $name not found.")
 
-    val tempFile = Files.createTempFile(name, ".vpr");
-    tempFile.toFile().deleteOnExit();
-    Files.copy(inpStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+    val tempFile = Files.createTempFile(name, ".vpr")
+    tempFile.toFile().deleteOnExit()
+    Files.copy(inpStream, tempFile, StandardCopyOption.REPLACE_EXISTING)
 
     new Logger(f"Parsing axioms $name.").log()
 
