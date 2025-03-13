@@ -1,13 +1,14 @@
 package viper.HHLVerifier.test
 
-import viper.HHLVerifier.{Main, Parser, ViperRunner}
+import viper.HHLVerifier.Main
 import au.com.bytecode.opencsv.CSVWriter
+import viper.HHLVerifier.management.ViperRunner
+import viper.HHLVerifier.parsing.Parser
 
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.jdk.CollectionConverters._
 
 object Test {
-
   var failedForAll: List[String] = List.empty
   var failedExists: List[String] = List.empty
   var failedOther: List[String] = List.empty

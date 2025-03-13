@@ -1,12 +1,22 @@
-package viper.HHLVerifier.parser
+package viper.HHLVerifier.parsing
 
 import viper.HHLVerifier.generation.Generator
-import viper.HHLVerifier.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BinaryExpr, BoolLit, BoolType, CombExpr, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, Hint, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, ImpliesExpr, IntType, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, MapTupleExpr, MapType, Method, MethodCallExpr, MethodCallStmt, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SeqType, SetAssignExpr, SetType, StateExistsExpr, StateType, Stmt, Type, TypeInstance, UnaryExpr, UnknownException, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
+import viper.HHLVerifier.typing._
+import viper.HHLVerifier.management.UnknownException
+import viper.HHLVerifier._
 
 // This file contains all the actual mappings from parsing rules to object. As those are not very important and
 // mostly tedious work, they were shifted into this file.
 // To understand this, look at the parsing rule, and then at the mapping rule.
 
+/** Parser Mappings
+ *
+ * This file is a companion object for [[viper.HHLVerifier.parsing.Parser]]. It contains all
+ * functions which map parser rules to actual AST objects.
+ *
+ * In order to understand the functionality of those, take a look at the parser ruler. They should contain documentation
+ * for the individual object.
+ */
 object Mappings {
   def mapProgram(methods: Seq[Method]): HHLProgram = methods match {
     case Nil => HHLProgram(Seq.empty)
@@ -18,7 +28,7 @@ object Mappings {
     val res = if (items._5 != None) items._5.get else Seq.empty
     val pre = if (items._6 != Nil) items._6 else Seq.empty
     val post = if (items._7 != Nil) items._7 else Seq.empty
-    Method(items._2, args, res, pre, post, items._8, items._1, items._3)
+    Method(items._2, args, res, pre, post, items._8).setOffsets(items._1, items._3)
   }
 
   def mapMethodVarDecl(items: (Id, Type)): Id = {
@@ -30,7 +40,7 @@ object Mappings {
 
   def mapBlockId(name: String): Id = {
       val blockId = Id(name)
-      blockId.typ = TypeInstance.stmtBlockType
+      blockId.typ = StmtBlockType()
       blockId
   }
 

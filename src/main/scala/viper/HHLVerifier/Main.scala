@@ -2,11 +2,15 @@ package viper.HHLVerifier
 
 import fastparse.Parsed
 import viper.HHLVerifier.generation.Generator
-import viper.HHLVerifier.parser.Parser
+import viper.HHLVerifier.management._
+import viper.HHLVerifier.parsing.Parser
+import viper.HHLVerifier.symbols.SymbolChecker
+import viper.HHLVerifier.typing.TypeChecker
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
 
+/** Main Method */
 object Main {
 
   // [DOC] Variables

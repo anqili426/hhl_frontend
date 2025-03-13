@@ -1,4 +1,7 @@
-package viper.HHLVerifier
+package viper.HHLVerifier.management
+
+import viper.HHLVerifier._
+import viper.HHLVerifier.typing.{BoolType, IntType, MapType, SeqType, SetType, StateType, StmtBlockType, Type, UnknownType}
 
 object PrettyPrinter {
 

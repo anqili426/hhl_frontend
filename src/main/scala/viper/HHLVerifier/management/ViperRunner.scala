@@ -1,4 +1,4 @@
-package viper.HHLVerifier
+package viper.HHLVerifier.management
 
 import viper.carbon.CarbonVerifier
 import viper.silicon.Silicon

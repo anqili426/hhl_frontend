@@ -1,6 +1,8 @@
 package viper.HHLVerifier.generation
 
 import viper.HHLVerifier._
+import viper.HHLVerifier.typing._
+import viper.HHLVerifier.management._
 import viper.silver.ast.{Info, NoInfo}
 import viper.silver.{ast => vpr}
 
@@ -515,7 +517,7 @@ object Generator {
 
           // Use an auxiliary variable to distinguish between ifBlockStates && elseBlockStates
           val isIfBlock = Id(isIfBlockVarName + "_" + alignCounter)
-          isIfBlock.typ = TypeInstance.intType
+          isIfBlock.typ = IntType()
           val isIfBlockVpr = vpr.LocalVar(isIfBlock.name, vpr.Int)()
           var setFlagForIf: Seq[vpr.Stmt] = Seq.empty
           var setFlagForElse: Seq[vpr.Stmt] = Seq.empty

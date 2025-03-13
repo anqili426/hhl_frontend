@@ -1,7 +1,8 @@
 package viper.HHLVerifier.generation
 
 import viper.HHLVerifier.generation.Generator.translateType
-import viper.HHLVerifier.{Id, Type}
+import viper.HHLVerifier.Id
+import viper.HHLVerifier.typing.Type
 import viper.silver.{ast => vpr}
 
 // All functionality regarding States and the corresponding domain

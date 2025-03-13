@@ -1,5 +1,6 @@
-package viper.HHLVerifier
+package viper.HHLVerifier.management
 
+import viper.HHLVerifier.Expr
 import viper.silver.ast.AnnotationInfo
 
 abstract sealed class ErrorMsg(expr: Expr) {

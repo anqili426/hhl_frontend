@@ -1,4 +1,7 @@
-package viper.HHLVerifier
+package viper.HHLVerifier.typing
+
+import viper.HHLVerifier._
+import viper.HHLVerifier.management.UnknownException
 
 object Normalizer {
 

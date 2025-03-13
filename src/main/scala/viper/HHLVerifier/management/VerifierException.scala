@@ -1,4 +1,4 @@
-package viper.HHLVerifier
+package viper.HHLVerifier.management
 
 abstract class VerifierException(msg: String) extends Exception {
   val errMsg = msg

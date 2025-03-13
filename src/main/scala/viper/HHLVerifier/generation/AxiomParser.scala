@@ -1,6 +1,6 @@
 package viper.HHLVerifier.generation
 
-import viper.HHLVerifier.Logger
+import viper.HHLVerifier.management.Logger
 import viper.silver.frontend.SilFrontend
 import viper.silver.frontend.ViperAstProvider
 import viper.silver.reporter.NoopReporter

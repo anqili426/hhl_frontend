@@ -1,4 +1,8 @@
-package viper.HHLVerifier
+package viper.HHLVerifier.symbols
+
+import viper.HHLVerifier.management.Logger
+import viper.HHLVerifier._
+import viper.HHLVerifier.typing.Type
 
 object SymbolChecker {
   // This map is used to keep track of the declared program variables + assertion variables for each method
