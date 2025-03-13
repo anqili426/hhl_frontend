@@ -1,4 +1,4 @@
-package viper.HHLVerifier
+package viper.HHLVerifier.ast
 
 import viper.HHLVerifier.management.PrettyPrinter
 import viper.HHLVerifier.typing._

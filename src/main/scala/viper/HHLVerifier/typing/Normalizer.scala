@@ -1,6 +1,7 @@
 package viper.HHLVerifier.typing
 
 import viper.HHLVerifier._
+import viper.HHLVerifier.ast.{Assertion, BinaryExpr, BoolLit, Expr, Hint, ImpliesExpr, LookupExpr, StateExistsExpr, UnaryExpr}
 import viper.HHLVerifier.management.UnknownException
 
 object Normalizer {

@@ -5,6 +5,7 @@ import fastparse._
 import viper.HHLVerifier.parsing.Mappings._
 import viper.HHLVerifier.typing.Type
 import viper.HHLVerifier._
+import viper.HHLVerifier.ast.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BoolLit, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, MapTupleExpr, Method, MethodCallExpr, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SetAssignExpr, Stmt, UnaryExpr, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
 
 /** The Parser object
  *

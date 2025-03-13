@@ -4,6 +4,7 @@ import viper.HHLVerifier.generation.Generator
 import viper.HHLVerifier.management.Logger
 import viper.HHLVerifier.symbols.SymbolChecker
 import viper.HHLVerifier._
+import viper.HHLVerifier.ast.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BinaryExpr, BoolLit, CombExpr, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, Hint, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, ImpliesExpr, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, Method, MethodCallExpr, MethodCallStmt, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SetAssignExpr, StateExistsExpr, Stmt, UnaryExpr, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
 
 object TypeChecker {
   val boolOp = List("==", "!=", "&&", "||", "forall", "exists", "==>")

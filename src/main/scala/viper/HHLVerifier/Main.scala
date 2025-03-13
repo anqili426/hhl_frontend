@@ -1,6 +1,7 @@
 package viper.HHLVerifier
 
 import fastparse.Parsed
+import viper.HHLVerifier.ast.HHLProgram
 import viper.HHLVerifier.generation.Generator
 import viper.HHLVerifier.management._
 import viper.HHLVerifier.parsing.Parser
