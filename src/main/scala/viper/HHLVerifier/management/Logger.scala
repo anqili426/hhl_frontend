@@ -30,6 +30,11 @@ class Logger(val message: String, val level: String = Logger.INFO) extends Throw
     this
   }
 
+  def addWhileRule(rule: String): Logger = {
+    extra += ("whileRule" -> rule)
+    this
+  }
+
   def log(): Unit = { println(Logger.format(this)) }
   def toAnnotationInfo(): AnnotationInfo = AnnotationInfo(Map("msg" -> Seq(Logger.format(this))))
 
