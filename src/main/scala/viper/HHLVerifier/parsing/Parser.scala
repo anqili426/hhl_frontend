@@ -4,7 +4,7 @@ import fastparse.JavaWhitespace._
 import fastparse._
 import viper.HHLVerifier.parsing.Mappings._
 import viper.HHLVerifier.typing.Type
-import viper.HHLVerifier.ast.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BoolLit, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, MapTupleExpr, Method, MethodCallExpr, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SetAssignExpr, Stmt, UnaryExpr, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
+import viper.HHLVerifier.ast.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BoolLit, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, MapTupleExpr, Method, MethodCallExpr, MethodCallStmt, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SetAssignExpr, Stmt, UnaryExpr, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
 
 /** The Parser object
  *
@@ -58,10 +58,11 @@ object Parser {
   def stmts[$: P] : P[CompositeStmt] = P(stmt.rep).map(CompositeStmt)
   def stmt[$: P] : P[Stmt] = P(Index ~ (
     varDecl | proofVarDecl |
-    assign | multiAssign |
+    multiAssign | methodCallStmt | assign |
     ifElse | whileLoop |
     assume | assert | havoc | frame | hyperAssume | hyperAssert | useHintStmt
   ) ~ Index).map { case (oL, stmt, oR) => mapStmt(oL, stmt, oR) }
+
   /** MultiAssign Statement
    *
    * Assigns the return values of a function call to multiple variables.
@@ -69,7 +70,12 @@ object Parser {
    *   var a: Int, b: Int, c: Int
    *   a, b, c := assignThreeValues()
    * }}}*/
-  def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map(mapMultiAssign)
+  def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map{
+    items => MultiAssignStmt(items._1, MethodCallExpr(items._2._1, items._2._2))
+  }
+  def methodCallStmt[$: P]: P[MethodCallStmt] = P(methodCall).map(mapMethodCallStmt)
+  def methodCall[$: P]: P[(String, Seq[Id])] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")")
+
   /** Assign Statement
    *
    * Assigns the result of an expression to a program variable.
@@ -107,7 +113,7 @@ object Parser {
   /** Frame Statement: Declare a frame. */
   def frame[$: P]: P[FrameStmt] = P("frame" ~~ spaces ~ expr ~ "{" ~ stmts ~ "}").map(mapFrame)
   /** UseHint Statement: Use a hint declare trigger for havoc statments. */
-  def useHintStmt[$: P]: P[UseHintStmt] = P("use" ~~ spaces ~ useHint).map(mapUseHintStmt)
+  def useHintStmt[$: P]: P[UseHintStmt] = P("use" ~~ spaces ~ expr).map(mapUseHintStmt)
 
   // Utils for statements
   /** LoopInvariant: Declares an invariant in a while loop. */
@@ -117,7 +123,6 @@ object Parser {
   def hintDecl[$: P]: P[HintDecl] = P("{" ~ generalId ~ "}").map(HintDecl)
   def useHint[$: P]: P[Expr] = P(Index ~ generalId ~ "(" ~ expr ~ ")" ~ Index).map { case (oL, id, expr, oR) => mapUseHint(oL, id, expr, oR) }
 
-  // Expressions
   // operations in expressions
   def arithOp1[$: P]: P[String] = P("+" | "-").!
   def arithOp2[$: P]: P[String] = P("*" | "/" | "%").!
@@ -165,7 +170,7 @@ object Parser {
   /** Combinator Operation Expression: Expressions containing operations relating composite types like ++, union, intersection, ... */
   def combinatorOpExpr[$: P]: P[Expr] = P(Index ~ bracketExpr ~ (combinatorOps ~/ combinatorOpExpr).? ~ Index).map { case (oL, lhs, par, oR) => mapCombinatorOpExpr(oL, lhs, par, oR) }
   /** Bracket Expression: Expression containing lookup operation to states or composite types OR map updates. */
-  def bracketExpr[$: P]: P[Expr] = P(Index ~ basicExpr ~ ("[" ~ (lookupExpr | updateExpr) ~ "]").rep(0) ~ Index).map{
+  def bracketExpr[$: P]: P[Expr] = P(Index ~ basicExpr ~ ("[" ~ (updateExpr | lookupExpr) ~ "]").rep(0) ~ Index).map{
     case (_, base, Nil, _) => base
     case (oL, base, list, oR) =>
       list.foldLeft(base){
@@ -179,7 +184,7 @@ object Parser {
   def updateExpr[$: P]: P[(Expr, Expr)] = P(implicationExpr ~ ":=" ~ implicationExpr)
 
   /** Basic Expression: Fundamental expression, hanlding all basic cases. */
-  def basicExpr[$: P]: P[Expr] = P(Index ~ (compositeTypeAssign | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | methodCall | identifier | number  | "(" ~ expr ~ ")") ~ Index).map{
+  def basicExpr[$: P]: P[Expr] = P(Index ~ (compositeTypeAssign | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | useHint | identifier | number  | "(" ~ expr ~ ")") ~ Index).map{
     case (oL, expr, oR) => expr.setOffsets(oL, oR)
   }
 
@@ -192,9 +197,9 @@ object Parser {
   def boolFalse[$: P]: P[BoolLit] = P("false").!.map(_ => mapBoolFalse())
   def loopIndex[$: P]: P[LoopIndex] = P("$n").map(_ => mapLoopIndex())
   def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(mapNumber)
-  def methodCall[$: P]: P[MethodCallExpr] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")").map{
-    case (name, vars) => MethodCallExpr(name, vars)
-  }
+  // def methodCall[$: P]: P[MethodCallExpr] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")").map{
+  //   case (name, vars) => MethodCallExpr(name, vars)
+  // }
 
   // Initialisation
   /** Composite Type Assign: Parent for all composite type assignments. */

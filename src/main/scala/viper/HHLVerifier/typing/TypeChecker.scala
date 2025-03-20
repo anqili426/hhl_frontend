@@ -152,15 +152,11 @@ object TypeChecker {
   }
 
   var lookupAccesses: Seq[LookupExpr] = Seq.empty
-  var methodCalls: Seq[MethodCallExpr] = Seq.empty
   def typeCheckExprWithChecks(s: Stmt, e: Expr, hyperAssertionExpected: Boolean, polarity: Int = 1): Boolean = {
     val isHyperAssertion = typeCheckExpr(e, hyperAssertionExpected, polarity)
 
     s.lookUpAccesses = lookupAccesses
     lookupAccesses = Seq.empty
-
-    s.methodCalls = methodCalls
-    methodCalls = Seq.empty
 
     isHyperAssertion
   }
@@ -263,10 +259,6 @@ object TypeChecker {
         val calledMethodList = SymbolChecker.allMethods.filter(m => m.mName == name)
         if (calledMethodList.isEmpty)
           throw new Logger("The function " + name + " was not found").addTitle("Type Checker Error").addOffset((call.offsetLeft, call.offsetRight))
-        if (calledMethodList(0).res.size != 1)
-          throw new Logger("The function " + name + " cannot be used in this context. A function must return exactly one value in order to be used in expressions.").addTitle("Type Checker Error").addOffset((call.offsetLeft, call.offsetRight))
-        call.typ = calledMethodList(0).res(0).typ
-        methodCalls = methodCalls :+ call
       case SeqAssignExpr(elements) =>
         elements.foreach(el => {
           typeCheckExpr(el, hyperAssertionExpected)

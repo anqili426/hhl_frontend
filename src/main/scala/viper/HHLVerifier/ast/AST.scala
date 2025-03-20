@@ -139,8 +139,6 @@ case class MapTupleExpr(k: Expr, v: Expr) extends Expr
 sealed trait Stmt extends ErrorData {
   /** Contains lookup accesses performed in a statement */
   var lookUpAccesses: Seq[LookupExpr] = Seq.empty
-  /** Contains all method calls performed in a statement */
-  var methodCalls: Seq[MethodCallExpr] = Seq.empty
 
   def setOffsets: (Int, Int) => Stmt =
     setOffsets[Stmt]
