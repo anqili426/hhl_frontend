@@ -18,8 +18,10 @@ import viper.silver.{ast => vpr}
  *   belongs to which original one. This is achieved by using the invariant tracking object.
  * - Every invariant is added to the tracker when it is first discovered
  * - Additionally, when an invariant is transformed by a quantifier removal, the removed quantifier count is updated to
- *   allow inform the user about the state of the expression which caused the error
+ *   allow to inform the user about the state of the expression which caused the error
  * */
+
+// TODO: Check if the splitting in inv and decr is correct
 
 object Generator {
   // Frequently used constants
@@ -804,6 +806,7 @@ object Generator {
               newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = new Logger(VerificationErrors.LoopEntryPoint(oInv), Logger.ERR)
                 .addTitle("Verification Error")
                 .addQuantifiersRemoved(qc)
+                .addWhileRule(rule)
                 .addOffset((invs(i).offsetLeft, invs(i).offsetRight))
                 .toAnnotationInfo())
             }
@@ -1344,6 +1347,7 @@ object Generator {
         Option(new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
           .addTitle("Verification Error")
           .addQuantifiersRemoved(qc)
+          .addWhileRule("existsRule")
           .addOffset((inv.offsetLeft, inv.offsetRight))
           .toAnnotationInfo())
       )
@@ -1354,7 +1358,7 @@ object Generator {
 
     val exprAddedToPost = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
     val temp = (addToTopExists(firstExistsInv, exprAddedToPost), Option(new Logger(VerificationErrors.LoopVariant(decrExpr), Logger.ERR)
-      .addTitle("Verification Error")
+      .addTitle("Verification Error 1")
       .addOffset((decrExpr.offsetLeft, decrExpr.offsetRight))
       .toAnnotationInfo()))
     posts = posts :+ temp
@@ -1392,8 +1396,9 @@ object Generator {
     val temp = (
       newInv,
       Option(new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
-        .addTitle("Verification Error Special")
+        .addTitle("Verification Error")
         .addQuantifiersRemoved(qc)
+        .addWhileRule("existsRule")
         .addOffset((oInv.offsetLeft, oInv.offsetRight))
         .toAnnotationInfo())
     )
@@ -1444,6 +1449,7 @@ object Generator {
       methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
         .addTitle("Verification Error")
         .addQuantifiersRemoved(qc)
+        .addWhileRule(rule)
         .addOffset((invs(i).offsetLeft, invs(i).offsetRight))
         .toAnnotationInfo())
     }
@@ -1459,7 +1465,7 @@ object Generator {
           vpr.Implies(SetState.getInSetApp(Seq(state.localVar, inputStates), useLimited = true),
             vpr.EqCmp(translatedDecr, State.get(state.localVar, tId))()
           )())(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
-            .addTitle("Verification Error")
+            .addTitle("Verification Error 2")
             .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
             .toAnnotationInfo())
         methodPres = methodPres :+ decrPre
@@ -1516,7 +1522,7 @@ object Generator {
           )()
         )()
       )(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
-        .addTitle("Verification Error")
+        .addTitle("Verification Error 3")
         .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
         .toAnnotationInfo())
       methodPosts = methodPosts :+ decrPost
@@ -1618,7 +1624,7 @@ object Generator {
       // Assert that the current value of decrExpr is in the range of [0, t)
       val tf_decr_exp = vpr.Forall(Seq(state), Seq.empty, vpr.Implies(SetState.getInSetApp(Seq(state.localVar, currStates)), vpr.And(vpr.GeCmp(translatedDecr, zero)(), vpr.LtCmp(translatedDecr, State.get(state.localVar, tId))())())())()
       val assert_variant = vpr.Assert(tf_decr_exp)(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
-        .addTitle("Verification Error")
+        .addTitle("Verification Error 4")
         .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
         .toAnnotationInfo())
       ifBodyStmts = ifBodyStmts :+ assert_variant

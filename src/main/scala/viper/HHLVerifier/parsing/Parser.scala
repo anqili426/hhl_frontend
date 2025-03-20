@@ -25,7 +25,7 @@ object Parser {
   def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ progTypes).map(mapMethodVarDecl)
 
   /** General identifier object: Refers to all entries of the symbol table except methods. */
-  def identifier[$: P]: P[Expr] = P(Index ~ (progVar | assertVar | proofVar) ~ Index).map { case (oL, id, oR) => mapIdentifier(oL, id, oR) }
+  def identifier[$: P]: P[Expr] = P(progVar | assertVar | proofVar)
   
   /** Program variables
    *
@@ -179,7 +179,9 @@ object Parser {
   def updateExpr[$: P]: P[(Expr, Expr)] = P(implicationExpr ~ ":=" ~ implicationExpr)
 
   /** Basic Expression: Fundamental expression, hanlding all basic cases. */
-  def basicExpr[$: P]: P[Expr] = P(compositeTypeAssign | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | methodCall | identifier | number  | "(" ~ expr ~ ")")
+  def basicExpr[$: P]: P[Expr] = P(Index ~ (compositeTypeAssign | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | methodCall | identifier | number  | "(" ~ expr ~ ")") ~ Index).map{
+    case (oL, expr, oR) => expr.setOffsets(oL, oR)
+  }
 
   // Basic building components and utils
   def unaryExpr[$: P]: P[UnaryExpr] = P(notExpr | negExpr)
