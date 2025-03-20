@@ -33,7 +33,6 @@ object Main {
 
     val programAbsPath = args(0)
     Logger.setFilePath(programAbsPath)
-    new Logger(f"The input program is read from $programAbsPath.").log()
     val programSource = scala.io.Source.fromFile(programAbsPath)
     val program = programSource.mkString
     Logger.setSourceCode(program)
@@ -52,6 +51,8 @@ object Main {
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
     else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
+
+    new Logger(f"The input program is read from $programAbsPath.").log()
 
     try {
       // [DOC] parse program
@@ -80,8 +81,13 @@ object Main {
         if (outputPath != "unspecified") {
           val fw = new FileWriter(outputPath, false)
           new Logger(f"The translated program is written to $outputPath.").log()
-          try fw.write(viperProgram.toString())
-          finally fw.close()
+          try {
+            fw.write(viperProgram.toString())
+          } catch {
+            case e: Exception =>
+              System.err.println(e.toString())
+              new Logger("Failed to write Viper encoding file.").log()
+          } finally fw.close()
         }
 
         val consistencyErrors = viperProgram.checkTransitively

@@ -1,17 +1,18 @@
 /*
-    A simple test case for errors caused by a loops invariant which may not be preserved.
+    A test case for errors caused by a loops invariant which may not be preserved.
     Output:
         Verification failed
-        After stripping 0 quantifier(s):
-        [WhileLoop] The following invariant might not hold:
+        [WhileLoop] The following invariant might not be preserved:
         forall <_s: State> :: ((!(<_s>)) || ((_s[i]) == (0)))
+        Metadata:
+        - LoopRule: syncRule
+        - QuantifiersRemoved: 0
 
-        After stripping 0 quantifier(s):
         [Method] The following post condition might not hold:
         exists <_s: State> :: ((<_s>) && ((_s[out]) == (2)))
 */
 
-method methodCallError() returns (out: Int)
+method loopInvariantErr() returns (out: Int)
     requires exists <_s> :: true
     ensures exists <_s> :: _s[out] == 2
 {

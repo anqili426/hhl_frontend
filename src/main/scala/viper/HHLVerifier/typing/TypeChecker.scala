@@ -18,7 +18,7 @@ object TypeChecker {
 
   var declaredTypes: Set[Type] = Set.empty
   var hasSeqs: Boolean = false
-  var hasMaps: Boolean = true
+  var hasMaps: Boolean = false
 
   def addToDeclaredTypes(typ: Type): Unit = {
     declaredTypes += typ

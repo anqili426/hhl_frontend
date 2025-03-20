@@ -64,8 +64,9 @@ object Normalizer {
       case e@LookupExpr(_, _) => if (negate) UnaryExpr("!", e) else e
       case _ => throw UnknownException("Normalizer: expression " + e + " is not expected. Typ is " + e.getClass())
     }
-    // update positioning of expressions
+    // update positioning of expressions and debugger information
     ret.setOffsets(e.offsetLeft, e.offsetRight)
+    ret.debugId = e.debugId
     ret
   }
 

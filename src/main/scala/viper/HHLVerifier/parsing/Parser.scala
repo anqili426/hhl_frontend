@@ -4,7 +4,6 @@ import fastparse.JavaWhitespace._
 import fastparse._
 import viper.HHLVerifier.parsing.Mappings._
 import viper.HHLVerifier.typing.Type
-import viper.HHLVerifier._
 import viper.HHLVerifier.ast.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BoolLit, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, MapTupleExpr, Method, MethodCallExpr, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SetAssignExpr, Stmt, UnaryExpr, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
 
 /** The Parser object
@@ -22,7 +21,7 @@ object Parser {
   def method[$: P]: P[Method] = P(Index ~ "method" ~~ spaces ~~ methodName ~ Index ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")"  ~ ("returns" ~ "(" ~ methodVarDecl.rep(sep=",") ~ ")").? ~ precondition.rep ~ postcondition.rep  ~"{" ~ stmts ~ "}").map(mapMethod)
   def precondition[$: P]: P[Expr] = P("requires" ~~ spaces ~ expr)
   def postcondition[$: P]: P[Expr] = P("ensures" ~~ spaces ~ expr)
-  def methodName[$: P]: P[String] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!.log
+  def methodName[$: P]: P[String] = P(CharIn("a-zA-Z_") ~~ CharsWhileIn("a-zA-Z0-9_", 0)).!
   def methodVarDecl[$: P]: P[Id] = P(progVar ~ ":" ~ progTypes).map(mapMethodVarDecl)
 
   /** General identifier object: Refers to all entries of the symbol table except methods. */
@@ -32,7 +31,7 @@ object Parser {
    *
    * Program variables to refer to all variables which have assigned values in the program code.
    * Use case: {{{var num: Int }}} */
-  def progVar[$: P]: P[Id] = generalId.map(name => Id(name)).log
+  def progVar[$: P]: P[Id] = generalId.map(name => Id(name))
   def varDecl[$: P] : P[PVarDecl] = P("var" ~ progVar ~ ":" ~ progTypes).map(mapVarDecl)
 
   /** Assert variables
@@ -70,7 +69,7 @@ object Parser {
    *   var a: Int, b: Int, c: Int
    *   a, b, c := assignThreeValues()
    * }}}*/
-  def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map(mapMultiAssign).log
+  def multiAssign[$: P]: P[MultiAssignStmt] = P(progVar.rep(sep=",", min=1) ~ ":=" ~ methodCall).map(mapMultiAssign)
   /** Assign Statement
    *
    * Assigns the result of an expression to a program variable.
@@ -78,7 +77,7 @@ object Parser {
    *   var a: Int
    *   a := (2 * 3) + 4
    * }}}*/
-  def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ implicationExpr).map(mapAssign).log
+  def assign[$: P] : P[AssignStmt] = P(progVar ~ ":=" ~ implicationExpr).map(mapAssign)
   /** Havoc Statement
    *
    * Randomly assigns a value to a program variable.
@@ -193,7 +192,7 @@ object Parser {
   def number[$: P]: P[Num] = P(CharIn("0-9").rep(1).!.map(_.toInt)).map(mapNumber)
   def methodCall[$: P]: P[MethodCallExpr] = P(methodName ~ "(" ~ progVar.rep(sep=",", min=0) ~")").map{
     case (name, vars) => MethodCallExpr(name, vars)
-  }.log
+  }
 
   // Initialisation
   /** Composite Type Assign: Parent for all composite type assignments. */

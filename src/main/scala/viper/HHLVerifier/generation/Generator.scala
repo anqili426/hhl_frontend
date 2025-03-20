@@ -1,11 +1,25 @@
 package viper.HHLVerifier.generation
 
-import viper.HHLVerifier._
-import viper.HHLVerifier.ast.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BinaryExpr, BoolLit, CombExpr, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, Hint, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, ImpliesExpr, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, Method, MethodCallStmt, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SetAssignExpr, SpecialId, StateExistsExpr, Stmt, UnaryExpr, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
+import viper.HHLVerifier.ast._
+import viper.HHLVerifier.generation.Generator.InvariantTracking.InvariantDebugInfo
 import viper.HHLVerifier.typing._
 import viper.HHLVerifier.management._
 import viper.silver.ast.{Info, NoInfo}
 import viper.silver.{ast => vpr}
+
+/** Documentation of Error Handling
+ *
+ * For all errors which do not include invariants:
+ * - There is a specific error generator class, which captures the faulty expression, wraps it into a nice error
+ *   encodes it into the hypra encoding
+ *
+ * For all errors which include invariants
+ * - Invariants are transformed multiple times in the process. Therefore, we need to track which transformed invariant
+ *   belongs to which original one. This is achieved by using the invariant tracking object.
+ * - Every invariant is added to the tracker when it is first discovered
+ * - Additionally, when an invariant is transformed by a quantifier removal, the removed quantifier count is updated to
+ *   allow inform the user about the state of the expression which caused the error
+ * */
 
 object Generator {
   // Frequently used constants
@@ -104,8 +118,27 @@ object Generator {
   val checkExistsRuleCond2MethodName = "check_exists_cond2"
   var stateRemoved = ""
 
-  // error messages
-  var countQuantifiersRemoved = 0
+  /** tracks information necessary to debug invariants */
+  object InvariantTracking {
+    class InvariantDebugInfo(val inv: Expr) {
+      var quantifiersRemoved = 0
+
+      def incrRemovedQuantifier(): Unit = { quantifiersRemoved += 1 }
+      def decrRemovedQuantifier(): Unit = { quantifiersRemoved += 1 }
+    }
+    class InvariantWithID(val inv: Expr, val id: Int)
+
+    private var counter = 0;
+    private var tracker: Map[Int, InvariantDebugInfo] = Map.empty
+
+    def insert(el: InvariantDebugInfo): Int = {
+      counter += 1
+      tracker = tracker + (counter -> el)
+      counter
+    }
+    def get(key: Int): InvariantDebugInfo = tracker.get(key).get
+    def remove(key: Int): Unit = tracker.removed(key)
+  }
 
   // Main generate method
   // - saves program source and used types
@@ -274,6 +307,7 @@ object Generator {
     val existsTriggers = Seq(vpr.Trigger(Seq(SetState.getInSetApp(Seq(state, currStates), useForAll=false, useLimited=true)))())
 
     // Create safety checks for lookup expressions
+    // TODO: Replace all s
     stmt.lookUpAccesses.foreach { luExp =>
       if (luExp.id.typ.isInstanceOf[MapType])
         newStmts = newStmts ++ translateStmt(generateMapAccessCheck(luExp), currStates, currFailureStates, isAutoSelected)._1
@@ -281,10 +315,6 @@ object Generator {
         newStmts = newStmts ++ translateStmt(generateSeqAccessCheck(luExp), currStates, currFailureStates, isAutoSelected)._1
       else
         throw UnknownException("Unkown type for lookup discovered")
-    }
-
-    if (stmt.methodCalls.size > 0) {
-
     }
 
     stmt match {
@@ -309,7 +339,10 @@ object Generator {
       case ProofVarDecl(pv, p) =>
         useAliasForProofVar = true
         currProofVarName = pv.name
-        val assertVarExists = vpr.Assert(vpr.Exists(Seq(getAliasForProofVar(pv)), Seq.empty, translateExp(p, state, currStates, currFailureStates))())(info = DeprecatedErr(p).getMsg)
+        val assertVarExists = vpr.Assert(vpr.Exists(Seq(getAliasForProofVar(pv)), Seq.empty, translateExp(p, state, currStates, currFailureStates))())(info = new Logger(VerificationErrors.Deprecated(p), Logger.ERR)
+          .addTitle("Verification Error")
+          .addOffset((stmt.offsetLeft, stmt.offsetRight))
+          .toAnnotationInfo())
         useAliasForProofVar = false
         val assumeP = vpr.Inhale(translateExp(p, state, currStates, currFailureStates))()
         newStmts = newStmts ++ Seq(assertVarExists, assumeP)
@@ -410,7 +443,10 @@ object Generator {
 
           callee.pre.foreach{ exp =>
             val vprExp = translateExp(exp, state, currStates, currFailureStates)
-            newStmts =  newStmts :+ vpr.Assert(vprExp)(info = MethodCallPreconditionErr(exp).getMsg)
+            newStmts =  newStmts :+ vpr.Assert(vprExp)(info = new Logger(VerificationErrors.MethodCall(exp), Logger.ERR)
+              .addTitle("Verification Error")
+              .addOffset((exp.offsetLeft, exp.offsetRight))
+              .toAnnotationInfo())
           }
 
           useParamsToArgsMap = false
@@ -604,7 +640,15 @@ object Generator {
         val getSkFuncName = "__get_Sk_" + loopCounter
         // Connect all invariants with && to form 1 invariant
         currLoopIndex = zero
-        val invariants = invWithHints.map(i => i._2) // TODO: Reuse this syntax above
+        val invs = invWithHints.map(i => i._2) // TODO: Reuse this syntax above
+
+        // append new invariants to the tracker
+        invs.foreach(i => {
+          if (i.debugId.isEmpty) {
+            val id = InvariantTracking.insert(new InvariantDebugInfo(i))
+            i.debugId = Some(id)
+          }
+        })
 
         // Let currStates == S0 before the loop
         // TODO: redefine this!
@@ -624,7 +668,7 @@ object Generator {
 
         newVars = Seq(loopFailureStates)
 
-        val normalizedInvariants = if (isAutoSelected) invariants else invariants.map(i => Normalizer.normalize(i, negate = false))
+        val normalizedInvariants = if (isAutoSelected) invs else invs.map(i => Normalizer.normalize(i, negate = false))
         if (!isAutoSelected) normalizedInvariants.foreach(i => Normalizer.detQuantifier(i, underForAll = false))
 
         if (autoSelectRules && rule == "unspecified") {
@@ -633,7 +677,7 @@ object Generator {
 
           if (!inline) {
             // Check whether sync(Tot) rule can be applied with a separate Viper program
-            val canUseSyncRule = checkSyncCondModular(normalizedInvariants, body, cond)
+            val canUseSyncRule = checkSyncCondModular(normalizedInvariants, body, cond) // TODO: Maybe update here
             new Logger("Can use sync rule? " + canUseSyncRule).log()
             if (canUseSyncRule) {
               val useSyncRule = if (loop.isTotal) {
@@ -754,9 +798,13 @@ object Generator {
           // Assert I(0)
           if (normalizedInvariants.nonEmpty) {
             for ((normalizedInv, i) <- normalizedInvariants.zipWithIndex) {
-              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = new Logger(VerificationErrors.LoopEntryPoint(invariants(i)), Logger.ERR)
+              val oInv = InvariantTracking.get(normalizedInv.debugId.get).inv
+              val qc = InvariantTracking.get(normalizedInv.debugId.get).quantifiersRemoved
+
+              newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = new Logger(VerificationErrors.LoopEntryPoint(oInv), Logger.ERR)
                 .addTitle("Verification Error")
-                .addOffset((invariants(i).offsetLeft, invariants(i).offsetRight))
+                .addQuantifiersRemoved(qc)
+                .addOffset((invs(i).offsetLeft, invs(i).offsetRight))
                 .toAnnotationInfo())
             }
           }
@@ -775,8 +823,7 @@ object Generator {
               newStmts = newStmts ++ invVerification._1
               newVars = newVars ++ invVerification._2
             } else {
-              // TODO: This need to be updated
-              val newMethod = translateInvariantVerificationModular(invariants, normalizedInvariants, cond, body, decr, rule, isAutoSelected)
+              val newMethod = translateInvariantVerificationModular(invs, normalizedInvariants, cond, body, decr, rule, isAutoSelected)
               allMethods = allMethods ++ newMethod
             }
           }
@@ -1207,7 +1254,7 @@ object Generator {
   // Remove the state that is quantified by a top-level existential quantifier
   // For every occurrence of the removed state, replace it with another state whose identifier is "_" + removed state identifier
   def removeTopExistsState(e: Expr, stateToRemove: String=""): Expr = {
-    e match {
+    val ret = e match {
       case a@Assertion(quantifier, assertVarDecls, body) =>
         if (a.topExists && stateToRemove == "") {
           val stateToRemove = a.assertVarDecls.head.vName.name
@@ -1265,6 +1312,9 @@ object Generator {
         else BoolLit(true)
       case _ => e
     }
+    ret.setOffsets(e.offsetLeft + 7, e.offsetRight)
+    ret.debugId = e.debugId
+    ret
   }
 
   def translateExistsRuleCond1(normalizedInvs: Seq[Expr], loopGuard: Expr, body: CompositeStmt, decrExpr: Expr): vpr.Method = {
@@ -1285,10 +1335,19 @@ object Generator {
     // Find the first invariant that contains a top-level existential quantifier
     val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i) == true).get
     pres = normalizedInvs.diff(Seq(firstExistsInv))
-    posts = pres.map(inv => (inv, Option(new Logger(VerificationErrors.LoopInvariant(inv, 0), Logger.ERR)
-      .addTitle("Verification Error")
-      .addOffset((inv.offsetLeft, inv.offsetRight))
-      .toAnnotationInfo())))
+    posts = pres.map(inv => {
+      val oInv = InvariantTracking.get(inv.debugId.get).inv
+      val qc = InvariantTracking.get(inv.debugId.get).quantifiersRemoved
+
+      (
+        inv,
+        Option(new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
+          .addTitle("Verification Error")
+          .addQuantifiersRemoved(qc)
+          .addOffset((inv.offsetLeft, inv.offsetRight))
+          .toAnnotationInfo())
+      )
+    })
 
     val exprAddedToPre = BinaryExpr(loopGuard, "&&", BinaryExpr(tProgVar, "==", decrExpr))
     pres = pres :+ addToTopExists(firstExistsInv, exprAddedToPre)
@@ -1319,17 +1378,33 @@ object Generator {
     pres = normalizedInvs.diff(Seq(firstExistsInv))
     posts = pres.map(inv => (inv, Option(null)))
 
-    val newInv = removeTopExistsState(firstExistsInv, "") // TODO: Here is the error
+    val newInv = removeTopExistsState(firstExistsInv, "")
+    // update removed quantifier count
+    InvariantTracking.get(firstExistsInv.debugId.get).incrRemovedQuantifier()
+    val oInv = InvariantTracking.get(firstExistsInv.debugId.get).inv
+    val qc = InvariantTracking.get(firstExistsInv.debugId.get).quantifiersRemoved
+
     val newState = State.localVar(stateAliasPrefix + stateRemoved + "_" + stateVarCounter)
     stateVarCounter = stateVarCounter + 1
     varsInStmt = varsInStmt :+ newState
     body.allProgVars +=  (newState.name -> StateType())
     pres = pres :+ newInv
-    val temp = (newInv, Option(LoopExistsInvErr(firstExistsInv).getMsg))
+    val temp = (
+      newInv,
+      Option(new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
+        .addTitle("Verification Error Special")
+        .addQuantifiersRemoved(qc)
+        .addOffset((oInv.offsetLeft, oInv.offsetRight))
+        .toAnnotationInfo())
+    )
     posts = posts :+ temp
 
     val stmt = WhileLoopStmt(loopGuard, body, pres.map(i => (Option.empty, i)), Option(decrExpr))
-    verifyStmtModular(methodName, stmt, varsInStmt, pres, posts)
+    val r = verifyStmtModular(methodName, stmt, varsInStmt, pres, posts)
+
+    InvariantTracking.get(firstExistsInv.debugId.get).decrRemovedQuantifier()
+
+    r
   }
 
   // This generates a method to verify the invariant when using sync, syncTot or forAllExists loop rule
@@ -1363,8 +1438,12 @@ object Generator {
     methodPres = methodPres :+ getAllInvariantsWithTriggers(normalizedInv, inputStates, inputFailureStates)
 
     for ((normInv, i) <- normalizedInv.zipWithIndex) {
-      methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = new Logger(VerificationErrors.LoopInvariant(invs(i), 0), Logger.ERR)
+      val oInv = InvariantTracking.get(normInv.debugId.get).inv
+      val qc = InvariantTracking.get(normInv.debugId.get).quantifiersRemoved
+
+      methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
         .addTitle("Verification Error")
+        .addQuantifiersRemoved(qc)
         .addOffset((invs(i).offsetLeft, invs(i).offsetRight))
         .toAnnotationInfo())
     }
@@ -1527,7 +1606,10 @@ object Generator {
     // Update loop index to be $n + 1 (Note that this only matters when the rule is default)
     currLoopIndex = vpr.Add(currLoopIndexDecl.localVar, one)()
     val assertIs = inv.map { i =>
-      vpr.Assert(translateExp(i, null, currStates, currFailureStates))(info = DeprecatedErr(i).getMsg)
+      vpr.Assert(translateExp(i, null, currStates, currFailureStates))(info = new Logger(VerificationErrors.Deprecated(i), Logger.ERR)
+        .addTitle("Verification Error")
+        .addOffset((i.offsetLeft, i.offsetRight))
+        .toAnnotationInfo())
     }
     ifBodyStmts = ifBodyStmts ++ assertIs
 

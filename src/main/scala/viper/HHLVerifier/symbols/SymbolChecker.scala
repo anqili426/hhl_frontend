@@ -1,7 +1,6 @@
 package viper.HHLVerifier.symbols
 
 import viper.HHLVerifier.management.Logger
-import viper.HHLVerifier._
 import viper.HHLVerifier.ast.{AssertStmt, AssertVar, AssertVarDecl, Assertion, AssignStmt, AssumeStmt, BinaryExpr, BoolLit, CombExpr, CompositeStmt, DeclareStmt, Expr, FrameStmt, HHLProgram, HavocStmt, Hint, HintDecl, HyperAssertStmt, HyperAssumeStmt, Id, IfElseStmt, ImpliesExpr, LengthExpr, LookupExpr, LoopIndex, MapAssignExpr, MapTupleExpr, Method, MethodCallExpr, MethodCallStmt, MultiAssignStmt, Num, PVarDecl, ProofVar, ProofVarDecl, ReuseStmt, SeqAssignExpr, SetAssignExpr, StateExistsExpr, Stmt, UnaryExpr, UpdateMapExpr, UseHintStmt, WhileLoopStmt}
 import viper.HHLVerifier.typing.Type
 

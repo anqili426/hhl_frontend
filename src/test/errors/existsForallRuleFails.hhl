@@ -1,0 +1,65 @@
+/*
+    A test case for errors caused by an invariant which doesn't hold after applying existsRule, stripping a quantifier, and then applying forallExistsRule.
+    Output:
+        [WhileLoop, forAllExistsRule selected, 1 quantifier(s) removed] The following invariant might not hold:
+        (true) && (forall <_s2: State> :: ((!(<_s2>)) || ((_s2[i]) >= (0))))
+
+        [WhileLoop, existsRule selected] The following invariant might not hold:
+        exists <_s1: State> :: ((<_s1>) && (forall <_s2: State> :: ((!(<_s2>)) || ((_s2[i]) >= (0)))))
+
+        [WhileLoop, existsRule selected] The following loop invariant might not hold at entry point:
+        exists <_s1: State> :: ((<_s1>) && (forall <_s2: State> :: ((!(<_s2>)) || ((_s2[i]) >= (0)))))
+*/
+
+method bla(n: Int) returns ()
+    requires exists <_s> :: true
+    ensures exists <_s> :: true
+{
+    var i: Int
+    var r: Int
+
+    havoc i {hint1}
+    use hint1(-1)
+    use hint1(1)
+
+    while (i >= 0 && i < n)
+        invariant exists <_s1> :: forall <_s2> :: _s2[i] >= 0
+        decreases n - i
+    {
+        havoc i {hint2}
+        use hint2(-1)
+        use hint2(1)
+
+        i := i + 1
+    }
+}
+
+
+/* TODO: Tell Anqi and Thibault that this does not terminate
+method minimum(n: Int) returns (x: Int, y: Int)
+    requires exists <_s> :: true
+    requires forall <_s1>, <_s2> :: _s1[n] == _s2[n]
+    ensures exists <_s1> :: forall <_s2> :: _s1[x] <= _s2[x] && _s1[y] <= _s2[y]
+{
+    var i: Int
+    var r: Int
+
+    i := 0
+    x := 0
+    y := 0
+
+    while existsRule (i < n)
+        invariant forall <_s1>, <_s2> :: _s1[n] == _s2[n] && _s1[i] == _s2[i]
+        invariant exists <_s1> :: forall <_s2> :: _s1[x] <= _s2[x] && _s1[y] <= _s2[y]
+        decreases n - i
+    {
+        havoc r {hint}
+        use hint(5)
+        x := x + y + 2 * i + 3 * r
+        y := x + 3 * i + 2 * r
+        if (x >= n) {
+            y := y + r
+        }
+        i := i + 1
+    }
+}*/

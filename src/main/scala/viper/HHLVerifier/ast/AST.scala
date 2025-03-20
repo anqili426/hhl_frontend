@@ -33,6 +33,10 @@ sealed class Expr() extends ErrorData {
    * operations with composite objects. For example, for intSeq[0] the type is Int, while the base type is Seq[Int] */
   var baseType: Type = UnknownType() // Additional type information needed to generate (e.g. type of map from which value is accessed)
 
+  /** Relates an expression to an earlier, untransformed expression
+   * used in the generator */
+  var debugId: Option[Int] = None
+
   def setOffsets: (Int, Int) => Expr =
     setOffsets[Expr]
 

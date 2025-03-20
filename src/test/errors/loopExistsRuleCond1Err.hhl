@@ -1,0 +1,49 @@
+/*
+    A test case for errors caused by a violation of the first condition in the exist rule.
+    Output Invariant Error:
+        Verification failed
+        [WhileLoop] The following transformed invariant (stripped from its existential quantifier) with the automatically chosen loop rule does not result in a postcondition that entails the original invariant
+        (true) && ((exists <_s2: State> :: ((<_s2>) && ((__s1_0[x]) != (_s2[x])))) || (exists <_s3: State> :: ((<_s3>) && ((__s1_0[x]) != (_s3[x])))))
+        Metadata:
+        - LoopRule: ExistsRule
+        - QuantifiersRemoved: 0
+
+    Output Variant Error:
+        Verification failed
+        [WhileLoop] The following variant might not decrease strictly:
+        10
+        Metadata:
+        - LoopRule: ExistsRule
+        - QuantifiersRemoved: 0
+
+        [Method] The following post condition might not hold:
+        exists <_s1: State>, <_s2: State> :: (((<_s1>) && (<_s2>)) && ((_s1[x]) != (_s2[x])))
+*/
+
+method loopExistsRuleCond1InvariantErr(x: Int) returns (z: Int)
+    requires exists <_s1>, <_s2> :: _s1[x] != _s2[x]
+    ensures exists <_s1>, <_s2> :: _s1[x] != _s2[x]
+{
+    var i: Int
+    i := 10
+    while (i > 0)
+        invariant exists <_s1> :: _s1[i] == 10
+        decreases i
+    {
+        i := i - 1
+    }
+}
+
+method loopExistsRuleCond1VariantErr(x: Int) returns (z: Int)
+    requires exists <_s1>, <_s2> :: _s1[x] != _s2[x]
+    ensures exists <_s1>, <_s2> :: _s1[x] != _s2[x]
+{
+    var i: Int
+    i := 10
+    while (i > 0)
+        invariant exists <_s1> :: _s1[i] <= 10 && _s1[i] >= 0
+        decreases 10
+    {
+        i := i - 1
+    }
+}
