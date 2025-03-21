@@ -3,6 +3,16 @@
 2. Install Boogie version 2.15.8.0
 3. Clone the project with the command `git clone --recursive https://github.com/anqili426/hhl_frontend.git`
 
+# Accessing the documentation
+
+The code of this project has been document using [scaladoc](https://docs.scala-lang.org/style/scaladoc.html). 
+The documentation can be found in the repository's <code>doc</code> folder or can be automatically generated 
+by running the <code>sbt doc</code> command. The generated documentation can be accessed via 
+<code>target/scala-2.13/api/index.html</code>. The <code>api</code> folder is self-contained.
+
+**Please note**: The documentation is still under development and therefore incomplete and possibly not absolutely accurate.
+Feel free to further improve it. Guidelines on how to write the documentation can be found via the link above.
+
 # Running the verifier
 ## To run in terminal
 Enter the following commands: 
