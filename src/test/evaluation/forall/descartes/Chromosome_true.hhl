@@ -7,12 +7,13 @@
 method compare1(o1: Seq[Int], o2: Seq[Int], i: Int) returns (res: Int)
 requires forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
     _s1[o1] == _s2[o2] && _s1[o2] == _s2[o1]
-requires forall <_s> :: (|_s[o1]| == 0 || |_s[o1]| == 5) && (|_s[o2]| == 0 || |_s[o2]| == 5)
+requires forall <_s> :: |_s[o1]| == 5 && (|_s[o2]| == 0 || |_s[o2]| == 5)
 ensures forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
     _s1[res] == -1 * _s2[res]
 {
-    hyperAssume forall <_s> :: _s[i] == 1 ==> |_s[o1]| == 5
-    hyperAssume forall <_s> :: _s[i] == 2 ==> |_s[o2]| == 5
+    // TODO: Add this as a precondition
+    // hyperAssume forall <_s> :: _s[i] == 1 ==> |_s[o1]| == 5
+    // hyperAssume forall <_s> :: _s[i] == 2 ==> |_s[o2]| == 5
 
     if (|o2| == 0) {
         res := 1

@@ -20,9 +20,9 @@ ensures forall <<_s>> :: false
     hyperAssert forall <_s> :: 2 in _s[m]
     hyperAssert forall <_s> :: 3 in _s[m]
 
-    hyperAssert forall <_s> :: (_s[m])[1] == 2
-    hyperAssert forall <_s> :: (_s[m])[2] == 3
-    hyperAssert forall <_s> :: (_s[m])[3] == 4
+    hyperAssert forall <_s> :: _s[m][1] == 2
+    hyperAssert forall <_s> :: _s[m][2] == 3
+    hyperAssert forall <_s> :: _s[m][3] == 4
 
     var m1: Map[Int, Int]
     var m2: Map[Int, Int]

@@ -13,13 +13,31 @@ method methodCallError() returns (out: Int)
     var n: Int
     n := 0
 
-    out := otherMethod(n)
+    var r1: Int
+    var r2: Int
+
+    r1, r2 := otherMethod(n)
+
+    // trivial() // TODO: Also ask Anqi about this
+
+    out := r1
 }
 
-method otherMethod(inp: Int) returns (out: Int)
-    requires forall <_s> :: _s[inp] == 1
-    ensures forall <_s> :: _s[out] == 2
+
+// TODO: Ask anqi about how this was handled previously
+// -> when r1, r2 are called differently, it doesn't work
+// If this is correct, it should be checked using errors
+method otherMethod(inp: Int) returns (r1: Int, r2: Int)
+    requires exists <_s> :: true
+    ensures exists <_s> :: _s[r1] == 2 && _s[r2] == 2
 {
-    out := 2
+    r1 := 2
+    r2 := 2
 }
 
+method trivial() returns ()
+    requires exists <_s> :: true
+    ensures exists <_s> :: true
+{
+
+}

@@ -2,7 +2,7 @@
     A simple program to test sets.
 */
 
-method testSets(in: Int) returns ()
+method testSets(inp: Int) returns ()
 requires forall <_s> :: true
 ensures forall <_s> :: true
 {
