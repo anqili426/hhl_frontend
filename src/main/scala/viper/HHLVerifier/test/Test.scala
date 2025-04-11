@@ -127,11 +127,15 @@ object Test {
     val pathOfExistsTests = "src/test/evaluation/exists"
     val pathOfForAllExistsTests = "src/test/evaluation/forall-exists"
     val pathOfExistsForAllTests = "src/test/evaluation/exists-forall"
+    val pathOfErrorTests = "src/test/errors"
+    val pathOfTypeTests = "src/test/types"
 
     val forAllTests = getListOfFiles(pathOfForAllTests)
     val existsTests = getListOfFiles(pathOfExistsTests)
     val forAllExistsTests = getListOfFiles(pathOfForAllExistsTests)
     val existsForAllTests = getListOfFiles(pathOfExistsForAllTests)
+    val errorTests = getListOfFiles(pathOfErrorTests)
+    val typeTests = getListOfFiles(pathOfTypeTests)
 
     var i = 0
     for (i <- 0 to numOfRep - 1) {
@@ -142,6 +146,8 @@ object Test {
       allTestData = allTestData ++ runTests(existsTests, "")
       allTestData = allTestData ++ runTests(forAllExistsTests, "")
       allTestData = allTestData ++ runTests(existsForAllTests, "")
+      allTestData = allTestData ++ runTests(errorTests, "")
+      allTestData = allTestData ++ runTests(typeTests, "")
       val failedNum = failedForAll.length + failedExists.length + failedOther.length
 
       println("---------------------")
