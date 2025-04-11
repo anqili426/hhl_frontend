@@ -1,0 +1,127 @@
+/**
+ * Based on http://codedbot.com/questions/5112702/comparison-method-violates-its-general-contractarraylist-comprasion 
+ * Fetched from the Descartes Benchmarks: https://github.com/marcelosousa/descartes/blob/master/benchmarks/pldi-16/stackoverflow/Word-false.java
+ */
+
+ // P1
+//  method compare1(arr1: Seq[Int], arr2: Seq[Int], count1: Int, count2: Int, i: Int) returns (res: Int)
+// requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+//     _s1[arr1] == _s2[arr2] && _s1[arr2] == _s2[arr1] &&
+//     _s1[count1] == _s2[count2] && _s1[count2] == _s2[count1]
+// ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 &&
+//     !((_s1[res] > 0 && _s2[res] < 0) || (_s1[res] < 0 && _s2[res] > 0) || (_s1[res] == 0 && _s2[res] == 0))
+// {
+//     var left: Int
+//     var right: Int
+//     left := count1
+//     right := count2
+
+//     if (left == right) {
+//         var exit: Bool
+//         exit := false
+
+//         if (|arr1| > |arr2|) {
+//             var i1: Int
+//             i1 := 0
+
+//             var aEntry: Int
+//             var bEntry: Int
+//             aEntry := 0
+//             bEntry := 0
+
+//             while (i1 < |arr2| && !exit)
+//             invariant forall <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+//                                             _s1[arr1] == _s2[arr2] && _s1[arr2] == _s2[arr1] && _s[]
+//             invariant forall <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+//                                             (_s1[aEntry] == _s2[bEntry] && _s1[bEntry] == _s2[aEntry])
+//             invariant forall <_s> :: (_s[exit] == false) ==> 
+//                                     (_s[aEntry] == _s[bEntry] && _s[res] == 0)
+//             invariant forall <_s> :: (_s[exit] == true) ==> 
+//                                     ((_s[aEntry] > _s[bEntry] && _s[res] == 1) || (_s[aEntry] < _s[bEntry] && _s[res] == -1))
+//             {
+//                 aEntry := arr1[i1]
+//                 bEntry := arr2[i1]
+
+//                 if (aEntry < bEntry) {
+//                     res := 1
+//                     exit := true
+//                 } else {
+//                     i1 := i1 + 1
+//                 }
+//             }
+
+//             res := -1
+//             exit := true
+
+//             // hyperAssert exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 &&
+//             //     !((_s1[res] > 0 && _s2[res] < 0) || (_s1[res] < 0 && _s2[res] > 0) || (_s1[res] == 0 &&
+//             //     _s2[res] == 0))
+//         } else {
+//             // var i2: Int
+//             // i2 := 0
+            
+//             // while (i2 < |arr2| && !exit) {
+//             //     if (arr1[i2] < arr2[i2]) {
+//             //         res := -1
+//             //         exit := true
+//             //     } else {
+//             //         i2 := i2 + 1
+//             //     }
+//             // }
+
+//             // res := 1
+//             // exit := true
+//         }
+//     } else {
+//         if (left > right) {
+//             res := 1
+//         } else {
+//             res := -1
+//         }
+//     }
+// }
+
+method alternative(arr1: Seq[Int], arr2: Seq[Int], i: Int) returns (res: Int)
+requires exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+    _s1[arr1] == _s2[arr2] && _s1[arr2] == _s2[arr1]
+requires forall <_s> :: |_s[arr1]| == |_s[arr2]| && |_s[arr1]| > 0
+ensures exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 &&
+    !((_s1[res] > 0 && _s2[res] < 0) || (_s1[res] < 0 && _s2[res] > 0) || (_s1[res] == 0 && _s2[res] == 0))
+{
+    var i1: Int
+    i1 := 0
+
+    var exit: Bool
+    exit := false
+
+    var aEntry: Int
+    var bEntry: Int
+    aEntry := 0
+    bEntry := 0
+
+    while (i1 < |arr2| && !exit)
+    invariant exists <_s1>, <_s2> :: _s1[i] == 1 && _s2[i] == 2 ==>
+                                    _s1[arr1] == _s2[arr2] && _s1[arr2] == _s2[arr1] && _s1[i1] == _s2[i1]
+    invariant exists <_s1>, <_s2> :: (_s1[i] == 1 && _s2[i] == 2) ==>
+                                    (_s1[aEntry] == _s2[bEntry] && _s1[bEntry] == _s2[aEntry])
+
+    invariant exists <_s> :: (_s[exit] == false) ==> 
+                            (_s[aEntry] == _s[bEntry] && _s[res] == 0)
+    invariant exists <_s> :: (_s[exit] == true) ==> 
+                            ((_s[aEntry] > _s[bEntry] && _s[res] == 1) || (_s[aEntry] < _s[bEntry] && _s[res] == -1))
+    decreases |arr2| - i1
+    {
+        aEntry := arr1[i1]
+        bEntry := arr2[i1]
+
+        if (aEntry < bEntry) {
+            res := 1
+            exit := true
+        } else {
+            i1 := i1 + 1
+        }
+    }
+
+    res := -1
+    exit := true
+}
