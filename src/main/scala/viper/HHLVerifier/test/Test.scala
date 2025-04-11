@@ -2,7 +2,6 @@ package viper.HHLVerifier.test
 
 import viper.HHLVerifier.Main
 import au.com.bytecode.opencsv.CSVWriter
-import viper.HHLVerifier.management.ViperRunner
 import viper.HHLVerifier.parsing.Parser
 
 import java.io.{BufferedWriter, File, FileWriter}
@@ -40,8 +39,11 @@ object Test {
 
   def getDataForTestCase(testPath: String): Array[Int] = {
     val programSource = scala.io.Source.fromFile(testPath)
-    val program = programSource.mkString
-    programSource.close()
+    val program = try {
+      programSource.mkString
+    } finally {
+      programSource.close()
+    }
     val allLines = program.split("\n")
     val allNonemptyLines = allLines.filter(l => l.trim.nonEmpty)
 
@@ -88,13 +90,14 @@ object Test {
       print(f)
       val argsForMain = Array(f.getPath, option, "--auto")
       Main.test = true
+      Main.logsActive = false
       Main.main(argsForMain)
       totalRuntime = totalRuntime + Main.runtime
 
       var res = "Failed"
       if ((!f.getName.endsWith("false.hhl") && Main.verified != 2) || (f.getName.endsWith("false.hhl") && Main.verified != 1)) {
         println(" Failed")
-        println(Main.errMessages)
+        // println(Main.errMessages)
         if (option == "--forall") failedForAll = failedForAll :+ f.getPath
         else if (option == "--exists") failedExists = failedExists :+ f.getPath
         else failedOther = failedOther :+ f.getPath

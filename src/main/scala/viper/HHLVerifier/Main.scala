@@ -20,6 +20,7 @@ object Main {
   var test = false
   var testWithLogs = false
   var errMessages: Seq[String] = Seq("")
+  var logsActive = true
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -73,7 +74,7 @@ object Main {
         new Logger("Type checking successful.").log()
 
         // Generate the Viper program
-        val viperProgram = Generator.generate(parsedProgram, program)
+        val viperProgram = Generator.generate(parsedProgram)
         SymbolChecker.reset()
         TypeChecker.reset()
         Generator.reset()
@@ -107,23 +108,25 @@ object Main {
             case ResFailure(err) =>
               verified = 1
               new Logger(f"The provided program could not be verified. Runtime: ${runtime}s", Logger.ERR).addTitle("Verification failed").log()
-              err.foreach(e => println(e)) // AnnotationInfos are already correctly formatted, they just need to be printed
+              if (logsActive) err.foreach(e => println(e)) // AnnotationInfos are already correctly formatted, they just need to be printed
           }
         }
       } else {
         val Parsed.Failure(expc, pos, extra) = res
-        println(extra.trace().longMsg)
+        System.err.println("Error Trace: " + extra.trace().longMsg)
         new Logger(extra.trace().msg, Logger.ERR).addTitle("Parser Error").addOffset((pos, pos+10)).log()
       }
     } catch {
       case e: VerifierException =>
         verified = 1
-        println(e.errMsg)
+        new Logger(e.getMessage, Logger.ERR).addTitle("Verifier Exception").log()
+        e.printStackTrace(System.err)
       case e: Logger =>
         e.log()
       case e: Exception =>
         verified = 1
         new Logger(e.getMessage, Logger.ERR).addTitle("Unkown Exception").log()
+        e.printStackTrace(System.err)
     }
   }
 }

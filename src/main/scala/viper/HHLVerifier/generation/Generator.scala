@@ -142,12 +142,13 @@ object Generator {
     def remove(key: Int): Unit = tracker.removed(key)
   }
 
-  // Main generate method
-  // - saves program source and used types
-  // - creates all aspects necessary for generating a vpr program
-  // - creates preamble containing all necessary base functions
-  // - translates actual program
-  def generate(input: HHLProgram, source: String): vpr.Program = {
+  /** Main generate method
+   * - saves program source and used types
+   * - creates all aspects necessary for generating a vpr program
+   * - creates preamble containing all necessary base functions
+   * - translates actual program
+   */
+  def generate(input: HHLProgram): vpr.Program = {
     val fields: Seq[vpr.Field] = Seq.empty
     val predicates: Seq[vpr.Predicate] = Seq.empty
     val extensions: Seq[vpr.ExtensionMember] = Seq.empty
@@ -167,17 +168,17 @@ object Generator {
   //    body: empty
   // 2. The method should contain domain declarations
 
+  /** Resets all variables used in the generation. */
   def reset(): Unit = {
     allDomains = Seq.empty
     allMethods = Seq.empty
     allFuncs = Seq.empty
   }
 
-  // Translate every method individually
+  /** Translates program by translating all methods individually. */
   def translateProgram(input: HHLProgram): Unit = input.content.map(translateMethod)
 
-  // Translate a method
-  // -
+  /** Translates a Hypra method. Individual steps annotated in code. */
   def translateMethod(method: Method): Unit = {
     currMethod = method
     // Declaring states
@@ -283,11 +284,13 @@ object Generator {
     postIsTopExists = false
   }
 
-  /*
-  * The following method returns:
-  * 1. the translated statement(s)
-  * 2. new auxiliary variables added during translation (happens when translating an if-else block)
-  */
+  /**
+   * Translates an individual statement.
+   *
+   * The following method returns:
+   * 1. the translated statement(s)
+   * 2. new auxiliary variables added during translation (happens when translating an if-else block)
+   */
   def translateStmt(stmt: Stmt, currStates: vpr.LocalVar, currFailureStates: vpr.LocalVar, isAutoSelected: Boolean = false): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
     // A set of states
     val STmp = SetState.localVar(tempStatesVarName) // val STmp = vpr.LocalVar(tempStatesVarName, currStates.typ)()
@@ -985,14 +988,35 @@ object Generator {
     )
   )
 
+  /**
+   * Converts a default expression into a Hyper Expression by associating every variable with a state.
+   * @param e expression to be converted
+   * @param state the state
+   * @return modified expression
+   */
   def getExprInState(e: Expr, state: SpecialId): Expr = {
-    e match {
+    val newE = e match {
       case id@Id(_) => LookupExpr(state, id)
       case ImpliesExpr(left, right) => ImpliesExpr(getExprInState(left, state), getExprInState(right, state))
       case BinaryExpr(e1, op, e2) => BinaryExpr(getExprInState(e1, state), op, getExprInState(e2, state))
       case UnaryExpr(op, body) => UnaryExpr(op, getExprInState(body, state))
+      // new operations for composite types
+      case SeqAssignExpr(elements) => SeqAssignExpr(elements.map(el => getExprInState(el, state)))
+      case SetAssignExpr(elements) => SetAssignExpr(elements.map(el => getExprInState(el, state)))
+      case MapAssignExpr(elements) => MapAssignExpr(elements.map(el => MapTupleExpr(getExprInState(el.k, state), getExprInState(el.v, state))))
+      case LookupExpr(id, index) => LookupExpr(getExprInState(id, state), getExprInState(index, state))
+      case LengthExpr(e) => LengthExpr(getExprInState(e, state))
+      case CombExpr(lhs, rhs, op) => CombExpr(getExprInState(lhs, state), getExprInState(rhs, state), op)
+      case UpdateMapExpr(id, update) => UpdateMapExpr(getExprInState(id, state), MapTupleExpr(getExprInState(update.k, state), getExprInState(update.v, state)))
       case _ => e
     }
+
+    newE.typ = e.typ
+    newE.debugId = e.debugId
+    newE.offsetRight = e.offsetRight
+    newE.offsetLeft = e.offsetLeft
+
+    newE
   }
 
   // This returns:
@@ -1050,8 +1074,15 @@ object Generator {
     translateAssumeWithViperExpr(state, S1, rightExpr, triggers = Seq(trigger), useForAll = useForAll)
   }
 
+  /**
+   * Creates a method which tests if the sync condition holds for a while loop. This method is then
+   * executed by Viper and the result is returned
+   * @param normalizedInv normalized invariants
+   * @param body loop body
+   * @param loopGuard loop guard
+   * @return true if the sync condition holds
+   */
   def checkSyncCondModular(normalizedInv: Seq[Expr], body: CompositeStmt, loopGuard: Expr): Boolean = {
-    // println(f"Invariants: ${normalizedInv}\nloopGuard: $loopGuard")
     val inputStates = SetState.localVarDecl("S0")
     val outputStates = SetState.localVarDecl("SS")
     val inputFailureStates = SetState.localVarDecl("S0_fail")
@@ -1097,8 +1128,9 @@ object Generator {
     ViperRunner.interpretResult(res)
   }
 
-  // Returns true if e satisfies the condition that there are no forall quantifiers over states after an exists quantifier
-  // Note that the input e is expected to be normalized, so e contains no implications
+  /** Returns true if e satisfies the condition that there are no forall quantifiers over states after an exists quantifier
+    * Note that the input e is expected to be normalized, so e contains no implications
+    */
   def checkForAllExistsRuleSideCondition(e: Expr, underExists: Boolean): Boolean = {
     e match {
       case Assertion(quantifier, vars, body) =>
@@ -1114,6 +1146,7 @@ object Generator {
     }
   }
 
+  /** Translates an assertion by setting the **needTriggers** flag and then calling translateExp. */
   def getAssertionWithTriggers(assertion: Expr, currStates: vpr.Exp, failureStates: vpr.Exp): vpr.Exp = {
     needTriggers = true
     val translatedExpr = translateExp(assertion, null, currStates, failureStates)
@@ -1121,12 +1154,14 @@ object Generator {
     translatedExpr
   }
 
+  /** Translates all provided invariants with triggers. */
   def getAllInvariantsWithTriggers(normalizedInvs: Seq[Expr], currStates: vpr.Exp, failureStates: vpr.Exp): vpr.Exp = {
     if (normalizedInvs.isEmpty) return trueLit
     val translatedInvs = normalizedInvs.map(i => getAssertionWithTriggers(i, currStates, failureStates))
     getAndOfExps(translatedInvs)
   }
 
+  /** Translates all provided expressions into Viper expressions and forms a conjunction */
   def getAllInvariants(invs: Seq[Expr], currStates: vpr.Exp, failureStates: vpr.Exp): vpr.Exp = {
     if (invs.isEmpty) return trueLit
     val translatedInvs = invs.map(i => translateExp(i, null, currStates, failureStates))
@@ -1171,6 +1206,8 @@ object Generator {
       Option(vpr.Seqn(methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()))()))()
   }
 
+  /** Translates the provided statement in a modular fashion by generating a seperate method in the Viper AST.
+   * Used to verify loop rule conditions in a modular fashion. */
   def verifyStmtModular(methodName: String, stmt: Stmt, allProgVarsInStmt: Seq[vpr.LocalVar], pres: Seq[Expr], posts: Seq[(Expr, Option[Info])]): vpr.Method = {
     val inputStates = SetState.localVarDecl("S0")
     val outputStates = SetState.localVarDecl("SS")
@@ -1202,8 +1239,8 @@ object Generator {
     createViperMethod(methodName, args, Seq.empty, methodPres, methodPosts, methodBody, methodLocalVars.map(i => vpr.LocalVarDecl(i.name, i.typ)()))
   }
 
-  // This returns a sequence of int variables and a sequence of non-int variables
-  // And an expression that ensures that all int variables are unique
+  /** This returns a sequence of int variables and a sequence of non-int variables
+    * And an expression that ensures that all int variables are unique. */
   def separateVarsByType(vars: Seq[vpr.LocalVar]): (Seq[vpr.LocalVar], Seq[vpr.LocalVar], Seq[vpr.LocalVar], Seq[vpr.Exp]) = {
     val allIntVars = vars.filter(v => v.typ == vpr.Int)
     val stateVars = vars.filter(v => v.typ == State.stateType)
@@ -1214,7 +1251,9 @@ object Generator {
     (allIntVars, stateVars, allOtherVars, exp)
   }
 
-  // e is exptected to be normalized, so it shouldn't contain any implications
+  /** Checks if an expression has an outermost exists quantifiers.
+   * NOTE:  e is exptected to be normalized, so it shouldn't contain any implications.
+   */
   def checkHasTopExists(e: Expr): Boolean = {
     e match {
       case a@Assertion(_, _, _) => a.topExists
@@ -1228,8 +1267,9 @@ object Generator {
     }
   }
 
-  // e is exptected to be normalized, so it shouldn't contain any implications
-  // e is expected to contain a top-level existential quantifier
+  /**  Adds an expression to another expression containing an outermost exists quantifier
+   * NOTE: e is exptected to be normalized, so it shouldn't contain any implications
+   * NOTE: e is expected to contain a top-level existential quantifier */
   def addToTopExists(e: Expr, toAdd: Expr): Expr = {
     e match {
       case a@Assertion(quantifier, assertVarDecls, body) =>
@@ -1291,14 +1331,6 @@ object Generator {
         val newLeft = removeTopExistsState(left, stateToRemove)
         val newRight = removeTopExistsState(right, stateToRemove)
         ImpliesExpr(newLeft, newRight)
-        // TODO: THIS MUST BE ADAPTED ABOVE
-      /*case GetValExpr(state, id) =>
-        if (state.idName != stateToRemove) e
-        else {
-          val newStateVar = AssertVar(stateAliasPrefix + stateToRemove + "_" + stateVarCounter)
-          newStateVar.typ = state.typ
-          GetValExpr(newStateVar, id)
-        }*/
       case expr@LookupExpr(id, index) =>
         if (id.typ.isInstanceOf[StateType]) {
           if (id.asInstanceOf[SpecialId].idName != stateToRemove) e
@@ -1318,8 +1350,12 @@ object Generator {
     ret.setOffsets(e.offsetLeft + 7, e.offsetRight)
     ret.debugId = e.debugId
     ret
+
+    // TODO: Maybe more type support is needed here
   }
 
+  /** Creates a modular method to check if the first exists rule condition holds.
+   * More Information about this method can be found in the paper under the section regarding loop translation. */
   def translateExistsRuleCond1(normalizedInvs: Seq[Expr], loopGuard: Expr, body: CompositeStmt, decrExpr: Expr): vpr.Method = {
     val methodName = checkExistsRuleCond1MethodName + "_" + loopCounter
     val tViperVar = vpr.LocalVar(tVarName + loopCounter, vpr.Int)()
@@ -1366,6 +1402,8 @@ object Generator {
     verifyStmtModular(methodName, stmt, varsInStmt, pres, posts)
   }
 
+  /** Creates a modular method to check if the second exists rule condition holds.
+   * More Information about this method can be found in the paper under the section regarding loop translation. */
   def translateExistsRuleCond2(normalizedInvs: Seq[Expr], loopGuard: Expr, body: CompositeStmt, decrExpr: Expr): vpr.Method = {
     val methodName = checkExistsRuleCond2MethodName + "_" +loopCounter
     var varsInStmt = body.allProgVars.map(v => vpr.LocalVar(v._1, v._2 match {
@@ -1412,7 +1450,7 @@ object Generator {
     r
   }
 
-  // This generates a method to verify the invariant when using sync, syncTot or forAllExists loop rule
+  /** Generates a method to verify the invariant when using sync, syncTot or forAllExists loop rule */
   def translateInvariantVerificationModular(invs: Seq[Expr], normalizedInv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, decrExpr: Option[Expr], rule: String, isAutoSelected: Boolean): Seq[vpr.Method] = {
     val methodName = if (!isAutoSelected) checkInvMethodName + "_" + rule + loopCounter
     else checkInvMethodName + "_" + rule + "_auto" + loopCounter
@@ -1532,6 +1570,7 @@ object Generator {
     Seq(method)
   }
 
+  /** Translates an invariant when using sync, syncTot or forAllExists loop rule without generating a new method. */
   def translateInvariantVerificationInline(inv: Seq[Expr], loopGuard: Expr, loopBody: CompositeStmt, decrExpr: Option[Expr], currStates: vpr.LocalVar, currFailureStates: vpr.LocalVar, rule: String, isAutoSelected: Boolean): (Seq[vpr.Stmt], Seq[vpr.LocalVar]) = {
     var returnedStmts: Seq[vpr.Stmt] = Seq.empty
     var ifBodyStmts: Seq[vpr.Stmt] = Seq.empty
@@ -1638,7 +1677,7 @@ object Generator {
     (returnedStmts, returnedVars)
   }
 
-  // Returns an alias that is formed by appending a $ to v's identifier
+  /** Returns an alias that is formed by appending a $ to v's identifier */
   def getAliasForProofVar(v: ProofVar): vpr.LocalVarDecl = {
     if (!useAliasForProofVar) throw UnknownException("Method getAliasForProofVar cannot be called when assertProofVar == false")
     vpr.LocalVarDecl("$" + v.name, translateType(v.typ))()
@@ -1665,7 +1704,15 @@ object Generator {
     Seq(unlimited, limited)
   }
 
-  // Note that second argument, state, is only used to translate id
+  /**
+   * Translates a provided expression into a Viper expression
+   * @param e the expression to be translated
+   * @param state the state which is used to lookup variables
+   * @param currStates set of states
+   * @param failureStates set of error states
+   * @param info
+   * @return translated Viper expression
+   */
   def translateExp(e: Expr, state: vpr.LocalVar, currStates: vpr.Exp, failureStates: vpr.Exp, info: Info = NoInfo): vpr.Exp = {
     e match {
       case id@Id(_) => State.get(state, id)
@@ -1801,12 +1848,12 @@ object Generator {
     }
   }
 
+  /** Generate 2 Viper functions for the hint declaration
+   * 1. A function named as decl.name where body is an expression that evaluates to true
+   * 2. A function named as decl.name + hintWrapperSuffix where body is a call to the function above
+   * The second function is needed when the hint is used in the postcondition */
   def translateHintDecl(decl: HintDecl, arg: vpr.Exp): vpr.Exp = {
     if (verifierOption == 0) throw UnknownException("Hints cannot be declared when using forall-HHL")
-    // Generate 2 Viper functions for the hint declaration
-    // 1. A function named as decl.name where body is an expression that evaluates to true
-    // 2. A function named as decl.name + hintWrapperSuffix where body is a call to the function above
-    // The second function is needed when the hint is used in the postcondition
     val k = vpr.LocalVarDecl(kVarName, vpr.Int)()
 
     val allFuncsNames = allFuncs.map(f => f.name)
@@ -1830,8 +1877,8 @@ object Generator {
     vpr.LocalVarDecl(decl.vName.name, translateType(decl.vType))()
   }
 
-  // This returns a Viper assume statement that expresses the following:
-  // assume forall stateVar :: in_set(state1, S1) ==> (exists state2 :: in_set(state2, S2) && equal_on_everything_except(state1, state2, varToHavoc) && extraExp)
+  /** This returns a Viper assume statement that expresses the following:
+    * assume forall stateVar :: in_set(state1, S1) ==> (exists state2 :: in_set(state2, S2) && equal_on_everything_except(state1, state2, varToHavoc) && extraExp) */
   def translateHavocVarHelper(S1: vpr.LocalVar, S2: vpr.LocalVar, state1: vpr.LocalVar, state2: vpr.LocalVar,
                               varToHavoc: vpr.LocalVarDecl, extraExp: vpr.Exp = null, extraVar: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty, useForAll: Boolean = true) : vpr.Inhale = {
     var itemsInExistsExpr: Seq[vpr.Exp] = Seq(SetState.getInSetApp(Seq(state2, S2), useForAll),
@@ -1841,8 +1888,8 @@ object Generator {
     translateAssumeWithViperExpr(state1, S1, existsExpr, extraVarDecl=extraVar, triggers=triggers, useForAll=useForAll)
   }
 
-  // This returns a Viper assume statement of the form "assume forall state (, extraVar) :: in_set(state, S) (&& leftExp) => (rightExp)"
-  // T is determined by the typVarMap(T -> someType)
+  /** This returns a Viper assume statement of the form "assume forall state (, extraVar) :: in_set(state, S) (&& leftExp) => (rightExp)"
+   * T is determined by the typVarMap(T -> someType) */
   def translateAssumeWithViperExpr(state: vpr.LocalVar, S: vpr.LocalVar, rightExp: vpr.Exp,
                                    leftExp: vpr.Exp = null, extraVarDecl: vpr.LocalVarDecl = null, triggers: Seq[vpr.Trigger] = Seq.empty, useForAll: Boolean = true) : vpr.Inhale = {
     val lhs = {
@@ -1883,7 +1930,7 @@ object Generator {
     (domains, methods)
   }
 
-  // Connects all expressions in the input with "&&"
+  /** Forms a conjuction all provided expressions */
   def getAndOfExps(exps: Seq[vpr.Exp]): vpr.Exp = {
     if (exps.isEmpty) throw UnknownException("The input to getAndOfExps cannot be an empty sequence")
     exps.reduceLeft((e1, e2) => vpr.And(e1, e2)())
@@ -1897,9 +1944,12 @@ object Generator {
     vpr.MethodCall(havocIntMethodName, Seq.empty, Seq(i))(pos = vpr.NoPosition, info = vpr.NoInfo, errT = vpr.NoTrafos)
   }
 
-  // translate type to vpr type
+  /**
+   * Translates a Hypra type into the corresponding Viper type.
+   * @param typ type to be translated
+   * @return translated Viper type
+   */
   def translateType(typ: Type): vpr.Type = {
-    // println("translating type:" + typ)
     typ match {
       case t: IntType => vpr.Int
       case t: BoolType => vpr.Bool

@@ -1,6 +1,7 @@
 package viper.HHLVerifier.management
 
 import play.api.libs.json._
+import viper.HHLVerifier.Main.logsActive
 import viper.HHLVerifier.ast.Expr
 import viper.silver.ast.AnnotationInfo
 
@@ -35,7 +36,9 @@ class Logger(val message: String, val level: String = Logger.INFO) extends Throw
     this
   }
 
-  def log(): Unit = { println(Logger.format(this)) }
+  def log(): Unit = {
+    if (logsActive) println(Logger.format(this))
+  }
   def toAnnotationInfo(): AnnotationInfo = AnnotationInfo(Map("msg" -> Seq(Logger.format(this))))
 
   def toJson: JsValue = {
@@ -115,6 +118,6 @@ object VerificationErrors {
   def MethodCall(expr: Expr) = f"The precondtion ${expr.toString()} might not hold"
   def LoopEntryPoint(expr: Expr) = f"The loop invariant ${expr.toString()} might not hold at entry point"
   def LoopSyncGuard(expr: Expr) = f"The loop guard ${expr.toString()} might not be identical for all states"
-  def LoopVariant(expr: Expr) = f"The variant ${expr.toString()} might not strictly decrease"
-  def LoopInvariant(expr: Expr) = f"The invariant ${expr.toString()} might not hold"
+  def LoopVariant(expr: Expr) = f"The loop variant ${expr.toString()} might not strictly decrease"
+  def LoopInvariant(expr: Expr) = f"The loop invariant ${expr.toString()} might not hold"
 }
