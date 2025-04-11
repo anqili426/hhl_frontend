@@ -181,7 +181,7 @@ object Parser {
   /** Lookup Expression: Accessing values from a base object. */
   def lookupExpr[$: P]: P[(Expr, Expr)] = P(implicationExpr).map{ case(expr) => (expr, null)}
   /** UpdateExpr: Updating a value for a key in a map */
-  def updateExpr[$: P]: P[(Expr, Expr)] = P(implicationExpr ~ ":=" ~ implicationExpr)
+  def updateExpr[$: P]: P[(Expr, Expr)] = P(basicExpr ~ ":=" ~ implicationExpr)
 
   /** Basic Expression: Fundamental expression, hanlding all basic cases. */
   def basicExpr[$: P]: P[Expr] = P(Index ~ (compositeTypeAssign | lengthExpr | loopIndex | proofVar | boolean | unaryExpr | useHint | identifier | number  | "(" ~ expr ~ ")") ~ Index).map{
