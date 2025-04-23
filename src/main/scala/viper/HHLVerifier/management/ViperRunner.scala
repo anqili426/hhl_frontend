@@ -93,7 +93,7 @@ object ViperRunner {
                 if (!resPromise.isCompleted) {
                   if (!checkSideCondition) {
                     new Logger("Carbon failed to verify the program.").log()
-                    if (logsActive) err.foreach(e => println(e.readableMessage))
+//                    if (logsActive) err.foreach(e => println(e.readableMessage))
                   }
                   if (!siliconRes.isCompleted) {
                     try {
@@ -126,7 +126,7 @@ object ViperRunner {
                 if (!resPromise.isCompleted) {
                   if (!checkSideCondition) {
                     new Logger("Silicon failed to verify the program.").log()
-                    if (logsActive) err.foreach(e => println(e.readableMessage))
+//                    if (logsActive) err.foreach(e => println(e.readableMessage))
                   }
                   if (!carbonRes.isCompleted) {
                     try {

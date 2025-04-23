@@ -73,18 +73,23 @@ object Logger {
 
   // convert logger entry to string
   def format(entry: Logger): String = if (isVSCodeExtension) {
-    entry.toJson.toString()
+    entry.toJson.toString().replace("\"", "'")
   } else {
     val time = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm").format(entry.timestamp)
     val level = Logger.translateLevel(entry.level)
 
     var out = f"[$time] [$level]"
+    if (entry.extra.contains("title")) out += " " + entry.extra.get("title").get
     if (entry.extra.contains("offsetLeft")) {
       val (line, offset) = getLineAndOffset(entry.extra.get("offsetLeft").get.toString().toInt)
-      out += f" in $filePath:$line:$offset"
+      out += f" in $filePath:$line:$offset:"
     }
-    if (entry.extra.contains("title")) out += " " + entry.extra.get("title").get + ":"
+
     out += " " + entry.message
+
+    if (entry.extra.contains("quantifiersRemoved") && entry.extra.get("quantifiersRemoved").get.asInstanceOf[Int] > 0) out += s" (${entry.extra.get("quantifiersRemoved").get} existential quantifier(s) removed)"
+    if (entry.extra.contains("whileRule")) out += s" (${entry.extra.get("whileRule").get})"
+
     out
   }
 
@@ -115,9 +120,10 @@ object VerificationErrors {
   def Postcondition(expr: Expr) = f"The post condition ${expr.toString()} might not hold"
   def HyperAssertion(expr: Expr) = f"The hyper assertion ${expr.toString()} might not hold"
   def Deprecated(expr: Expr) = f"The expression ${expr.toString()} caused an error, but this should be deprecated"
-  def MethodCall(expr: Expr) = f"The precondtion ${expr.toString()} might not hold"
+  def MethodCall(expr: Expr) = f"The precondtion ${expr.toString()} might not hold when to associated method is called"
   def LoopEntryPoint(expr: Expr) = f"The loop invariant ${expr.toString()} might not hold at entry point"
   def LoopSyncGuard(expr: Expr) = f"The loop guard ${expr.toString()} might not be identical for all states"
   def LoopVariant(expr: Expr) = f"The loop variant ${expr.toString()} might not strictly decrease"
   def LoopInvariant(expr: Expr) = f"The loop invariant ${expr.toString()} might not hold"
+  def ExistsRuleNoStateFound(expr: Expr) = f"There exists no state for which the invariant and the loops variant represented by ${expr.toString()} hold. This can be ignored if either the invariant or the variant could not be verified individually"
 }

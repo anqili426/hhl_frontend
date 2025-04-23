@@ -1,9 +1,5 @@
 /*
     A test case for errors caused by a frame statement which may not hold.
-    Output:
-        Verification failed
-        [Frame] The following hyper assertion used in a frame might not hold:
-        forall <_s: State> :: ((<_s>) ==> (false))
 */
 
 method frameErr() returns (out: Int)

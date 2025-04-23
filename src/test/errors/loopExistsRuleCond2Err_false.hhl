@@ -1,12 +1,5 @@
 /*
     A test case for errors caused by a violation of the second condition in the exist rule.
-    Output:
-        Verification failed
-        [WhileLoop] The following transformed invariant (stripped from its existential quantifier) with the automatically chosen loop rule does not result in a postcondition that entails the original invariant
-        (true) && ((exists <_s2: State> :: ((<_s2>) && ((__s1_0[x]) != (_s2[x])))) || (exists <_s3: State> :: ((<_s3>) && ((__s1_0[x]) != (_s3[x])))))
-        Metadata:
-        - LoopRule: ExistsRule
-        - QuantifiersRemoved: 0
 */
 
 method loopExistsRuleErr(x: Int) returns (z: Int)

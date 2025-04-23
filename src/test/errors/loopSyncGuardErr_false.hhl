@@ -1,12 +1,5 @@
 /*
     A test case for errors caused by a loops invariant which may not hold at entry point.
-    Output:
-        Verification failed
-        [WhileLoop] The following loop guard might not be identical for all states, violating low(b):
-        (i) < (2)
-        Metadata:
-        - LoopRule: syncTotRule
-        - QuantifiersRemoved: 0
 */
 
 method loopSyncGuardErr() returns (i: Int)

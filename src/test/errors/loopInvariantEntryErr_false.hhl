@@ -1,12 +1,5 @@
 /*
     A simple test case for errors caused by a loops invariant which may not hold at entry point.
-    Output:
-        Verification failed
-        [WhileLoop] The following loop invariant might not hold at entry point:
-        forall <_s: State> :: ((!(<_s>)) || (false))
-        Metadata:
-        - LoopRule: syncRule
-        - QuantifiersRemoved: 0
 */
 
 method loopInvariantEntryErr() returns (out: Int)

@@ -1,14 +1,5 @@
 /*
     A test case for errors caused by an invariant which doesn't hold after applying existsRule, stripping a quantifier, and then applying forallExistsRule.
-    Output:
-        [WhileLoop, forAllExistsRule selected, 1 quantifier(s) removed] The following invariant might not hold:
-        (true) && (forall <_s2: State> :: ((!(<_s2>)) || ((_s2[i]) >= (0))))
-
-        [WhileLoop, existsRule selected] The following invariant might not hold:
-        exists <_s1: State> :: ((<_s1>) && (forall <_s2: State> :: ((!(<_s2>)) || ((_s2[i]) >= (0)))))
-
-        [WhileLoop, existsRule selected] The following loop invariant might not hold at entry point:
-        exists <_s1: State> :: ((<_s1>) && (forall <_s2: State> :: ((!(<_s2>)) || ((_s2[i]) >= (0)))))
 */
 
 method bla(n: Int) returns ()

@@ -21,8 +21,6 @@ import viper.silver.{ast => vpr}
  *   allow to inform the user about the state of the expression which caused the error
  * */
 
-// TODO: Check if the splitting in inv and decr is correct
-
 object Generator {
   // Frequently used constants
   // State domain
@@ -119,6 +117,9 @@ object Generator {
   val checkExistsRuleCond1MethodName = "check_exists_cond1"
   val checkExistsRuleCond2MethodName = "check_exists_cond2"
   var stateRemoved = ""
+  
+  // used to annotate errors originating in this file
+  val errorCategory = "Verification Error"
 
   /** tracks information necessary to debug invariants */
   object InvariantTracking {
@@ -273,7 +274,7 @@ object Generator {
 
       translateExp(normalizedPost, null, outputStates.localVar, outputFailureStates.localVar, info =
         new Logger(VerificationErrors.Postcondition(exp), Logger.ERR)
-          .addTitle("Verification Error")
+          .addTitle(errorCategory)
           .addOffset((exp.offsetLeft, exp.offsetRight))
           .toAnnotationInfo())
     }
@@ -384,7 +385,7 @@ object Generator {
         useAliasForProofVar = true
         currProofVarName = pv.name
         val assertVarExists = vpr.Assert(vpr.Exists(Seq(getAliasForProofVar(pv)), Seq.empty, translateExp(p, state, currStates, currFailureStates))())(info = new Logger(VerificationErrors.Deprecated(p), Logger.ERR)
-          .addTitle("Verification Error")
+          .addTitle(errorCategory)
           .addOffset((stmt.offsetLeft, stmt.offsetRight))
           .toAnnotationInfo())
         useAliasForProofVar = false
@@ -450,7 +451,7 @@ object Generator {
 
       case stmt@HyperAssertStmt(e) =>
         val assert = vpr.Assert(translateExp(e, null, currStates, currFailureStates))(info = new Logger(VerificationErrors.HyperAssertion(e), Logger.ERR)
-          .addTitle("Verification Error")
+          .addTitle(errorCategory)
           .addOffset((stmt.offsetLeft, stmt.offsetRight))
           .toAnnotationInfo())
         newStmts = newStmts ++ Seq(assert)
@@ -488,7 +489,7 @@ object Generator {
           callee.pre.foreach{ exp =>
             val vprExp = translateExp(exp, state, currStates, currFailureStates)
             newStmts =  newStmts :+ vpr.Assert(vprExp)(info = new Logger(VerificationErrors.MethodCall(exp), Logger.ERR)
-              .addTitle("Verification Error")
+              .addTitle(errorCategory)
               .addOffset((exp.offsetLeft, exp.offsetRight))
               .toAnnotationInfo())
           }
@@ -846,7 +847,7 @@ object Generator {
               val qc = InvariantTracking.get(normalizedInv.debugId.get).quantifiersRemoved
 
               newStmts = newStmts :+ vpr.Assert(translateExp(normalizedInv, null, currStates, loopFailureStates))(info = new Logger(VerificationErrors.LoopEntryPoint(oInv), Logger.ERR)
-                .addTitle("Verification Error")
+                .addTitle(errorCategory)
                 .addQuantifiersRemoved(qc)
                 .addWhileRule(rule)
                 .addOffset((invs(i).offsetLeft, invs(i).offsetRight))
@@ -917,7 +918,7 @@ object Generator {
       case FrameStmt(exp, body) =>
         val framedExpr = translateExp(exp, state, currStates, currFailureStates)
         val assertFrame = vpr.Assert(framedExpr)(info = new Logger(VerificationErrors.HyperAssertion(exp), Logger.ERR)
-          .addTitle("Verification Error")
+          .addTitle(errorCategory)
           .addOffset((exp.offsetLeft, exp.offsetRight))
           .toAnnotationInfo())
         val translatedBody = translateStmt(body, currStates, currFailureStates)
@@ -935,7 +936,7 @@ object Generator {
           currParamsToArgsMap = call.paramsToArgs
           call.method.pre.foreach{ precondition =>
             newStmts :+ vpr.Assert(translateExp(precondition, state, currStates, currFailureStates))(info = new Logger(VerificationErrors.MethodCall(precondition), Logger.ERR)
-              .addTitle("Verification Error")
+              .addTitle(errorCategory)
               .addOffset((precondition.offsetLeft, stmt.offsetRight))
               .toAnnotationInfo())
           }
@@ -1003,29 +1004,56 @@ object Generator {
 
   // Manual access check before looking up objects in Maps
   def generateMapAccessCheck(luExp: LookupExpr): Stmt = AssertStmt(
-    CombExpr(
-      luExp.index,
-      luExp.id,
-      "in"
+    removeAnyState(
+      CombExpr(
+        luExp.index,
+        luExp.id,
+        "in"
+      )
     )
   )
 
   // Manual access check before looking up objects in Sequences
   def generateSeqAccessCheck(luExp: LookupExpr): Stmt = AssertStmt(
-    BinaryExpr(
+    removeAnyState(
       BinaryExpr(
-        Num(0),
-        "<=",
-        luExp.index
-      ),
-      "&&",
-      BinaryExpr(
-        luExp.index,
-        "<",
-        LengthExpr(luExp.id)
+        BinaryExpr(
+          Num(0),
+          "<=",
+          luExp.index
+        ),
+        "&&",
+        BinaryExpr(
+          luExp.index,
+          "<",
+          LengthExpr(luExp.id)
+        )
       )
     )
   )
+
+  /** Removes any state from an expression */
+  def removeAnyState(expr: Expr): Expr = {
+    val ret = expr match {
+      case BinaryExpr(e1, op, e2) => BinaryExpr(removeAnyState(e1), op, removeAnyState(e2))
+      case UnaryExpr(op, e) => UnaryExpr(op, removeAnyState(e))
+      case ImpliesExpr(left, right) => ImpliesExpr(removeAnyState(left), removeAnyState(right))
+      case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, removeAnyState(body))
+      case SeqAssignExpr(elements) => SeqAssignExpr(elements.map(removeAnyState))
+      case SetAssignExpr(elements) => SetAssignExpr(elements.map(removeAnyState))
+      case MapAssignExpr(elements) => MapAssignExpr(elements.map(e => removeAnyState(e).asInstanceOf[MapTupleExpr]))
+      case LookupExpr(id, index) =>
+        if (id.typ.isInstanceOf[StateType]) removeAnyState(index)
+        else LookupExpr(removeAnyState(id), removeAnyState(index))
+      case LengthExpr(id) => LengthExpr(removeAnyState(id))
+      case CombExpr(lhs, rhs, op) => CombExpr(removeAnyState(lhs), removeAnyState(rhs), op)
+      case UpdateMapExpr(id, update) => UpdateMapExpr(removeAnyState(id), removeAnyState(update).asInstanceOf[MapTupleExpr])
+      case MapTupleExpr(k, v) => MapTupleExpr(removeAnyState(k), removeAnyState(v))
+      case _ => expr
+    }
+    ret.typ = expr.typ
+    ret
+  }
 
   /**
    * Converts a default expression into a Hyper Expression by associating every variable with a state.
@@ -1149,7 +1177,7 @@ object Generator {
       vpr.And(SetState.getInSetApp(Seq(s1.localVar, outputStates.localVar)), SetState.getInSetApp(Seq(s2.localVar, outputStates.localVar)))(),
       vpr.EqCmp(translateExp(loopGuard, s1.localVar, outputStates.localVar, outputFailureStates.localVar), translateExp(loopGuard, s2.localVar, outputStates.localVar, outputFailureStates.localVar))()
     )())(info = new Logger(VerificationErrors.LoopSyncGuard(loopGuard), Logger.ERR)
-      .addTitle("Verification Error")
+      .addTitle(errorCategory)
       .addOffset((loopGuard.offsetLeft,
       loopGuard.offsetRight))
       .toAnnotationInfo())
@@ -1413,14 +1441,14 @@ object Generator {
     // Find the first invariant that contains a top-level existential quantifier
     val firstExistsInv = normalizedInvs.find(i => checkHasTopExists(i) == true).get
     pres = normalizedInvs.diff(Seq(firstExistsInv))
-    posts = pres.map(inv => {
+    posts = normalizedInvs.map(inv => {
       val oInv = InvariantTracking.get(inv.debugId.get).inv
       val qc = InvariantTracking.get(inv.debugId.get).quantifiersRemoved
 
       (
         inv,
         Option(new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
-          .addTitle("Verification Error")
+          .addTitle(errorCategory)
           .addQuantifiersRemoved(qc)
           .addWhileRule("existsRule")
           .addOffset((inv.offsetLeft, inv.offsetRight))
@@ -1431,12 +1459,25 @@ object Generator {
     val exprAddedToPre = BinaryExpr(loopGuard, "&&", BinaryExpr(tProgVar, "==", decrExpr))
     pres = pres :+ addToTopExists(firstExistsInv, exprAddedToPre)
 
-    val exprAddedToPost = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
-    val temp = (addToTopExists(firstExistsInv, exprAddedToPost), Option(new Logger(VerificationErrors.LoopVariant(decrExpr), Logger.ERR)
-      .addTitle("Verification Error 1")
+    val variant = BinaryExpr(BinaryExpr(decrExpr, ">=", Num(0)), "&&", BinaryExpr(decrExpr, "<", tProgVar))
+    val assertVar = AssertVar("_s")
+    assertVar.typ = StateType()
+    val assertVarDecl = AssertVarDecl(assertVar, StateType())
+    assertVarDecl.typ = StateType()
+    val be = BinaryExpr(StateExistsExpr(assertVar, false), "&&", BoolLit(true))
+    be.typ = BoolType()
+    val asser = Assertion("exists", Seq(assertVarDecl), be)
+    asser.topExists = true
+
+    posts = posts :+ (addToTopExists(asser, variant), Option(new Logger(VerificationErrors.LoopVariant(decrExpr), Logger.ERR)
+      .addTitle(errorCategory)
       .addOffset((decrExpr.offsetLeft, decrExpr.offsetRight))
       .toAnnotationInfo()))
-    posts = posts :+ temp
+    val combined = addToTopExists(firstExistsInv, variant)
+    posts = posts :+ (combined, Option(new Logger(VerificationErrors.ExistsRuleNoStateFound(combined), Logger.ERR)
+      .addTitle(errorCategory)
+      .addOffset((firstExistsInv.offsetLeft, decrExpr.offsetRight))
+      .toAnnotationInfo()))
 
     verifyStmtModular(methodName, stmt, varsInStmt, pres, posts)
   }
@@ -1473,7 +1514,7 @@ object Generator {
     val temp = (
       newInv,
       Option(new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
-        .addTitle("Verification Error")
+        .addTitle(errorCategory)
         .addQuantifiersRemoved(qc)
         .addWhileRule("existsRule")
         .addOffset((oInv.offsetLeft, oInv.offsetRight))
@@ -1524,7 +1565,7 @@ object Generator {
       val qc = InvariantTracking.get(normInv.debugId.get).quantifiersRemoved
 
       methodPosts = methodPosts :+ translateExp(normInv, null, outputStates, outputFailureStates, info = new Logger(VerificationErrors.LoopInvariant(oInv), Logger.ERR)
-        .addTitle("Verification Error")
+        .addTitle(errorCategory)
         .addQuantifiersRemoved(qc)
         .addWhileRule(rule)
         .addOffset((invs(i).offsetLeft, invs(i).offsetRight))
@@ -1542,7 +1583,7 @@ object Generator {
           vpr.Implies(SetState.getInSetApp(Seq(state.localVar, inputStates), useLimited = true),
             vpr.EqCmp(translatedDecr, State.get(state.localVar, tId))()
           )())(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
-            .addTitle("Verification Error 2")
+            .addTitle(errorCategory)
             .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
             .toAnnotationInfo())
         methodPres = methodPres :+ decrPre
@@ -1573,7 +1614,7 @@ object Generator {
 
     if (rule == "syncRule" || rule == "syncTotRule") {
       if (!isAutoSelected) methodBody = methodBody :+ vpr.Assert(sameGuardValue)(info = new Logger(VerificationErrors.LoopSyncGuard(loopGuard), Logger.ERR)
-        .addTitle("Verification Error")
+        .addTitle(errorCategory)
         .addOffset((loopGuard.offsetLeft, loopGuard.offsetRight))
         .toAnnotationInfo())
       methodBody = methodBody :+ vpr.Inhale(loopGuardHoldsForAll)()
@@ -1599,7 +1640,7 @@ object Generator {
           )()
         )()
       )(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
-        .addTitle("Verification Error 3")
+        .addTitle(errorCategory)
         .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
         .toAnnotationInfo())
       methodPosts = methodPosts :+ decrPost
@@ -1669,7 +1710,7 @@ object Generator {
     )())()
     if (rule == "syncRule" || rule == "syncTotRule") {
       if (!isAutoSelected) ifBodyStmts = ifBodyStmts :+ vpr.Assert(sameGuardValue)(info = new Logger(VerificationErrors.LoopSyncGuard(loopGuard), Logger.ERR)
-        .addTitle("Verification Error")
+        .addTitle(errorCategory)
         .addOffset((loopGuard.offsetLeft, loopGuard.offsetRight))
         .toAnnotationInfo())
       ifBodyStmts = ifBodyStmts :+ vpr.Inhale(loopGuardHoldsForAll)()
@@ -1691,7 +1732,7 @@ object Generator {
     currLoopIndex = vpr.Add(currLoopIndexDecl.localVar, one)()
     val assertIs = inv.map { i =>
       vpr.Assert(translateExp(i, null, currStates, currFailureStates))(info = new Logger(VerificationErrors.Deprecated(i), Logger.ERR)
-        .addTitle("Verification Error")
+        .addTitle(errorCategory)
         .addOffset((i.offsetLeft, i.offsetRight))
         .toAnnotationInfo())
     }
@@ -1702,7 +1743,7 @@ object Generator {
       // Assert that the current value of decrExpr is in the range of [0, t)
       val tf_decr_exp = vpr.Forall(Seq(state), Seq.empty, vpr.Implies(SetState.getInSetApp(Seq(state.localVar, currStates)), vpr.And(vpr.GeCmp(translatedDecr, zero)(), vpr.LtCmp(translatedDecr, State.get(state.localVar, tId))())())())()
       val assert_variant = vpr.Assert(tf_decr_exp)(info = new Logger(VerificationErrors.LoopVariant(decrExpr.get), Logger.ERR)
-        .addTitle("Verification Error 4")
+        .addTitle(errorCategory)
         .addOffset((decrExpr.get.offsetLeft, decrExpr.get.offsetRight))
         .toAnnotationInfo())
       ifBodyStmts = ifBodyStmts :+ assert_variant

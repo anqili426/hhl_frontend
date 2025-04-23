@@ -60,31 +60,3 @@ ensures forall <_s> :: forall _i: Int :: (_i >= 0 && _i < _s[l]) ==> ((_s[seq])[
 
     res := max
 }
-
-/* Why does this not work?
-method findMaxInSeq(seq: Seq[Int], l: Int) returns (res: Int)
-requires forall <_s> :: _s[seq] != Seq[Int]() && _s[l] == |_s[seq]|
-ensures forall <_s> :: forall _i: Int :: (_i >= 0 && _i < |_s[seq]|) ==> (_s[seq][_i] <= _s[res])
-{
-    var max: Int
-    max := seq[0]
-
-    var i: Int
-    i := 1
-
-    while (i < l)
-        invariant forall <_s> :: forall _j: Int :: ((_j >= 0 && _j < _s[i]) ==> _s[seq][_j] <= _s[max])
-        invariant forall <_s> :: 0 <= _s[i] && _s[i] <= _s[l]
-        decreases l - i
-    {
-        if (seq[i] > max) {
-            max := seq[i]
-        }
-        i := i + 1
-    }
-
-    res := max
-}
-*/
-
-// TODO: Fix error regarding hyperAssert in this statement

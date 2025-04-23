@@ -27,22 +27,3 @@ ensures exists <_s> :: _s[res]
         res := b2
     }
 }
-
-/*
-method numberIsEven(i: Int) returns (res: Bool)
-requires forall <_s> :: _s[i] >= 0
-ensures forall <_s> :: _s[res] == (_s[i] % 2 == 0)
-{
-    res := true
-
-    var j: Int
-    var t: Seq[Int]
-    j := 0
-
-    while (j < i) 
-    invariant forall <_s> :: _s[res] == (_s[j] % 2 == 0)
-    {
-        res := true
-        j := j - 1
-    }
-}*/

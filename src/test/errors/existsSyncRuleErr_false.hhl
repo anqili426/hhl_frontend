@@ -1,12 +1,5 @@
 /*
     A test case for errors caused by a loops invariant which may not be preserved.
-    Output:
-        Verification failed
-        [WhileLoop, syncTotRule selected, 1 quantifier(s) removed] The following invariant might not hold:
-        (true) && (forall <_s: State> :: ((!(<_s>)) || ((_s[i]) == (0))))
-
-        [WhileLoop, existsRule selected] The following invariant might not hold:
-        exists <_sa: State> :: ((<_sa>) && (forall <_s: State> :: ((!(<_s>)) || ((_s[i]) == (0)))))
 */
 
 method ExistsSyncRuleErr() returns (out: Int)

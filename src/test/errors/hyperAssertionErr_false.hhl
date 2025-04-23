@@ -1,9 +1,5 @@
 /*
     A test case for errors caused by a hyper assert which may not hold.
-    Output:
-        Verification failed
-        [HyperAssertion] The following hyper assertion might not hold:
-        forall <_s: State> :: ((<_s>) ==> (false))
 */
 
 method hyperAssertionErr() returns (out: Int)

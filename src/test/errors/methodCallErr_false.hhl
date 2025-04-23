@@ -1,9 +1,5 @@
 /*
     A simple test case for errors caused by a method call for which the preconditions may not hold.
-    Output:
-        Verification failed
-        [MethodCall] The following precondition of a custom method might not hold:
-        forall <_s: State> :: ((<_s>) ==> ((_s[inp]) == (1)))
 */
 
 method methodCallError() returns (out: Int)
@@ -18,26 +14,13 @@ method methodCallError() returns (out: Int)
 
     r1, r2 := otherMethod(n)
 
-    // trivial() // TODO: Also ask Anqi about this
-
     out := r1
 }
 
-
-// TODO: Ask anqi about how this was handled previously
-// -> when r1, r2 are called differently, it doesn't work
-// If this is correct, it should be checked using errors
 method otherMethod(inp: Int) returns (r1: Int, r2: Int)
     requires exists <_s> :: false
     ensures exists <_s> :: _s[r1] == 2 && _s[r2] == 2
 {
     r1 := 2
     r2 := 2
-}
-
-method trivial() returns ()
-    requires exists <_s> :: true
-    ensures exists <_s> :: true
-{
-
 }
