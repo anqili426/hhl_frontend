@@ -14,6 +14,9 @@ object SymbolChecker {
   var allHintNames: Set[String] = Set.empty // All hints declared in one program
   var allHintsInMethod: Set[String] = Set.empty // All hints declared in one method
 
+  // used to annotate errors originating in this file
+  val errorCategory = "Symbol Checker Error"
+
   def reset(): Unit = {
     allVars = Map.empty
     allVarsInCurrScope = Map.empty
@@ -32,7 +35,7 @@ object SymbolChecker {
     if (dupMethodNames.size > 0) {
       val m = allMethods.filter(m => m.mName == dupMethodNames(0))(0)
 
-      throw new Logger("Duplicate method name").addTitle("Symbol Checker Error").addOffset((m.offsetLeft, m.offsetRight))
+      throw new Logger(f"The method ${m.mName} already exists").addTitle(errorCategory).addOffset((m.offsetLeft, m.offsetRight))
     }
     p.content.foreach(checkSymbolsMethod)
   }
@@ -101,7 +104,7 @@ object SymbolChecker {
         val allVarsInP = checkSymbolsExpr(p, false, false)
         if (allVarsInP.filter(v => pv.name == v._1).isEmpty) {
           throw new Logger("The proof variable " + pv.name + " must appear on the right-hand side of the statement")
-            .addTitle("Symbol Checker Error")
+            .addTitle(errorCategory)
             .addOffset((pv.offsetLeft, pv.offsetRight))
         }
         (allVarsInP, Seq.empty)
@@ -110,7 +113,7 @@ object SymbolChecker {
         // Do not allow assignment to method arguments
         if (allArgNames.contains(id.name))
           throw new Logger("Cannot reassign to method argument " + id.name)
-            .addTitle("Symbol Checker Error")
+            .addTitle(errorCategory)
             .addOffset((stmt.offsetLeft, stmt.offsetRight))
         val rightVars = checkSymbolsExpr(exp, false, false)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
@@ -120,35 +123,35 @@ object SymbolChecker {
         val idAssignedTo = left.map(id => checkSymbolsExpr(id, false, false)).flatten
         val idAssignedToNames = left.map(id => id.name)
         if (idAssignedToNames.toSet.size != idAssignedToNames.length)
-          throw new Logger("A variable cannot appear on the RHS of an assignment more than once")
-            .addTitle("Symbol Checker Error")
+          throw new Logger(s"The statement ${stmt.toString()} contains multiple identical variables on its right hand side. A variable cannot appear more than once")
+            .addTitle(errorCategory)
             .addOffset((stmt.offsetLeft, stmt.offsetRight))
         val args = checkSymbolsExpr(right, false, false)
         val argNames = right.args.map(a => a.name)
         idAssignedToNames.foreach(
           id => {
             if (allArgNames.contains(id))
-              throw new Logger("Cannot reassign to method argument " + id)
-                .addTitle("Symbol Checker Error")
+              throw new Logger(s"Cannot reassign to method argument $id in statement ${stmt.toString()}")
+                .addTitle(errorCategory)
                 .addOffset((stmt.offsetLeft, stmt.offsetRight))
             if (argNames.contains(id))
-              throw new Logger("Cannot assign to variables that are used as arguments in a method call in the same statement")
-                .addTitle("Symbol Checker Error")
+              throw new Logger(s"Cannot assign to variable $id that is used as an argument in a method call in the statement ${stmt.toString()}")
+                .addTitle(errorCategory)
                 .addOffset((stmt.offsetLeft, stmt.offsetRight))
           }
         )
         val numRet = right.method.res.length
         if (left.length != numRet)
-          throw new Logger("The call to method " + right.methodName + " should be assigned to exactly " + numRet + " variables.")
-            .addTitle("Symbol Checker Error")
+          throw new Logger(s"The call to method ${right.methodName} in statement ${stmt.toString()} should be assigned to exactly $numRet variables.")
+            .addTitle(errorCategory)
             .addOffset((stmt.offsetLeft, stmt.offsetRight))
         val resNames = right.method.res.map(r => r.name)
         right.paramsToArgs = right.paramsToArgs ++ resNames.zip(idAssignedToNames).toMap
         (idAssignedTo, args)
 
       case HavocStmt(id, hintDecl) =>
-        if (allArgNames.contains(id.name)) throw new Logger("Cannot reassign to method argument " + id.name)
-          .addTitle("Symbol Checker Error")
+        if (allArgNames.contains(id.name)) throw new Logger(s"Cannot reassign to method argument ${id.name} in statement ${stmt.toString()}")
+          .addTitle(errorCategory)
           .addOffset((stmt.offsetLeft, stmt.offsetRight)) // throw IllegalAssignmentException("Cannot reassign to method argument " + id.name)
         if (!hintDecl.isEmpty) checkHintDecl(hintDecl.get)
         val idAssignedTo = checkSymbolsExpr(id, false, false)
@@ -171,9 +174,9 @@ object SymbolChecker {
         val reuseStmts = elseBlock.stmts.filter(s => s.isInstanceOf[ReuseStmt])
         val numOfDeclareStmts = declareStmts.size
         val numOfReuseStmts = reuseStmts.size
-        if (numOfDeclareStmts > 1) throw new Logger("There can be at most 1 declare statement in an if-block").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
-        if (numOfReuseStmts > 1) throw new Logger("There can be at most 1 reuse statement in an else-block").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
-        if (numOfDeclareStmts != numOfReuseStmts) throw new Logger("Declare & reuse statements must both exist").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
+        if (numOfDeclareStmts > 1) throw new Logger(s"The declare statement ${declareStmts(1).toString()} is illegal. There can be at most 1 declare statement in an if-block").addTitle(errorCategory).addOffset((declareStmts(1).offsetLeft, declareStmts(1).offsetRight))
+        if (numOfReuseStmts > 1) throw new Logger(s"The reuse statement ${reuseStmts(1).toString()} is illegal. There can be at most 1 reuse statement in an else-block").addTitle(errorCategory).addOffset((reuseStmts(1).offsetLeft, reuseStmts(1).offsetRight))
+        if (numOfDeclareStmts != numOfReuseStmts) throw new Logger(s"Declare & reuse statements must both exist, but statement ${stmt.toString()} does not satisfy this").addTitle(errorCategory).addOffset((stmt.offsetLeft, stmt.offsetRight))
 
         // Check that the reuse statement is using the identifier of the matching declare statement
         if (numOfDeclareStmts == 1) {
@@ -181,8 +184,8 @@ object SymbolChecker {
           val reuseStmt = reuseStmts(0).asInstanceOf[ReuseStmt]
           checkIdDup(declareStmt.blockName)
           allVars = allVars + (declareStmt.blockName.name -> declareStmt.blockName.typ)
-          if (declareStmt.stmts.stmts.size == 0) throw new Logger("Declare statement block cannot be empty").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
-          if (reuseStmt.blockName.name != declareStmt.blockName.name) throw new Logger("Reuse statement must refer to the matching declare statement").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
+          if (declareStmt.stmts.stmts.size == 0) throw new Logger(s"The declare statement ${declareStmt.toString()} has a empty block").addTitle(errorCategory).addOffset((stmt.offsetLeft, stmt.offsetRight))
+          if (reuseStmt.blockName.name != declareStmt.blockName.name) throw new Logger(s"The reuse statement ${reuseStmt.toString()} must refer to the matching declare statement").addTitle(errorCategory).addOffset((stmt.offsetLeft, stmt.offsetRight))
           reuseStmt.reusedBlock = declareStmt.stmts
         }
 
@@ -219,7 +222,7 @@ object SymbolChecker {
         val allBodyVars = checkSymbolsStmt(body)
         val framedVarsModified = framedVars.intersect(allBodyVars._2)
         // Make sure that the program variables in the frame are not modified in the body
-        if (framedVarsModified.size > 0) throw new Logger("Variables " + framedVarsModified + " in framed assertions cannot be modified.").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
+        if (framedVarsModified.size > 0) throw new Logger("Variables " + framedVarsModified + s" in framed assertions must not be modified, but statment ${stmt.toString()} contains modifications").addTitle(errorCategory).addOffset((stmt.offsetLeft, stmt.offsetRight))
         (framedVars ++ allBodyVars._1, allBodyVars._2)
 
       case UseHintStmt(hint) =>
@@ -228,17 +231,17 @@ object SymbolChecker {
         (varsInHint, Seq.empty)
 
       case stmt@MethodCallStmt(name, args) =>
-        if (!allMethodNames.contains(name)) throw new Logger("Method " + name + " is undefined, so it cannot be called").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
+        if (!allMethodNames.contains(name)) throw new Logger("Method " + name + " is undefined, so it cannot be called").addTitle(errorCategory).addOffset((stmt.offsetLeft, stmt.offsetRight))
         stmt.method = allMethods.find(m => m.mName == name).get
-        if (stmt.method.params.length != args.length) throw new Logger("Call to method " + name + " has an unexpected number of arguments").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
+        if (stmt.method.params.length != args.length) throw new Logger("Call to method " + name + " has an unexpected number of arguments").addTitle(errorCategory).addOffset((stmt.offsetLeft, stmt.offsetRight))
         val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
-        if (stmt.method.res.length > 0) throw new Logger("The call to method " + name + " should be assigned to exactly " + stmt.method.res.length + " variables.").addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
+        if (stmt.method.res.length > 0) throw new Logger("The call to method " + name + " should be assigned to exactly " + stmt.method.res.length + " variables.").addTitle(errorCategory).addOffset((stmt.offsetLeft, stmt.offsetRight))
         val argNames = args.map(a => a.name)
         val paramNames = stmt.method.params.map(p => p.name)
         stmt.paramsToArgs = paramNames.zip(argNames).toMap
         (varsInArgs, Seq.empty)
 
-      case stmt => throw new Logger("Statement " + stmt + " is of unexpected type " + stmt.getClass()).addTitle("Symbol Checker Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
+      case stmt => throw new Logger(s"SymbolChecker.checkSymbolStmt(...): The statement ${stmt.toString()} has the unexpected type ${stmt.getClass()}").addTitle("Internal Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
     }
   }
 
@@ -291,21 +294,21 @@ object SymbolChecker {
           if (id.isInstanceOf[ProofVar]) varsInExpr = varsInExpr :+ (id.asInstanceOf[ProofVar].idName, allVarsInCurrScope.get(id.asInstanceOf[ProofVar].idName).get)
           varsInExpr
         case expr@StateExistsExpr(state, _) =>
-            if (isFrame) throw new Logger("Framed assertion cannot include state-exists-expression").addTitle("Symbol Checker Error").addOffset((expr.offsetLeft, expr.offsetRight))
+            if (isFrame) throw new Logger(s"The framed assertion ${expr.toString()} cannot include state-exists-expression").addTitle(errorCategory).addOffset((expr.offsetLeft, expr.offsetRight))
             checkIdDefined(state)
             if (state.isInstanceOf[ProofVar]) Seq((state.idName, allVarsInCurrScope.get(state.idName).get))
             else Seq.empty  // No need to return anything if it's an assertion variable
         case expr@LoopIndex() =>
-            if (!isInLoopInv) throw new Logger("Loop index $n can only appear in the invariant of a loop that does not use the sync rule").addTitle("Symbol Checker Error").addOffset((expr.offsetLeft, expr.offsetRight))
+            if (!isInLoopInv) throw new Logger(s"The loop index ${expr.toString()} can only appear in the invariant of a loop that does not use the sync rule").addTitle(errorCategory).addOffset((expr.offsetLeft, expr.offsetRight))
             Seq.empty
         case h@Hint(_, arg) =>
             checkHintDefined(h)
             val varsInArg = checkSymbolsExpr(arg, isInLoopInv, isFrame)
             varsInArg
         case expr@MethodCallExpr(name, args) =>
-            if (!allMethodNames.contains(name)) throw new Logger("Method " + name + " is undefined, so it cannot be called").addTitle("Symbol Checker Error").addOffset((expr.offsetLeft, expr.offsetRight))
+            if (!allMethodNames.contains(name)) throw new Logger("Method " + name + " is undefined, so it cannot be called").addTitle(errorCategory).addOffset((expr.offsetLeft, expr.offsetRight))
             expr.method = allMethods.find(m => m.mName == name).get
-            if (expr.method.params.length != args.length) throw new Logger("Call to method " + name + " has an unexpected number of arguments").addTitle("Symbol Checker Error").addOffset((expr.offsetLeft, expr.offsetRight))
+            if (expr.method.params.length != args.length) throw new Logger("Call to method " + name + " has an unexpected number of arguments").addTitle(errorCategory).addOffset((expr.offsetLeft, expr.offsetRight))
             val varsInArgs = args.map(a => checkSymbolsExpr(a, false, false)).flatten
             val argNames = args.map(a => a.name)
             val paramNames = expr.method.params.map(p => p.name)
@@ -327,23 +330,23 @@ object SymbolChecker {
         case UpdateMapExpr(id, update) => checkSymbolsExpr(id, isInLoopInv, isFrame) ++ checkSymbolsExpr(update, isInLoopInv, isFrame)
         case MapTupleExpr(k, v) => checkSymbolsExpr(k, isInLoopInv, isFrame) ++ checkSymbolsExpr(v, isInLoopInv, isFrame)
         case CombExpr(lhs, rhs, _) => checkSymbolsExpr(lhs, isInLoopInv, isFrame) ++ checkSymbolsExpr(rhs, isInLoopInv, isFrame)
-        case expr => throw new Logger("Symbol checker: Expression " + exp + " is of unexpected type " + exp.getClass()).addTitle("Symbol Checker Error").addOffset((expr.offsetLeft, expr.offsetRight))
+        case expr => throw new Logger(s"SymbolChecker.checkSymbolExpr(...): The expression ${expr.toString()} has the unexpected type ${expr.getClass()}").addTitle("Internal Error").addOffset((expr.offsetLeft, expr.offsetRight))
       }
     }
 
     def checkIdDup(id: Expr): Unit = {
       val idName = getIdName(id)
       val allNames = allVars.keySet ++ allMethodNames ++ allHintNames
-      if (allNames.contains(idName)) throw new Logger("Duplicate identifier " + idName).addTitle("Symbol Checker Error").addOffset((id.offsetLeft, id.offsetRight))
+      if (allNames.contains(idName)) throw new Logger(s"${idName.toString()} is a duplicate identifier").addTitle(errorCategory).addOffset((id.offsetLeft, id.offsetRight))
     }
 
     def checkHintDefined(hint: Hint): Unit = {
-      if (!allHintsInMethod.contains(hint.name)) throw new Logger("Hint " + hint.name + " not found").addTitle("Symbol Checker Error").addOffset((hint.offsetLeft, hint.offsetRight))
+      if (!allHintsInMethod.contains(hint.name)) throw new Logger("Hint " + hint.name + " not found").addTitle(errorCategory).addOffset((hint.offsetLeft, hint.offsetRight))
     }
 
     def checkIdDefined(id: Expr): Unit = {
       val idName = getIdName(id)
-      if (!allVarsInCurrScope.contains(idName)) throw new Logger("Identifier " + idName + " not found").addTitle("Symbol Checker Error").addOffset((id.offsetLeft, id.offsetRight))
+      if (!allVarsInCurrScope.contains(idName)) throw new Logger("Identifier " + idName + " not found").addTitle(errorCategory).addOffset((id.offsetLeft, id.offsetRight))
     }
 
     def getIdName(id: Expr): String = {
@@ -354,7 +357,7 @@ object SymbolChecker {
         case ProofVar(name) => name
         case HintDecl(name) => name
         case Hint(name, _) => name
-        case _ => throw new Logger("In getIdName(id: Expr): Expression " + id + " is of unexpected type " + id.getClass).addTitle("Symbol Checker Error").addOffset((id.offsetLeft, id.offsetRight))
+        case _ => throw new Logger(s"SymbolChecker.getIdName(...): The id ${id.toString()} has the unexpected type ${id.getClass()}").addTitle("Internal Error").addOffset((id.offsetLeft, id.offsetRight))
       }
     }
 
@@ -385,6 +388,6 @@ object SymbolChecker {
             checkIfHintOnly(body.asInstanceOf[ImpliesExpr].right))
         case _ =>
       }
-      if (!res) throw new Logger("The expression in the use statement is not well-formed:\n " + hint + "\nExpected syntax: use <hints> or use forall: ... ==> <hints>").addTitle("Symbol Checker Error").addOffset((hint.offsetLeft, hint.offsetRight))
+      if (!res) throw new Logger(s"The expression ${hint.toString()} in the use statement is not well-formed:\n " + hint + "\nExpected syntax: use <hints> or use forall: ... ==> <hints>").addTitle(errorCategory).addOffset((hint.offsetLeft, hint.offsetRight))
     }
 }

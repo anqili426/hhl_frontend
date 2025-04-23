@@ -28,7 +28,7 @@ method methodCallError() returns (out: Int)
 // -> when r1, r2 are called differently, it doesn't work
 // If this is correct, it should be checked using errors
 method otherMethod(inp: Int) returns (r1: Int, r2: Int)
-    requires exists <_s> :: true
+    requires exists <_s> :: false
     ensures exists <_s> :: _s[r1] == 2 && _s[r2] == 2
 {
     r1 := 2

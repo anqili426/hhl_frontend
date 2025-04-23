@@ -140,7 +140,52 @@ object Generator {
     }
     def get(key: Int): InvariantDebugInfo = tracker.get(key).get
     def remove(key: Int): Unit = tracker.removed(key)
+    def reset(): Unit = {
+      counter = 0
+      tracker = Map.empty
+    }
   }
+
+  /** Resets all variables used in the generation. */
+  def reset(): Unit = {
+    ifCounter = 0
+    loopCounter = 0
+    alignCounter = 0
+    stateVarCounter = 0
+    currLoopIndex = null
+    currLoopIndexName = "$n"
+
+    allMethods = Seq.empty
+    allFuncs = Seq.empty
+    allDomains = Seq.empty
+
+    verifierOption = 0
+    inline = false
+    forAllFrame = true
+    existsFrame = false
+    autoSelectRules = false
+
+    useAliasForProofVar = false
+    currProofVarName = ""
+
+    containsHints = false
+    removeHints = false
+    needTriggers = false
+
+    useParamsToArgsMap = false
+    currParamsToArgsMap = Map.empty
+
+    currMethod = null
+    postIsTopExists = false
+    syncTotWarningPrinted = false
+    isPostcondition = false
+
+    stateAliasPrefix = "_"
+    stateRemoved = ""
+
+    InvariantTracking.reset()
+  }
+
 
   /** Main generate method
    * - saves program source and used types
@@ -168,12 +213,6 @@ object Generator {
   //    body: empty
   // 2. The method should contain domain declarations
 
-  /** Resets all variables used in the generation. */
-  def reset(): Unit = {
-    allDomains = Seq.empty
-    allMethods = Seq.empty
-    allFuncs = Seq.empty
-  }
 
   /** Translates program by translating all methods individually. */
   def translateProgram(input: HHLProgram): Unit = input.content.map(translateMethod)

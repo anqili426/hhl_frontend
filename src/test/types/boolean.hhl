@@ -1,4 +1,4 @@
-/*method basicFunctionality(b: Bool) returns (res: Bool)
+method basicFunctionality(b: Bool) returns (res: Bool)
 requires forall <_s> :: !_s[b]
 ensures forall <_s> :: _s[res]
 {
@@ -26,8 +26,9 @@ ensures exists <_s> :: _s[res]
     } else {
         res := b2
     }
-}*/
+}
 
+/*
 method numberIsEven(i: Int) returns (res: Bool)
 requires forall <_s> :: _s[i] >= 0
 ensures forall <_s> :: _s[res] == (_s[i] % 2 == 0)
@@ -44,4 +45,4 @@ ensures forall <_s> :: _s[res] == (_s[i] % 2 == 0)
         res := true
         j := j - 1
     }
-}
+}*/
