@@ -17,7 +17,7 @@ ensures forall <_s> :: _s[res]
     res := t1 || t2
 }
 
-method nonDeterministic(b1: Bool, b2: Bool, i: Int) returns (res: Bool)
+method nonDeterministic1(b1: Bool, b2: Bool, i: Int) returns (res: Bool)
 requires exists <_s> :: (_s[b1] && _s[b2]) && (_s[i] == 0 || _s[i] == 1)
 ensures exists <_s> :: _s[res]
 {

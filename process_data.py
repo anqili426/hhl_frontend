@@ -9,7 +9,9 @@ def process_data(data_dict):
         "forall": {},
         "exists": {},
         "forall-exists": {},
-        "exists-forall": {}
+        "exists-forall": {},
+        "errors": {},
+        "types": {},
     }
 
     for key, value in data_dict.items():
@@ -21,10 +23,13 @@ def process_data(data_dict):
             source_dict[source].append(value)
         else:
             source_dict[source]=[value]
+    
+    print(dict)
 
     resDir = Path("result")
     if not resDir.exists():
         resDir.mkdir(parents=True, exist_ok=True)
+
     with open("result/result.csv", 'w', newline='') as file:
         writer = csv.writer(file)
         for type, source_dict in dict.items():
@@ -44,6 +49,7 @@ def process_data(data_dict):
 def calculate_average(csv_folder):
     # Dictionary to store data for each row
     data_dict = {}
+
 
     try:
         # Loop through each CSV file in the folder
@@ -85,5 +91,10 @@ if __name__ == "__main__":
     else:
         csv_folder = sys.argv[1]
         average_dict = calculate_average(csv_folder)
+
+        # entries = average_dict.values()
+        # print("The mean is: ",  statistics.mean(entries))
+        # print("The median is: ", statistics.median(entries))
+
         print(average_dict)
         process_data(average_dict)

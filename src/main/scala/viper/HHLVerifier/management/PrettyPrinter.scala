@@ -57,6 +57,7 @@ object PrettyPrinter {
       case ReuseStmt(blockName) => "reuse " + formatExpr(blockName)
       case UseHintStmt(hint) => "use " + formatExpr(hint)
       case MethodCallStmt(methodName, args) => methodName + "(" + args.map(a => formatExpr(a)).mkString(", ") + ")"
+      case _ => throw new Logger(s"PrettyPrinter.formatStmt: Unknown statement type: $stmt", Logger.ERR).addTitle("Internal Error").addOffset((stmt.offsetLeft, stmt.offsetRight))
     }
   }
 
@@ -87,6 +88,7 @@ object PrettyPrinter {
       case CombExpr(lhs, rhs, op) => f"${formatExpr(lhs)} $op ${formatExpr(rhs)}"
       case UpdateMapExpr(base, update) => f"${formatExpr(base)}[${formatExpr(update)}]"
       case MapTupleExpr(k, v) => f"$k := $v"
+      case _ => throw new Logger(s"PrettyPrinter.formatExpr: Unknown expression type: $expr", Logger.ERR).addTitle("Internal Error").addOffset((expr.offsetLeft, expr.offsetRight))
     }
   }
 
@@ -101,6 +103,7 @@ object PrettyPrinter {
       case t: SetType => f"set_${formatType(t.sType)}_"
       case t: SeqType => f"seq_${formatType(t.sType)}_"
       case t: MapType => f"map_${formatType(t.kType)}1${formatType(t.vType)}_"
+      case _ => throw new Logger(s"PrettyPrinter.formatType: Unknown type: $typ", Logger.ERR).addTitle("Internal Error").addOffset((1,1))
     }
   }
 

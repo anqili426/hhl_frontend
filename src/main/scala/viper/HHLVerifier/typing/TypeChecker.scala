@@ -336,7 +336,7 @@ object TypeChecker {
         }
       case _ => throw new Logger(s"TypeChecker.typeCheckExpr(...): The expression ${e.toString()} has the unexpected type ${e.getClass()}", Logger.ERR).addTitle("Internal Error").addOffset((e.offsetLeft, e.offsetRight))
     }
-    if (!res) throw new Logger(s"The expression ${e.toString()} has a type error: The expression has type ${e.typ.toString()}", Logger.ERR).addTitle(errorCategory).addOffset((e.offsetLeft, e.offsetRight))
+    if (!res) throw new Logger(s"The expression ${e.toString()} has a type error: The expression expects type ${e.typ.toString()}", Logger.ERR).addTitle(errorCategory).addOffset((e.offsetLeft, e.offsetRight))
     isHyperAssertion
   }
 

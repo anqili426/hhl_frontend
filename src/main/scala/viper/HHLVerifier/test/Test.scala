@@ -18,7 +18,7 @@ object Test {
   val proofKeyword = List("use", "hyperAssert", "hyperAssume", "declare", "reuse", "let", "invariant", "frame")
   val otherKeyword = List("assume", "assert", "while", "if", "else", "}", "{", "havoc")
   val commentKeyword = List("//", "/*") // The current implementation doesn't support the counting of block comments
-  val defaultNumOfRep = 3
+  val defaultNumOfRep = 1
 
   def partOfCurrStmt(lineInd: Int, allNonemptyLines: Array[String]): Boolean = {
 
@@ -127,8 +127,8 @@ object Test {
     val pathOfExistsTests = "src/test/evaluation/exists"
     val pathOfForAllExistsTests = "src/test/evaluation/forall-exists"
     val pathOfExistsForAllTests = "src/test/evaluation/exists-forall"
-    val pathOfErrorTests = "src/test/errors"
-    val pathOfTypeTests = "src/test/types"
+    val pathOfErrorTests = "src/test/evaluation/errors/hypra"
+    val pathOfTypeTests = "src/test/evaluation/types/hypra"
 
     val forAllTests = getListOfFiles(pathOfForAllTests)
     val existsTests = getListOfFiles(pathOfExistsTests)
