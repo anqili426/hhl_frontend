@@ -29,16 +29,22 @@ object Characterizer {
     case AssignStmt(left, right) => acc.map {
       case CharPath(pc, subst) => CharPath(pc, subst + (left -> applySubstitution(right, subst)))
     }
+    case MultiAssignStmt(left, right) => ??? // TODO
     case IfElseStmt(cond, ifStmt, elseStmt) => {
-      val ifRes = characterizeStmt(ifStmt, acc).map {
-        case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(cond, subst), "&&", pc), subst)
-      }
-      val elseRes = characterizeStmt(elseStmt, acc).map {
-        case CharPath(pc, subst) => CharPath(BinaryExpr(UnaryExpr("!", applySubstitution(cond, subst)), "&&", pc), subst)
-      }
+      // we need to apply the substitution to the condition as well, but in the initial state of the if-statement
+      val ifRes = for {
+        CharPath(pcBefore, substBefore) <- acc
+        CharPath(pcAfter, substAfter) <- characterizeStmt(ifStmt, acc)
+      } yield CharPath(BinaryExpr(applySubstitution(cond, substBefore), "&&", pcAfter), substAfter)
+      val elseRes = for {
+        CharPath(pcBefore, substBefore) <- acc
+        CharPath(pcAfter, substAfter) <- characterizeStmt(elseStmt, acc)
+      } yield CharPath(BinaryExpr(UnaryExpr("!", applySubstitution(cond, substBefore)), "&&", pcAfter), substAfter)
       ifRes ++ elseRes
     }
-    case _ => acc // TODO: Add remaining statements from AST: MultiAssign
+    case HavocStmt(_, _) => sys.error("Characterizer: Cannot yet handle havoc: " + stmt.toString)
+    case WhileLoopStmt(_, _, _, _, _) => sys.error("Characterizer: Expected a loop-free program")
+    case _ => acc
   }
 
   private def applySubstitution(expr: Expr, map: Map[Id, Expr]): Expr = expr match {
@@ -50,9 +56,7 @@ object Characterizer {
     case BinaryExpr(e1, op, e2) => BinaryExpr(applySubstitution(e1, map), op, applySubstitution(e2, map))
     case UnaryExpr(op, e) => UnaryExpr(op, applySubstitution(e, map))
     case ImpliesExpr(left, right) => ImpliesExpr(applySubstitution(left, map), applySubstitution(right, map))
-    case LoopIndex() => ??? // TODO: ???
-    case Hint(name, arg) => ??? // TODO: ???
     case MethodCallExpr(methodName, args) => ??? // TODO: For MultiAssignStmt
-    case _ => sys.error("Characterizer: Yet unsupported expression in substitution: " + expr.toString)
+    case _ => sys.error("Characterizer: Yet unsupported expression in substitution: " + expr.toString) // TODO: Check which other expressions could be assigned
   }
 }
