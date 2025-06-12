@@ -7,6 +7,8 @@ import viper.HHLVerifier.management._
 import viper.HHLVerifier.parsing.Parser
 import viper.HHLVerifier.symbols.SymbolChecker
 import viper.HHLVerifier.typing.TypeChecker
+import viper.HHLVerifier.syntactic.Characterizer._
+import viper.HHLVerifier.syntactic.Characterizer
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
@@ -21,6 +23,7 @@ object Main {
   var testWithLogs = false
   var errMessages: Seq[String] = Seq("")
   var logsActive = true
+  var syntactic = false
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -52,6 +55,7 @@ object Main {
     if (args.contains("--forall") && !args.contains("--exists")) Generator.verifierOption = 0
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
     else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
+    if (args.contains("--syntactic")) syntactic = true
 
     new Logger(f"The input program is read from $programAbsPath.").log()
 
@@ -64,6 +68,7 @@ object Main {
         new Logger("Parsing successful.").log()
 
         val parsedProgram: HHLProgram = res.get.value
+        println(parsedProgram)
 
         // Symbol table
         SymbolChecker.checkSymbolsProg(parsedProgram)
@@ -72,6 +77,12 @@ object Main {
         // Type checking
         TypeChecker.typeCheckProg(parsedProgram)
         new Logger("Type checking successful.").log()
+
+        if (syntactic) {
+          val characterizer: Seq[CharPath] = Characterizer.characterizeLoopFreeProgram(parsedProgram)
+          println(characterizer)
+          return
+        }
 
         // Generate the Viper program
         val viperProgram = Generator.generate(parsedProgram)

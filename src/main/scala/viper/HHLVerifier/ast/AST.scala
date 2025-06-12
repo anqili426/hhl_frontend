@@ -40,8 +40,8 @@ sealed class Expr() extends ErrorData {
   def setOffsets: (Int, Int) => Expr =
     setOffsets[Expr]
 
-  override def toString: String =
-    PrettyPrinter.formatExpr(this)
+  //override def toString: String =
+    //PrettyPrinter.formatExpr(this)
 }
 
 /** Identifiers for non-program variables */
@@ -143,8 +143,8 @@ sealed trait Stmt extends ErrorData {
   def setOffsets: (Int, Int) => Stmt =
     setOffsets[Stmt]
 
-  override def toString: String =
-    PrettyPrinter.formatStmt(this)
+  //override def toString: String =
+    //Printer.formatStmt(this)
 }
 
 
