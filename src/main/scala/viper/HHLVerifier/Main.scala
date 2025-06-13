@@ -1,14 +1,15 @@
 package viper.HHLVerifier
 
 import fastparse.Parsed
-import viper.HHLVerifier.ast.HHLProgram
+import viper.HHLVerifier.ast.{Expr, HHLProgram}
 import viper.HHLVerifier.generation.Generator
 import viper.HHLVerifier.management._
 import viper.HHLVerifier.parsing.Parser
 import viper.HHLVerifier.symbols.SymbolChecker
 import viper.HHLVerifier.typing.TypeChecker
 import viper.HHLVerifier.syntactic.Characterizer._
-import viper.HHLVerifier.syntactic.Characterizer
+import viper.HHLVerifier.syntactic.{Characterizer, WeakestPrecondition}
+import viper.HHLVerifier.syntactic.WeakestPrecondition._
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
@@ -78,9 +79,13 @@ object Main {
         TypeChecker.typeCheckProg(parsedProgram)
         new Logger("Type checking successful.").log()
 
+        // Syntactic evaluation mode
         if (syntactic) {
-          val characterizer: Seq[CharPath] = Characterizer.characterizeLoopFreeProgram(parsedProgram)
-          println(characterizer)
+          val characterizer: Characterizer = Characterizer.characterizeLoopFreeProgram(parsedProgram)
+          println("Characterizer: " + characterizer)
+          val weakestPrecondition: Expr = WeakestPrecondition.compute(characterizer, parsedProgram.methods.head.post)
+          println("Postcondition: " + parsedProgram.methods.head.post)
+          println("Computed WP: " + weakestPrecondition)
           return
         }
 

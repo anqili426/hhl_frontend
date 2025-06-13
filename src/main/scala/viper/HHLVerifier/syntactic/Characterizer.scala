@@ -2,8 +2,6 @@ package viper.HHLVerifier.syntactic
 
 import viper.HHLVerifier.ast._
 
-import scala.::
-
 object Characterizer {
 
   /** A path of the characterizer representing one path of the (loop-free) program
@@ -47,7 +45,7 @@ object Characterizer {
     case _ => acc
   }
 
-  private def applySubstitution(expr: Expr, map: Map[Id, Expr]): Expr = expr match {
+  def applySubstitution(expr: Expr, map: Map[Id, Expr]): Expr = expr match {
     case id@Id(_) => {
       if (!map.contains(id)) expr // in this case there is no more substitution to be done (parameter)
       else applySubstitution(map(id), map)
