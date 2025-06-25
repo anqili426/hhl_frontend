@@ -51,7 +51,7 @@ object WeakestPrecondition {
   /**
    * Helper function substituting all variables in an assertion for a given path and given assertion variables.
    * The substitution is only taking place if we encounter a [[LookupExpr]] for one of the variables in `assertVars.
-   * Otherwise, the substitution will be (or has been) handled by an another quantifier.
+   * Otherwise, the substitution will be (or has been) handled by another quantifier.
    */
   private def substituteExprPath(expr: Expr, map: Map[Id, Expr], assertVars: Seq[AssertVar])(implicit c: Characterizer): Expr = expr match {
     case Assertion(quantifier, assertVarDecls, body) => {
