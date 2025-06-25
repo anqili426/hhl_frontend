@@ -4,20 +4,38 @@ import viper.HHLVerifier.ast._
 
 object Characterizer {
 
-  /** A path of the characterizer representing one path of the (loop-free) program
+  /**
+   * A path of the characterizer representing one path of a (loop-free) program
    *
-   * @param pc path condition, a program boolean expression
-   * @param subst maps each variable to an expression */
+   * @param pc    path condition, a program boolean expression, which holds on an initial state if and only if
+   *              this initial state can take this path.
+   * @param subst maps each variable `x` of the program to an expression `p`, meaning that the variable `x` in
+   *              the final state will have the value of the expression `p` in the initial state.
+   */
   case class CharPath(pc: Expr, subst: Map[Id, Expr])
 
   type Characterizer = Seq[CharPath]
 
+  /**
+   * Derives a [[Characterizer]] for a '''loop-free''' [[HHLProgram]].
+   *
+   * @param program a loop-free [[HHLProgram]] to analyze
+   * @return        a characterizer capturing all paths of a program. A characterizer is defined as
+   *                a list of [[CharPath]]s, where each element of the list covers one path of the program.
+   *                The characterizer itself then covers exactly all paths of the program.
+   * @throws java.lang.RuntimeException if the program contains more than one
+   *                                    method (feature not yet implemented)
+   */
   def characterizeLoopFreeProgram(program: HHLProgram): Characterizer = program.methods match {
     case Nil => Nil
     case x :: Nil => characterizeStmt(x.body)
     case _ => sys.error("Characterizer: Cannot yet handle multiple methods") // TODO: Add support
   }
 
+  /**
+   * Recursively '''symbolically characterizes''' a single statement, yielding all feasible execution
+   * paths as [[CharPath]] objects.
+   */
   private def characterizeStmt(stmt: Stmt, acc: Seq[CharPath] = Seq(CharPath(BoolLit(true), Map.empty))): Characterizer = stmt match {
     case CompositeStmt(Nil) => acc
     case CompositeStmt(x :: xs) => {
@@ -45,6 +63,14 @@ object Characterizer {
     case _ => acc
   }
 
+  /**
+   * Performs a '''recursive substitution''' of identifiers according to the given mapping. Chained substitutions
+   * are also fully resolved.
+   *
+   * @param expr the expression in which the substitution takes place
+   * @param map  a mapping from identifiers to the expressions that replace them
+   * @return     a copy of `expr` where every identifier occuring in `map` has been transitively substituted
+   */
   def applySubstitution(expr: Expr, map: Map[Id, Expr]): Expr = expr match {
     case id@Id(_) => {
       if (!map.contains(id)) expr // in this case there is no more substitution to be done (parameter)

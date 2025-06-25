@@ -4,6 +4,16 @@ import viper.HHLVerifier.ast._
 import Characterizer._
 
 object WeakestPrecondition {
+  /**
+   * Computes the '''weakest precondition (WP)''' for a given program (described by a characterizer) and
+   * given postconditions.
+   *
+   * @param characterizer characterizer, characterizing all execution paths of a program.
+   * @param post          non-empty sequence of postconditions.
+   * @return              an [[Expr]] that is the '''weakest precondition''' for the given
+   *                      program and postconditions.
+   * @throws java.lang.RuntimeException if `post` is empty.
+   */
   def compute(characterizer: Characterizer, post: Seq[Expr]): Expr = post match {
     case Nil => sys.error("WeakestPrecondition: No postcondition given")
     case _ => post
@@ -11,6 +21,10 @@ object WeakestPrecondition {
       .reduceLeft((acc,x) => BinaryExpr(acc, "&&", x))
   }
 
+  /**
+   * Helper function computing the '''weakest precondition (WP)''' for a given characterizer and
+   * a ''single'' postcondition.
+   */
   private def computeSinglePost(characterizer: Characterizer, post: Expr): Expr = {
     implicit val c: Characterizer = characterizer
 
@@ -34,6 +48,11 @@ object WeakestPrecondition {
     }
   }
 
+  /**
+   * Helper function substituting all variables in an assertion for a given path and given assertion variables.
+   * The substitution is only taking place if we encounter a [[LookupExpr]] for one of the variables in `assertVars.
+   * Otherwise, the substitution will be (or has been) handled by an another quantifier.
+   */
   private def substituteExprPath(expr: Expr, map: Map[Id, Expr], assertVars: Seq[AssertVar])(implicit c: Characterizer): Expr = expr match {
     case Assertion(quantifier, assertVarDecls, body) => {
       val substitutedOuter = Assertion(quantifier, assertVarDecls, substituteExprPath(body, map, assertVars))
@@ -49,6 +68,11 @@ object WeakestPrecondition {
     case _ => expr // TODO: Double-check which other Expr are possible
   }
 
+  /**
+   * Helper function substituting the path condition for a given state. In particular, identifiers are
+   * substituted for a [[LookupExpr]] for the particular state. This is, because we need to make sure that
+   * every variable reference in the path condition is bound to a state.
+   */
   private def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
     case Id(_) => LookupExpr(state, pc)
     case Num(_) | BoolLit(_) => pc
