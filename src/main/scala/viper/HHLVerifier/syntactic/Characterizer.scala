@@ -64,18 +64,14 @@ object Characterizer {
   }
 
   /**
-   * Performs a '''recursive substitution''' of identifiers according to the given mapping. Chained substitutions
-   * are also fully resolved.
+   * Performs a '''recursive substitution''' of identifiers according to the given mapping.
    *
    * @param expr the expression in which the substitution takes place
    * @param map  a mapping from identifiers to the expressions that replace them
-   * @return     a copy of `expr` where every identifier occuring in `map` has been transitively substituted
+   * @return     a copy of `expr` where every identifier occuring in `map` has been substituted
    */
   def applySubstitution(expr: Expr, map: Map[Id, Expr]): Expr = expr match {
-    case id@Id(_) => {
-      if (!map.contains(id)) expr // in this case there is no more substitution to be done (parameter)
-      else applySubstitution(map(id), map)
-    }
+    case id@Id(_) => map.getOrElse(id, expr)
     case Num(_) | BoolLit(_) => expr
     case BinaryExpr(e1, op, e2) => BinaryExpr(applySubstitution(e1, map), op, applySubstitution(e2, map))
     case UnaryExpr(op, e) => UnaryExpr(op, applySubstitution(e, map))
