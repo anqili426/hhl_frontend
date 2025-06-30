@@ -36,7 +36,7 @@ object Characterizer {
    * Recursively '''symbolically characterizes''' a single statement, yielding all feasible execution
    * paths as [[CharPath]] objects.
    */
-  private def characterizeStmt(stmt: Stmt, acc: Seq[CharPath] = Seq(CharPath(BoolLit(true), Map.empty))): Characterizer = stmt match {
+  private def characterizeStmt(stmt: Stmt, acc: Characterizer = Seq(CharPath(BoolLit(true), Map.empty))): Characterizer = stmt match {
     case CompositeStmt(Nil) => acc
     case CompositeStmt(x :: xs) => {
       val firstRes = characterizeStmt(x, acc)
@@ -57,6 +57,9 @@ object Characterizer {
         CharPath(pcAfter, substAfter) <- characterizeStmt(elseStmt, acc)
       } yield CharPath(BinaryExpr(UnaryExpr("!", applySubstitution(cond, substBefore)), "&&", pcAfter), substAfter)
       ifRes ++ elseRes
+    }
+    case AssumeStmt(e) => acc.map {
+      case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
     }
     case HavocStmt(_, _) => sys.error("Characterizer: Cannot yet handle havoc: " + stmt.toString)
     case WhileLoopStmt(_, _, _, _, _) => sys.error("Characterizer: Expected a loop-free program")
