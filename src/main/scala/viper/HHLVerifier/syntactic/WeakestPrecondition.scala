@@ -3,6 +3,9 @@ package viper.HHLVerifier.syntactic
 import viper.HHLVerifier.ast._
 import Characterizer._
 
+import scala.collection.immutable.{AbstractSeq, LinearSeq}
+import scala.xml.NodeSeq
+
 object WeakestPrecondition {
   /**
    * Computes the '''weakest precondition (WP)''' for a given program (described by a characterizer) and
@@ -27,12 +30,12 @@ object WeakestPrecondition {
    */
   private def computeSinglePost(characterizer: Characterizer, post: Expr): Expr = {
     implicit val c: Characterizer = characterizer
-
-    post match {
+    val normalizedPost: Expr = desugarQuantifiers(post) // to correctly compute the WP, it is handy to have chains of single-variable quantifiers
+    normalizedPost match {
       case Assertion("forall", assertVarDecls, body) => {
         Assertion("forall", assertVarDecls,
-          characterizer // TODO: which AssertVar to take when there are multiple in assert statement?
-            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVarDecls.last.vName), substituteExprPath(body, subst, assertVarDecls.map { case AssertVarDecl(x, _) => x })) }
+          characterizer
+            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVarDecls.head.vName), substituteExprPath(body, subst, assertVarDecls.head.vName)) }
             .map(x => ImpliesExpr(x._1, x._2))
             .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e))
         )
@@ -40,7 +43,7 @@ object WeakestPrecondition {
       case Assertion("exists", assertVarDecls, body) => {
         Assertion("exists", assertVarDecls,
           characterizer
-            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVarDecls.last.vName), substituteExprPath(body, subst, assertVarDecls.map { case AssertVarDecl(x, _) => x })) }
+            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVarDecls.head.vName), substituteExprPath(body, subst, assertVarDecls.head.vName)) }
             .map(x => BinaryExpr(x._1, "&&", x._2))
             .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e))
         )
@@ -49,22 +52,19 @@ object WeakestPrecondition {
   }
 
   /**
-   * Helper function substituting all variables in an assertion for a given path and given assertion variables.
-   * The substitution is only taking place if we encounter a [[LookupExpr]] for one of the variables in `assertVars.
+   * Helper function substituting all variables in an assertion for a given path and a given assertion variable.
+   * The substitution is only taking place if we encounter a [[LookupExpr]] for the `assertVar`.
    * Otherwise, the substitution will be (or has been) handled by another quantifier.
    */
-  private def substituteExprPath(expr: Expr, map: Map[Id, Expr], assertVars: Seq[AssertVar])(implicit c: Characterizer): Expr = expr match {
+  private def substituteExprPath(expr: Expr, map: Map[Id, Expr], assertVar: AssertVar)(implicit c: Characterizer): Expr = expr match {
     case Assertion(quantifier, assertVarDecls, body) => {
-      val substitutedOuter = Assertion(quantifier, assertVarDecls, substituteExprPath(body, map, assertVars))
+      val substitutedOuter = Assertion(quantifier, assertVarDecls, substituteExprPath(body, map, assertVar))
       computeSinglePost(c, substitutedOuter)
     }
-    case BinaryExpr(e1, op, e2) => BinaryExpr(substituteExprPath(e1, map, assertVars), op, substituteExprPath(e2, map, assertVars))
-    case UnaryExpr(op, e) => UnaryExpr(op, substituteExprPath(e, map, assertVars))
-    case ImpliesExpr(left, right) => ImpliesExpr(substituteExprPath(left, map, assertVars), substituteExprPath(right, map, assertVars))
-    case le@LookupExpr(id, index) => {
-      if (assertVars.contains(id)) LookupExpr(id, Characterizer.applySubstitution(index, map))
-      else le
-    }
+    case BinaryExpr(e1, op, e2) => BinaryExpr(substituteExprPath(e1, map, assertVar), op, substituteExprPath(e2, map, assertVar))
+    case UnaryExpr(op, e) => UnaryExpr(op, substituteExprPath(e, map, assertVar))
+    case ImpliesExpr(left, right) => ImpliesExpr(substituteExprPath(left, map, assertVar), substituteExprPath(right, map, assertVar))
+    case LookupExpr(assertVar, index) => LookupExpr(assertVar, Characterizer.applySubstitution(index, map)) // only perform substitution, if assertVar matches
     case _ => expr // TODO: Double-check which other Expr are possible
   }
 
@@ -80,5 +80,20 @@ object WeakestPrecondition {
     case UnaryExpr(op, e) => UnaryExpr(op, substitutePathCondition(e, state))
     case ImpliesExpr(left, right) => ImpliesExpr(substitutePathCondition(left, state), substitutePathCondition(right, state))
     case _ => sys.error("WeakestPrecondition: Yet unsupported expression in path-condition substitution: " + state.toString) // TODO: Check which other expressions could be assigned
+  }
+
+  /**
+   * Converts every multi-variable quantifier into an equivalent chain of single-variable quantifiers.
+   * This normalization is later needed for computing the weakest precondition.
+   */
+  private def desugarQuantifiers(e: Expr): Expr = e match {
+    case Assertion(quantifier, assertVarDecls, body) => assertVarDecls match {
+      case _ :: Nil => e // only one assertVar ==> already desugared, nothing more to do
+      case x :: xs => Assertion(quantifier, List(x), desugarQuantifiers(Assertion(quantifier, xs, body))) // TODO: Support error states
+    }
+    case BinaryExpr(e1, op, e2) => BinaryExpr(desugarQuantifiers(e1), op, desugarQuantifiers(e2))
+    case UnaryExpr(op, e) => UnaryExpr(op, desugarQuantifiers(e))
+    case ImpliesExpr(left, right) => ImpliesExpr(desugarQuantifiers(left), desugarQuantifiers(right))
+    case _ => e // TODO: Double-check which other Expr are possible
   }
 }
