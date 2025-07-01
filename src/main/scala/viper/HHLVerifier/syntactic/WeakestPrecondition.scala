@@ -9,7 +9,7 @@ import scala.xml.NodeSeq
 object WeakestPrecondition {
   /**
    * Computes the '''weakest precondition (WP)''' for a given program (described by a characterizer) and
-   * given postconditions.
+   * given postconditions. Each assertion occurring in the WP quantifies over only one state variable.
    *
    * @param characterizer characterizer, characterizing all execution paths of a program.
    * @param post          non-empty sequence of postconditions.
@@ -64,7 +64,7 @@ object WeakestPrecondition {
     case BinaryExpr(e1, op, e2) => BinaryExpr(substituteExprPath(e1, map, assertVar), op, substituteExprPath(e2, map, assertVar))
     case UnaryExpr(op, e) => UnaryExpr(op, substituteExprPath(e, map, assertVar))
     case ImpliesExpr(left, right) => ImpliesExpr(substituteExprPath(left, map, assertVar), substituteExprPath(right, map, assertVar))
-    case LookupExpr(assertVar, index) => LookupExpr(assertVar, Characterizer.applySubstitution(index, map)) // only perform substitution, if assertVar matches
+    case LookupExpr(id, index) if id == assertVar => LookupExpr(assertVar, Characterizer.applySubstitution(index, map)) // only perform substitution, if assertVar matches
     case _ => expr // TODO: Double-check which other Expr are possible
   }
 
