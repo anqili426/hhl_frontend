@@ -8,19 +8,50 @@ import scala.collection.mutable
 
 class LogicEncoderNew {
 
+  /** Z3 context used to construct sorts, expressions and solvers. */
   private val ctx: Context = new Context()
+
   private val IntSort: Sort  = ctx.getIntSort
   private val BoolSort: Sort = ctx.getBoolSort
-  // represent states as an array int → int. Each integer index represents a variable, the stored integer is its value in this state
+
+  /** Sort that represents a ''program state'': An array from variable
+   * indices to their value in this state. */
   private val StateSort: Sort = ctx.mkArraySort(IntSort, IntSort)
-  // represent sets of states as an array state → bool. For a state (select S s) is true iff s is in S.
+
+  /** Sort that represents a ''set of program states'': An array from
+   * [[StateSort]] to a boolean membership flag. Usually, we only need
+   * one object of this sort (defined below). */
   private val SetSort: Sort = ctx.mkArraySort(StateSort, BoolSort)
-  // generate a general set S which we use in our encodings (see HHL paper Def. 3)
+
+  /** Fresh Z3 constant of sort [[SetSort]] that denotes the abstract set '''S'''.
+   * Cf. HHL paper, definition 3. */
   private val S: ArrayExpr[ArraySort[IntSort, IntSort], BoolSort] = ctx.mkConst("S", SetSort).asInstanceOf[ArrayExpr[ArraySort[IntSort, IntSort], BoolSort]]
 
+  /** Environment that maps program variable names to their Z3 integer constants.
+   * Populated by [[generateProgVars]]. */
   private val progEnv: mutable.Map[String, IntExpr] = mutable.Map.empty[String, IntExpr]
+
+  /** Environment that maps state variable names (introduced by quantifiers) to Z3
+   * array constants of sort [[StateSort]]. Populated by [[generateStateVars]]. */
   private val stateEnv: mutable.Map[String, ArrayExpr[IntSort, IntSort]] = mutable.Map.empty[String, ArrayExpr[IntSort, IntSort]]
 
+  /**
+   * Checks whether the precondition `pre` ''logically implies'' the weakest
+   * precondition `wp`. This is done by utilizing the ''Z3 solver'' to check the
+   * satisfiability of <code>¬(pre ⇒ wp)</code>.
+   *
+   * @param pre The user-supplied precondition.
+   * @param wp The weakest precondition computed by [[WeakestPrecondition.compute]]
+   * @param progVars All program variables that might occur in `pre` or `wp`. This are
+   *                 usually all parameters passed to the method
+   * @return Z3 [[Status]]:
+   *         <ul>
+   *          <li>`UNSATISFIABLE` – <code>pre ⇒ wp</code> is valid.</li>
+   *          <li>`SATISFIABLE` – implication does <strong>not</strong> hold
+   *            (a model serves as counter‑example).</li>
+   *          <li>`UNKNOWN` – solver aborted.</li>
+   *         </ul>
+   */
   def checkImplication(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, progVars: Seq[Id]): Status = {
     // generate all necessary program variables in Z3 and add them to the environment
     generateProgVars(progVars)
@@ -43,7 +74,6 @@ class LogicEncoderNew {
     solver.add(ctx.mkNot(ctx.mkImplies(z3Pre, z3WP)))
 
     println("solver instantiated")
-
     solver.check()
   }
 
