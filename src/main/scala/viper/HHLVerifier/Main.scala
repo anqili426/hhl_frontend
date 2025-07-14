@@ -1,18 +1,20 @@
 package viper.HHLVerifier
 
 import fastparse.Parsed
-import viper.HHLVerifier.ast.{Expr, HHLProgram}
+import viper.HHLVerifier.ast.{BinaryExpr, Expr, HHLProgram}
 import viper.HHLVerifier.generation.Generator
 import viper.HHLVerifier.management._
 import viper.HHLVerifier.parsing.Parser
 import viper.HHLVerifier.symbols.SymbolChecker
 import viper.HHLVerifier.typing.TypeChecker
 import viper.HHLVerifier.syntactic.Characterizer._
-import viper.HHLVerifier.syntactic.{Characterizer, WeakestPrecondition}
-import viper.HHLVerifier.syntactic.WeakestPrecondition._
+import viper.HHLVerifier.syntactic.{Characterizer, WeakestPrecondition, LogicEncoderNew}
+import com.microsoft.z3._
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
+
+import scala.collection.mutable
 
 /** Main Method */
 object Main {
@@ -24,7 +26,7 @@ object Main {
   var testWithLogs = false
   var errMessages: Seq[String] = Seq("")
   var logsActive = true
-  var syntactic = false
+  var syntactic = true
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -83,9 +85,20 @@ object Main {
         if (syntactic) {
           val characterizer: Characterizer = Characterizer.characterizeLoopFreeProgram(parsedProgram)
           println("Characterizer: " + characterizer)
-          val weakestPrecondition: Expr = WeakestPrecondition.compute(characterizer, parsedProgram.methods.head.post)
+          val weakestPrecondition: Expr = WeakestPrecondition.compute(characterizer, parsedProgram.methods.head.post) // TODO: Extend to support multiple methods
+          val combinedPrecondition: Expr = parsedProgram.methods.head.pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
           println("Postcondition: " + parsedProgram.methods.head.post)
           println("Computed WP: " + weakestPrecondition)
+
+          // Z3 encoding
+          val encoder: LogicEncoderNew = new LogicEncoderNew
+          val result = encoder.checkImplication(combinedPrecondition, weakestPrecondition, parsedProgram.methods.head.params)
+
+          result match {
+            case Status.UNSATISFIABLE => println("Valid: Precondition implies WP.")
+            case Status.SATISFIABLE => println("Invalid: Counterexample found.")
+            case Status.UNKNOWN => println("Unknown: Z3 couldn't determine the result.")
+          }
           return
         }
 

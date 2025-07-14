@@ -1,0 +1,129 @@
+package viper.HHLVerifier.syntactic
+
+import com.microsoft.z3._
+import viper.HHLVerifier.ast._
+import viper.HHLVerifier.syntactic.WeakestPrecondition
+
+import scala.collection.mutable
+
+class LogicEncoderNew {
+
+  private val ctx: Context = new Context()
+  private val IntSort: Sort  = ctx.getIntSort
+  private val BoolSort: Sort = ctx.getBoolSort
+  // represent states as an array int → int. Each integer index represents a variable, the stored integer is its value in this state
+  private val StateSort: Sort = ctx.mkArraySort(IntSort, IntSort)
+  // represent sets of states as an array state → bool. For a state (select S s) is true iff s is in S.
+  private val SetSort: Sort = ctx.mkArraySort(StateSort, BoolSort)
+  // generate a general set S which we use in our encodings (see HHL paper Def. 3)
+  private val S: ArrayExpr[ArraySort[IntSort, IntSort], BoolSort] = ctx.mkConst("S", SetSort).asInstanceOf[ArrayExpr[ArraySort[IntSort, IntSort], BoolSort]]
+
+  private val progEnv: mutable.Map[String, IntExpr] = mutable.Map.empty[String, IntExpr]
+  private val stateEnv: mutable.Map[String, ArrayExpr[IntSort, IntSort]] = mutable.Map.empty[String, ArrayExpr[IntSort, IntSort]]
+
+  def checkImplication(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, progVars: Seq[Id]): Status = {
+    // generate all necessary program variables in Z3 and add them to the environment
+    generateProgVars(progVars)
+    // generate all necessary state variables in Z3 and add them to the environment
+    generateStateVars(pre)
+    generateStateVars(wp)
+
+    println("vars generated")
+
+    // encode the precondition and WP
+    val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
+    val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
+
+    println("encoding complete")
+    println("Z3 encoding Pre: " + z3Pre)
+    println("Z3 encoding WP: " + z3WP)
+
+    // solve not (pre ==> WP)
+    val solver = ctx.mkSolver()
+    solver.add(ctx.mkNot(ctx.mkImplies(z3Pre, z3WP)))
+
+    println("solver instantiated")
+
+    solver.check()
+  }
+
+  private def encodeBool(expr: viper.HHLVerifier.ast.Expr): BoolExpr = expr match {
+    case BoolLit(value) => ctx.mkBool(value)
+    case BinaryExpr(e1, op, e2) => op match {
+      case "&&" => ctx.mkAnd(encodeBool(e1), encodeBool(e2))
+      case "||" => ctx.mkOr(encodeBool(e1), encodeBool(e2))
+      case "==" => ctx.mkEq(encodeInt(e1), encodeInt(e2))
+      case "!=" => ctx.mkDistinct(encodeInt(e1), encodeInt(e2))
+      case ">=" => ctx.mkGe(encodeInt(e1), encodeInt(e2))
+      case "<=" => ctx.mkLe(encodeInt(e1), encodeInt(e2))
+      case ">" => ctx.mkGt(encodeInt(e1), encodeInt(e2))
+      case "<" => ctx.mkLt(encodeInt(e1), encodeInt(e2))
+    }
+    case UnaryExpr("!", e) => ctx.mkNot(encodeBool(e))
+    case ImpliesExpr(left, right) => ctx.mkImplies(encodeBool(left), encodeBool(right))
+    case Assertion(quantifier, List(AssertVarDecl(vName, _)), body) => {
+      val constantsArray: Array[com.microsoft.z3.Expr[_]] = Array(stateEnv(vName.name))
+      val encodedBody: com.microsoft.z3.BoolExpr = encodeBool(body)
+      quantifier match {
+        case "exists" => ctx.mkExists(constantsArray, encodedBody, 0, null, null, null, null)
+        case "forall" => ctx.mkForall(constantsArray, encodedBody, 0, null, null, null, null)
+      }
+    }
+    case StateExistsExpr(AssertVar(name), _) => ctx.mkSelect(S, stateEnv(name)).asInstanceOf[BoolExpr]
+  }
+
+  private def encodeInt(expr: viper.HHLVerifier.ast.Expr): IntExpr = expr match {
+    case LookupExpr(AssertVar(stateName), Id(varName)) => ctx.mkSelect(stateEnv(stateName), progEnv(varName)).asInstanceOf[IntExpr]
+    case LookupExpr(id, index) => encodeInt(resolveLookup(index)(id.asInstanceOf[AssertVar]))
+    case Num(value) => ctx.mkInt(value)
+    case BinaryExpr(e1, op, e2) => op match {
+      case "+" => ctx.mkAdd(encodeInt(e1), encodeInt(e2)).asInstanceOf[IntExpr]
+      case "-" => ctx.mkSub(encodeInt(e1), encodeInt(e2)).asInstanceOf[IntExpr]
+      case "*" => ctx.mkMul(encodeInt(e1), encodeInt(e2)).asInstanceOf[IntExpr]
+      case "/" => ctx.mkDiv(encodeInt(e1), encodeInt(e2)).asInstanceOf[IntExpr]
+      case "%" => ctx.mkMod(encodeInt(e1), encodeInt(e2))
+    }
+    case UnaryExpr("-", e) => ctx.mkUnaryMinus(encodeInt(e)).asInstanceOf[IntExpr]
+    case _ => sys.error("LogicEncoder: Unexpected expression in integer conversion: " + expr.toString)
+  }
+
+  private def generateProgVars(progVars: Seq[Id]): Unit = {
+    progVars.foreach { progVar =>
+      val z3Var = ctx.mkIntConst(progVar.name)
+      progEnv += (progVar.name -> z3Var)
+    }
+  }
+
+  private def generateStateVars(expr: viper.HHLVerifier.ast.Expr): Unit = expr match {
+    case BinaryExpr(e1, _, e2) => {
+      generateStateVars(e1)
+      generateStateVars(e2)
+    }
+    case UnaryExpr(_, e) => generateStateVars(e)
+    case ImpliesExpr(left, right) => {
+      generateStateVars(left)
+      generateStateVars(right)
+    }
+    case Assertion(_, assertVarDecls, body) => {
+      assertVarDecls.foreach { case AssertVarDecl(AssertVar(name), _) => {
+          if (!stateEnv.contains(name)) {
+            val z3Var = ctx.mkConst(name, StateSort).asInstanceOf[ArrayExpr[IntSort, IntSort]]
+            stateEnv += (name -> z3Var)
+          }
+        }
+      }
+      generateStateVars(body)
+    }
+    case _ => ()
+  }
+
+  private def resolveLookup(expr: viper.HHLVerifier.ast.Expr)(implicit assertVar: AssertVar): viper.HHLVerifier.ast.Expr = expr match {
+    case Id(_) => LookupExpr(assertVar, expr)
+    case Num(_) => expr
+    case BinaryExpr(e1, op, e2) => BinaryExpr(resolveLookup(e1), op, resolveLookup(e2))
+    case UnaryExpr(op, e) => UnaryExpr(op, resolveLookup(e))
+    case ImpliesExpr(left, right) => ImpliesExpr(resolveLookup(left), resolveLookup(right))
+    case _ => sys.error("LogicEncoder: Unexpected expression in lookup expression: " + expr.toString)
+  }
+
+}

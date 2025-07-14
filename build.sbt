@@ -8,6 +8,7 @@ ThisBuild / scalaVersion := "2.13.10"
 val fastParse = "com.lihaoyi" %% "fastparse" % "2.2.2"
 val csvWriter = "au.com.bytecode" % "opencsv" % "2.4"
 val play = "com.typesafe.play" %% "play-json" % "2.10.0"
+val z3 = "tools.aqua" % "z3-turnkey" % "4.14.1"
 
 lazy val silicon = (project in file("silicon"))
   .settings(assembly / mainClass := None)
@@ -26,6 +27,7 @@ lazy val impcon_frontend = (project in file("."))
     libraryDependencies += fastParse,
     libraryDependencies += csvWriter,
     libraryDependencies += play,
+    libraryDependencies += z3,
 
     Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-reports", "-oD"),
 

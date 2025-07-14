@@ -86,7 +86,7 @@ object WeakestPrecondition {
    * Converts every multi-variable quantifier into an equivalent chain of single-variable quantifiers.
    * This normalization is later needed for computing the weakest precondition.
    */
-  private def desugarQuantifiers(e: Expr): Expr = e match {
+  def desugarQuantifiers(e: Expr): Expr = e match {
     case Assertion(quantifier, assertVarDecls, body) => assertVarDecls match {
       case _ :: Nil => e // only one assertVar ==> already desugared, nothing more to do
       case x :: xs => Assertion(quantifier, List(x), desugarQuantifiers(Assertion(quantifier, xs, body))) // TODO: Support error states
