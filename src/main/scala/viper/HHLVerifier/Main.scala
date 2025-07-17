@@ -26,7 +26,7 @@ object Main {
   var testWithLogs = false
   var errMessages: Seq[String] = Seq("")
   var logsActive = true
-  var syntactic = true
+  var syntactic = false
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -71,7 +71,6 @@ object Main {
         new Logger("Parsing successful.").log()
 
         val parsedProgram: HHLProgram = res.get.value
-        println(parsedProgram)
 
         // Symbol table
         SymbolChecker.checkSymbolsProg(parsedProgram)
@@ -83,22 +82,43 @@ object Main {
 
         // Syntactic evaluation mode
         if (syntactic) {
-          val characterizer: Characterizer = Characterizer.characterizeLoopFreeProgram(parsedProgram)
-          println("Characterizer: " + characterizer)
-          val weakestPrecondition: Expr = WeakestPrecondition.compute(characterizer, parsedProgram.methods.head.post) // TODO: Extend to support multiple methods
-          val combinedPrecondition: Expr = parsedProgram.methods.head.pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
-          println("Postcondition: " + parsedProgram.methods.head.post)
-          println("Computed WP: " + weakestPrecondition)
+          parsedProgram.methods.foreach { method =>
+            println("----------")
+            println("Method \"" + method.mName + "\"")
 
-          // Z3 encoding
-          val encoder: LogicEncoderNew = new LogicEncoderNew
-          val result = encoder.checkImplication(combinedPrecondition, weakestPrecondition, parsedProgram.methods.head.params)
+            if (method.pre.isEmpty || method.post.isEmpty) {
+              println("\t Error: Pre and/or postcondition is empty.")
+              verified = 2
+            } else {
+              val characterizer: Characterizer = Characterizer.characterizeStmt(method.body)
+              val weakestPrecondition: Expr = WeakestPrecondition.compute(characterizer, method.post)
+              val combinedPrecondition: Expr = method.pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
 
-          result match {
-            case Status.UNSATISFIABLE => println("Valid: Precondition implies WP.")
-            case Status.SATISFIABLE => println("Invalid: Counterexample found.")
-            case Status.UNKNOWN => println("Unknown: Z3 couldn't determine the result.")
+              // Z3 encoding
+              val encoder: LogicEncoderNew = new LogicEncoderNew
+              val result = encoder.checkImplication(combinedPrecondition, weakestPrecondition, parsedProgram.methods.head.params)
+
+              result match {
+                case Status.UNSATISFIABLE =>
+                  println("\tValid: Precondition implies WP.")
+                  if (verified != 2) verified = 1
+                case Status.SATISFIABLE =>
+                  println("\tInvalid: Counterexample found.")
+                  verified = 2
+                case Status.UNKNOWN =>
+                  println("\tUnknown: Z3 couldn't determine the result.")
+                  verified = 2 // for now, we handle "unknown" as invalid
+              }
+            }
           }
+
+          val t1 = System.nanoTime()
+          runtime = (t1 - t0) / 1E9
+
+          println("----------")
+
+          if (verified == 1) println(f"SUCCESS: Verification succeeded in ${runtime}s")
+          if (verified == 2) println(f"ERROR: The provided program could not be verified. Runtime: ${runtime}s")
           return
         }
 

@@ -33,10 +33,15 @@ object Characterizer {
   }
 
   /**
-   * Recursively '''symbolically characterizes''' a single statement, yielding all feasible execution
-   * paths as [[CharPath]] objects.
+   * Derives a [[Characterizer]] for a '''loop-free''' [[Stmt]]. Recursively
+   * '''symbolically characterizes''' a single statement, yielding all feasible execution paths as [[CharPath]] objects.
+   *
+   * @param stmt a loop-free [[Stmt]] to analyze
+   * @return        a characterizer capturing all paths of the statement. A characterizer is defined as
+   *                a list of [[CharPath]]s, where each element of the list covers one path of the program.
+   *                The characterizer itself then covers exactly all paths of the program.
    */
-  private def characterizeStmt(stmt: Stmt, acc: Characterizer = Seq(CharPath(BoolLit(true), Map.empty))): Characterizer = stmt match {
+  def characterizeStmt(stmt: Stmt, acc: Characterizer = Seq(CharPath(BoolLit(true), Map.empty))): Characterizer = stmt match {
     case CompositeStmt(Nil) => acc
     case CompositeStmt(x :: xs) => {
       val firstRes = characterizeStmt(x, acc)

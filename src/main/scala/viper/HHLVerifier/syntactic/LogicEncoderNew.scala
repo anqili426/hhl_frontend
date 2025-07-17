@@ -59,21 +59,19 @@ class LogicEncoderNew {
     generateStateVars(pre)
     generateStateVars(wp)
 
-    println("vars generated")
-
     // encode the precondition and WP
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
     val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
+    val z3FinalFormula = ctx.mkNot(ctx.mkImplies(z3Pre, z3WP))
 
-    println("encoding complete")
-    println("Z3 encoding Pre: " + z3Pre)
-    println("Z3 encoding WP: " + z3WP)
+    //println("Z3 encoding Pre: " + z3Pre)
+    //println("Z3 encoding WP: " + z3WP)
+    //println("Z3 encoding final formula: " + z3FinalFormula)
 
-    // solve not (pre ==> WP)
+    // solve ¬(pre ⇒ wp)
     val solver = ctx.mkSolver()
-    solver.add(ctx.mkNot(ctx.mkImplies(z3Pre, z3WP)))
+    solver.add(z3FinalFormula)
 
-    println("solver instantiated")
     solver.check()
   }
 
