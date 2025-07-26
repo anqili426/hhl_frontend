@@ -7,9 +7,7 @@ import viper.HHLVerifier.management._
 import viper.HHLVerifier.parsing.Parser
 import viper.HHLVerifier.symbols.SymbolChecker
 import viper.HHLVerifier.typing.TypeChecker
-import viper.HHLVerifier.syntactic.Characterizer._
-import viper.HHLVerifier.syntactic.{Characterizer, WeakestPrecondition, LogicEncoderNew}
-import com.microsoft.z3._
+import viper.HHLVerifier.syntactic.SyntacticEngine
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
@@ -82,36 +80,8 @@ object Main {
 
         // Syntactic evaluation mode
         if (syntactic) {
-          parsedProgram.methods.foreach { method =>
-            println("----------")
-            println("Method \"" + method.mName + "\"")
-
-            if (method.pre.isEmpty || method.post.isEmpty) {
-              println("\t Error: Pre and/or postcondition is empty.")
-              verified = 2
-            } else {
-              val characterizer: Characterizer = Characterizer.characterizeStmt(method.body)
-              val weakestPrecondition: Expr = WeakestPrecondition.compute(characterizer, method.post)
-              val combinedPrecondition: Expr = method.pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
-
-              // Z3 encoding
-              val encoder: LogicEncoderNew = new LogicEncoderNew
-              val result = encoder.checkImplication(combinedPrecondition, weakestPrecondition, parsedProgram.methods.head.params)
-
-              result match {
-                case Status.UNSATISFIABLE =>
-                  println("\tValid: Precondition implies WP.")
-                  if (verified != 2) verified = 1
-                case Status.SATISFIABLE =>
-                  println("\tInvalid: Counterexample found.")
-                  verified = 2
-                case Status.UNKNOWN =>
-                  println("\tUnknown: Z3 couldn't determine the result.")
-                  verified = 2 // for now, we handle "unknown" as invalid
-              }
-            }
-          }
-
+          println(parsedProgram)
+          verified = SyntacticEngine.verify(parsedProgram)
           val t1 = System.nanoTime()
           runtime = (t1 - t0) / 1E9
 

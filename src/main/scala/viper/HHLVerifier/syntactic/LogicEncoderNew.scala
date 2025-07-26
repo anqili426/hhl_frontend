@@ -52,7 +52,7 @@ class LogicEncoderNew {
    *          <li>`UNKNOWN` – solver aborted.</li>
    *         </ul>
    */
-  def checkImplication(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, progVars: Seq[Id]): Status = {
+  def checkImplication(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, progVars: Seq[Id]): (Status, Option[Model]) = {
     // generate all necessary program variables in Z3 and add them to the environment
     generateProgVars(progVars)
     // generate all necessary state variables in Z3 and add them to the environment
@@ -72,7 +72,8 @@ class LogicEncoderNew {
     val solver = ctx.mkSolver()
     solver.add(z3FinalFormula)
 
-    solver.check()
+    val result = solver.check()
+    (result, if (result == Status.SATISFIABLE) Some(solver.getModel()) else None)
   }
 
   private def encodeBool(expr: viper.HHLVerifier.ast.Expr): BoolExpr = expr match {
