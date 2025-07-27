@@ -3,6 +3,7 @@ package viper.HHLVerifier.syntactic
 import com.microsoft.z3._
 import viper.HHLVerifier.ast._
 import viper.HHLVerifier.syntactic.WeakestPrecondition
+import viper.HHLVerifier.typing._
 
 import scala.collection.mutable
 
@@ -32,8 +33,12 @@ class LogicEncoderNew {
   private val progEnv: mutable.Map[String, IntExpr] = mutable.Map.empty[String, IntExpr]
 
   /** Environment that maps state variable names (introduced by quantifiers) to Z3
-   * array constants of sort [[StateSort]]. Populated by [[generateStateVars]]. */
+   * array constants of sort [[StateSort]]. Populated by [[generateQuantifiedVars]]. */
   private val stateEnv: mutable.Map[String, ArrayExpr[IntSort, IntSort]] = mutable.Map.empty[String, ArrayExpr[IntSort, IntSort]]
+
+  /** Environment that maps quantified variable names (other than states, currently integers)
+   * to their Z3 integer constants. Populated by [[generateQuantifiedVars]]. */
+  private val quantifiedEnv: mutable.Map[String, IntExpr] = mutable.Map.empty[String, IntExpr]
 
   /**
    * Checks whether the precondition `pre` ''logically implies'' the weakest
@@ -56,8 +61,8 @@ class LogicEncoderNew {
     // generate all necessary program variables in Z3 and add them to the environment
     generateProgVars(progVars)
     // generate all necessary state variables in Z3 and add them to the environment
-    generateStateVars(pre)
-    generateStateVars(wp)
+    generateQuantifiedVars(pre)
+    generateQuantifiedVars(wp)
 
     // encode the precondition and WP
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
@@ -90,7 +95,7 @@ class LogicEncoderNew {
     }
     case UnaryExpr("!", e) => ctx.mkNot(encodeBool(e))
     case ImpliesExpr(left, right) => ctx.mkImplies(encodeBool(left), encodeBool(right))
-    case Assertion(quantifier, List(AssertVarDecl(vName, _)), body) => {
+    case Assertion(quantifier, List(AssertVarDecl(vName, StateType())), body) => {
       val constantsArray: Array[com.microsoft.z3.Expr[_]] = Array(stateEnv(vName.name))
       val encodedBody: com.microsoft.z3.BoolExpr = encodeBool(body)
       quantifier match {
@@ -98,13 +103,23 @@ class LogicEncoderNew {
         case "forall" => ctx.mkForall(constantsArray, encodedBody, 0, null, null, null, null)
       }
     }
+    case Assertion(quantifier, List(AssertVarDecl(vName, _)), body) => { // quantifier over non-state variable
+      val constantsArray: Array[com.microsoft.z3.Expr[_]] = Array(quantifiedEnv(vName.name))
+      val encodedBody: com.microsoft.z3.BoolExpr = encodeBool(body)
+      quantifier match {
+        case "exists" => ctx.mkExists(constantsArray, encodedBody, 0, null, null, null, null)
+        case "forall" => ctx.mkForall(constantsArray, encodedBody, 0, null, null, null, null)
+      }
+    }
     case StateExistsExpr(AssertVar(name), _) => ctx.mkSelect(S, stateEnv(name)).asInstanceOf[BoolExpr]
+    case _ => sys.error("LogicEncoder: Unexpected expression in boolean conversion: " + expr.toString)
   }
 
   private def encodeInt(expr: viper.HHLVerifier.ast.Expr): IntExpr = expr match {
     case LookupExpr(AssertVar(stateName), Id(varName)) => ctx.mkSelect(stateEnv(stateName), progEnv(varName)).asInstanceOf[IntExpr]
     case LookupExpr(id, index) => encodeInt(resolveLookup(index)(id.asInstanceOf[AssertVar]))
     case Num(value) => ctx.mkInt(value)
+    case AssertVar(name) => quantifiedEnv(name)
     case BinaryExpr(e1, op, e2) => op match {
       case "+" => ctx.mkAdd(encodeInt(e1), encodeInt(e2)).asInstanceOf[IntExpr]
       case "-" => ctx.mkSub(encodeInt(e1), encodeInt(e2)).asInstanceOf[IntExpr]
@@ -123,25 +138,32 @@ class LogicEncoderNew {
     }
   }
 
-  private def generateStateVars(expr: viper.HHLVerifier.ast.Expr): Unit = expr match {
+  private def generateQuantifiedVars(expr: viper.HHLVerifier.ast.Expr): Unit = expr match {
     case BinaryExpr(e1, _, e2) => {
-      generateStateVars(e1)
-      generateStateVars(e2)
+      generateQuantifiedVars(e1)
+      generateQuantifiedVars(e2)
     }
-    case UnaryExpr(_, e) => generateStateVars(e)
+    case UnaryExpr(_, e) => generateQuantifiedVars(e)
     case ImpliesExpr(left, right) => {
-      generateStateVars(left)
-      generateStateVars(right)
+      generateQuantifiedVars(left)
+      generateQuantifiedVars(right)
     }
     case Assertion(_, assertVarDecls, body) => {
-      assertVarDecls.foreach { case AssertVarDecl(AssertVar(name), _) => {
+      assertVarDecls.foreach {
+        case AssertVarDecl(AssertVar(name), StateType()) => {
           if (!stateEnv.contains(name)) {
             val z3Var = ctx.mkConst(name, StateSort).asInstanceOf[ArrayExpr[IntSort, IntSort]]
             stateEnv += (name -> z3Var)
           }
         }
+        case AssertVarDecl(AssertVar(name), IntType()) => {
+          if (!quantifiedEnv.contains(name)) {
+            val z3Var = ctx.mkIntConst(name)
+            quantifiedEnv += (name -> z3Var)
+          }
+        }
       }
-      generateStateVars(body)
+      generateQuantifiedVars(body)
     }
     case _ => ()
   }

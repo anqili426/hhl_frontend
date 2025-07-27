@@ -3,6 +3,7 @@ package viper.HHLVerifier.syntactic
 import com.microsoft.z3._
 import viper.HHLVerifier.ast._
 import Characterizer._
+import viper.HHLVerifier.syntactic.WeakestPrecondition.substitutePathCondition
 
 object SyntacticEngine {
 
@@ -20,18 +21,17 @@ object SyntacticEngine {
 
       // Verifying all triples
       split
-        .zipWithIndex
-        .foreach { case (triple, idx) => verifyTriple(triple, getAllProgVars(method)) }
+        .foreach { triple => verifyLoopFreeTriple(triple, getAllProgVars(method)) }
 
-      // verifyTriple(Triple(method.body, method.pre, method.post), method.params, "top-level")(method) // old version for loop-free programs
+      // verifyLoopFreeTriple(Triple(method.body, method.pre, method.post), method.params, "top-level")(method) // old version for loop-free programs
     }
     verificationResult
   }
 
-  private def verifyTriple(triple: Triple, progVars: Seq[Id]): Boolean = triple match {
+  private def verifyLoopFreeTriple(triple: Triple, progVars: Seq[Id]): Boolean = triple match {
     case Triple(body, pre, post, name) => {
       if (pre.isEmpty || post.isEmpty) {
-        println("\t Error: Pre and/or postcondition is empty.")
+        println(f"\t Error ($name): Pre and/or postcondition is empty.")
         verificationResult = 2
         false
       } else {
@@ -75,9 +75,9 @@ object SyntacticEngine {
             case WhileLoopStmt(cond, body, inv, decr, rule) :: after => {
               val mappedInvariant = inv.map(_._2)
               val loopPostcondition = handleRuleForallExists(WhileLoopStmt(cond, body, inv, decr, rule))
-              val prefixOpt = Some(Triple(CompositeStmt(before), pre, inv.map(_._2), name + " > loop-prefix"))
+              val prefixOpt = Some(Triple(CompositeStmt(before), pre, inv.map(_._2), name + " > [P] prefix [I]"))
               val bodyOpt = Some(Triple(IfElseStmt(cond, body, CompositeStmt(Nil)), mappedInvariant, mappedInvariant, name + " > [I] if (b) {C} [I]"))
-              val suffixOpt = Some(Triple(CompositeStmt(after), List(loopPostcondition), post, name + " > loop-suffix"))
+              val suffixOpt = Some(Triple(CompositeStmt(after), List(loopPostcondition), post, name + " > [Q_loop] suffix [Q]"))
               List(prefixOpt, bodyOpt, suffixOpt).flatten
             }
             case _ => List(triple) // no loop found in stmt
@@ -93,19 +93,19 @@ object SyntacticEngine {
   private def handleRuleForallExists(stmt: WhileLoopStmt): viper.HHLVerifier.ast.Expr = stmt match {
     case WhileLoopStmt(cond, body, inv, decr, rule) => {
       val mappedInvariant = inv.map(_._2)
-      substitutionForAllExists(mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x)))(cond)
+      substitutionForallExists(mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x)))(cond)
     }
   }
 
-  private def substitutionForAllExists(inv: viper.HHLVerifier.ast.Expr, noForallAfterExists: Boolean = true)(implicit loopCondition: viper.HHLVerifier.ast.Expr): viper.HHLVerifier.ast.Expr = inv match {
-    case Assertion("exists", List(AssertVarDecl(vName, vType)), body) => Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(substitutionForAllExists(body, false), "&&", ImpliesExpr(UnaryExpr("not", loopCondition), StateExistsExpr(vName, false)))) // cf. Hypra paper, p. 19, bottom
+  private def substitutionForallExists(inv: viper.HHLVerifier.ast.Expr, noForallAfterExists: Boolean = true)(implicit loopCondition: viper.HHLVerifier.ast.Expr): viper.HHLVerifier.ast.Expr = inv match {
+    case Assertion("exists", List(AssertVarDecl(vName, vType)), body) => Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(substitutionForallExists(body, false), "&&", ImpliesExpr(UnaryExpr("!", substitutePathCondition(loopCondition, vName)), StateExistsExpr(vName, false)))) // cf. Hypra paper, p. 19, bottom
     case Assertion("exists", _, _) => sys.error("SyntacticEngine: Tried to apply \"forallExistsRule\", but found non-desugared quantifier.")
     case Assertion("forall", assertVarDecls, body) =>
       if (!noForallAfterExists) sys.error("SyntacticEngine: Tried to apply \"forallExistsRule\", but invariant \"no forall after exists quantifier\" was violated.")
-      else Assertion("forall", assertVarDecls, substitutionForAllExists(body, noForallAfterExists))
-    case BinaryExpr(e1, op, e2) => BinaryExpr(substitutionForAllExists(e1, noForallAfterExists), op, substitutionForAllExists(e2, noForallAfterExists))
-    case UnaryExpr(op, e) => UnaryExpr(op, substitutionForAllExists(e, noForallAfterExists))
-    case ImpliesExpr(left, right) => ImpliesExpr(substitutionForAllExists(left, noForallAfterExists), substitutionForAllExists(right, noForallAfterExists))
+      else Assertion("forall", assertVarDecls, substitutionForallExists(body, noForallAfterExists))
+    case BinaryExpr(e1, op, e2) => BinaryExpr(substitutionForallExists(e1, noForallAfterExists), op, substitutionForallExists(e2, noForallAfterExists))
+    case UnaryExpr(op, e) => UnaryExpr(op, substitutionForallExists(e, noForallAfterExists))
+    case ImpliesExpr(left, right) => ImpliesExpr(substitutionForallExists(left, noForallAfterExists), substitutionForallExists(right, noForallAfterExists))
     case _ => inv // TODO: Double-check which other Expr are possible
   }
 

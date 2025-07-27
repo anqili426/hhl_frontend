@@ -2,6 +2,7 @@ package viper.HHLVerifier.syntactic
 
 import viper.HHLVerifier.ast._
 import Characterizer._
+import viper.HHLVerifier.typing.StateType
 
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
 import scala.xml.NodeSeq
@@ -32,22 +33,28 @@ object WeakestPrecondition {
     implicit val c: Characterizer = characterizer
     val normalizedPost: Expr = desugarQuantifiers(post) // to correctly compute the WP, it is handy to have chains of single-variable quantifiers
     normalizedPost match {
-      case Assertion("forall", assertVarDecls, body) => {
+      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), body) => {
         Assertion("forall", assertVarDecls,
           characterizer
-            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVarDecls.head.vName), substituteExprPath(body, subst, assertVarDecls.head.vName)) }
+            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(body, subst, assertVar)) }
             .map(x => ImpliesExpr(x._1, x._2))
             .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e))
         )
       }
-      case Assertion("exists", assertVarDecls, body) => {
+      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), body) => {
         Assertion("exists", assertVarDecls,
           characterizer
-            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVarDecls.head.vName), substituteExprPath(body, subst, assertVarDecls.head.vName)) }
+            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(body, subst, assertVar)) }
             .map(x => BinaryExpr(x._1, "&&", x._2))
             .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e))
         )
       }
+      case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, computeSinglePost(c, body)) // quantifier over non-state variable
+      case BinaryExpr(e1, op, e2) => BinaryExpr(computeSinglePost(c, e1), op, computeSinglePost(c, e2))
+      case UnaryExpr(op, e) => UnaryExpr(op, computeSinglePost(c, e))
+      case ImpliesExpr(left, right) => ImpliesExpr(computeSinglePost(c, left), computeSinglePost(c, right))
+      case LookupExpr(_, _) => sys.error("WeakestPrecondition: Unquantified LookupExpr found")
+      case _ => post
     }
   }
 
@@ -73,7 +80,7 @@ object WeakestPrecondition {
    * substituted for a [[LookupExpr]] for the particular state. This is, because we need to make sure that
    * every variable reference in the path condition is bound to a state.
    */
-  private def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
+  def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
     case Id(_) => LookupExpr(state, pc)
     case Num(_) | BoolLit(_) => pc
     case BinaryExpr(e1, op, e2) => BinaryExpr(substitutePathCondition(e1, state), op, substitutePathCondition(e2, state))
