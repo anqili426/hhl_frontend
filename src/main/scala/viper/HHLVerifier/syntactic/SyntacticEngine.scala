@@ -4,6 +4,7 @@ import com.microsoft.z3._
 import viper.HHLVerifier.ast._
 import Characterizer._
 import viper.HHLVerifier.syntactic.WeakestPrecondition.substitutePathCondition
+import viper.HHLVerifier.typing.StateType
 
 object SyntacticEngine {
 
@@ -100,8 +101,8 @@ object SyntacticEngine {
   private def substitutionForallExists(inv: viper.HHLVerifier.ast.Expr, noForallAfterExists: Boolean = true)(implicit loopCondition: viper.HHLVerifier.ast.Expr): viper.HHLVerifier.ast.Expr = inv match {
     case Assertion("exists", List(AssertVarDecl(vName, vType)), body) => Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(substitutionForallExists(body, false), "&&", ImpliesExpr(UnaryExpr("!", substitutePathCondition(loopCondition, vName)), StateExistsExpr(vName, false)))) // cf. Hypra paper, p. 19, bottom
     case Assertion("exists", _, _) => sys.error("SyntacticEngine: Tried to apply \"forallExistsRule\", but found non-desugared quantifier.")
-    case Assertion("forall", assertVarDecls, body) =>
-      if (!noForallAfterExists) sys.error("SyntacticEngine: Tried to apply \"forallExistsRule\", but invariant \"no forall after exists quantifier\" was violated.")
+    case Assertion("forall", assertVarDecls@List(AssertVarDecl(_, vType)), body) =>
+      if (!noForallAfterExists && vType.isInstanceOf[StateType]) sys.error("SyntacticEngine: Tried to apply \"forallExistsRule\", but invariant \"no forall <_> after exists quantifier\" was violated.")
       else Assertion("forall", assertVarDecls, substitutionForallExists(body, noForallAfterExists))
     case BinaryExpr(e1, op, e2) => BinaryExpr(substitutionForallExists(e1, noForallAfterExists), op, substitutionForallExists(e2, noForallAfterExists))
     case UnaryExpr(op, e) => UnaryExpr(op, substitutionForallExists(e, noForallAfterExists))
