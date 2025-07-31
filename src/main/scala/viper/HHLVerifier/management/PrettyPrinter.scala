@@ -74,7 +74,7 @@ object PrettyPrinter {
       case UnaryExpr(op, e) => op + "(" + formatExpr(e) + ")"
       case ImpliesExpr(left, right) => "(" + formatExpr(left) + ") ==> (" + formatExpr(right) + ")"
       case Assertion(quantifier, assertVarDecls, body) =>
-        quantifier + " " + assertVarDecls.map(a => "<" + formatExpr(a) + ">").mkString(", ") + " :: (" + formatExpr(body) + ")"
+        quantifier + " " + assertVarDecls.map(formatExpr).mkString(", ") + " :: (" + formatExpr(body) + ")"
       case StateExistsExpr(state, err) => if (err) "<<" + formatExpr(state) + ">>" else "<" + formatExpr(state) + ">"
       case LoopIndex() => "$n"
       case HintDecl(name) => "(" + name + ")"

@@ -41,7 +41,7 @@ class LogicEncoderNew {
   private val quantifiedEnv: mutable.Map[String, IntExpr] = mutable.Map.empty[String, IntExpr]
 
   /**
-   * Checks whether the precondition `pre` ''logically implies'' the weakest
+   * Checks whether the precondition `pre` ''logically entails'' the weakest
    * precondition `wp`. This is done by utilizing the ''Z3 solver'' to check the
    * satisfiability of <code>¬(pre ⇒ wp)</code>.
    *
@@ -51,13 +51,13 @@ class LogicEncoderNew {
    *                 usually all parameters passed to the method
    * @return Z3 [[Status]]:
    *         <ul>
-   *          <li>`UNSATISFIABLE` – <code>pre ⇒ wp</code> is valid.</li>
+   *          <li>`UNSATISFIABLE` – <code>pre ⊨ wp</code> is valid.</li>
    *          <li>`SATISFIABLE` – implication does <strong>not</strong> hold
    *            (a model serves as counter‑example).</li>
    *          <li>`UNKNOWN` – solver aborted.</li>
    *         </ul>
    */
-  def checkImplication(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, progVars: Seq[Id]): (Status, Option[Model]) = {
+  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, progVars: Seq[Id]): (Status, Option[Model]) = {
     // generate all necessary program variables in Z3 and add them to the environment
     generateProgVars(progVars)
     // generate all necessary state variables in Z3 and add them to the environment
@@ -111,6 +111,8 @@ class LogicEncoderNew {
         case "forall" => ctx.mkForall(constantsArray, encodedBody, 0, null, null, null, null)
       }
     }
+    case LookupExpr(AssertVar(stateName), Id(varName)) => sys.error("LogicEncoder: Unexpected LookupExpr in boolean conversion: " + expr.toString)
+    case LookupExpr(id, index) => encodeBool(resolveLookup(index)(id.asInstanceOf[AssertVar]))
     case StateExistsExpr(AssertVar(name), _) => ctx.mkSelect(S, stateEnv(name)).asInstanceOf[BoolExpr]
     case _ => sys.error("LogicEncoder: Unexpected expression in boolean conversion: " + expr.toString)
   }
