@@ -1,0 +1,15 @@
+// VALID: false
+
+method naive_encoding(t: Int, n: Int) returns (x: Int)
+    requires exists <_s1> :: _s1[t] == 1
+    requires forall _v: Int :: _v >= 0 ==> (exists <_s2> :: _s2[t] == 2 && _s2[n] == _v)
+    ensures exists _v: Int :: (forall <_s1> :: _s1[x] <= _v)
+{
+    x := 0
+    while (t == 1 || x < n)
+        invariant exists <_s1> :: _s1[t] == 1
+        invariant forall <_s1>, <_s2> :: _s1[t] == 1 ==> _s1[x] >= _s2[x]
+    {
+        x := x + 1
+    }
+}

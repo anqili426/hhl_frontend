@@ -11,6 +11,8 @@ object SyntacticEngine {
   case class Triple(stmt: Stmt, pre: Seq[viper.HHLVerifier.ast.Expr], post: Seq[viper.HHLVerifier.ast.Expr], name: String = "")
 
   def verify(program: HHLProgram): Int = {
+    verificationResult = 0
+
     program.methods.foreach { method =>
       println("----------")
       println("Method \"" + method.mName + "\"")
@@ -32,7 +34,7 @@ object SyntacticEngine {
     case Triple(body, pre, post, name) => {
       if (pre.isEmpty || post.isEmpty) {
         println(f"\tError ($name): Pre and/or postcondition is empty.")
-        verificationResult = 2
+        verificationResult = 1
         false
       } else {
         val characterizer: Characterizer = Characterizer.characterizeStmt(body)
@@ -48,15 +50,15 @@ object SyntacticEngine {
         result._1 match {
           case Status.UNSATISFIABLE =>
             println(f"\tValid ($name): Precondition implies WP.")
-            if (verificationResult != 2) verificationResult = 1
+            if (verificationResult != 1) verificationResult = 2
             true
           case Status.SATISFIABLE =>
             println(f"\tInvalid ($name): Counterexample found.")
-            verificationResult = 2
+            verificationResult = 1
             false
           case Status.UNKNOWN =>
             println(f"\tUnknown ($name): Z3 couldn't determine the result.")
-            verificationResult = 2 // for now, we handle "unknown" as invalid
+            verificationResult = 1 // for now, we handle "unknown" as invalid
             false
         }
       }

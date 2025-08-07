@@ -1,0 +1,20 @@
+// VALID: true
+
+method simple(a: Int) returns (x: Int)
+    requires forall <_s1> :: (exists <_s2> :: _s2[a] > _s1[a])
+    requires forall <_s1>, <_s2> :: _s1[a] == _s2[a]
+    ensures  forall <_s1> :: (exists <_s2> :: _s2[a] > _s1[x])
+{
+    var y: Int
+    var z: Int
+
+    y := a
+    z := 2 * a
+
+    if (y > 0) {
+        y := 3 * a
+        x := y
+    } else {
+        x := z
+    }
+}

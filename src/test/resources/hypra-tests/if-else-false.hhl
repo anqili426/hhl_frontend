@@ -1,0 +1,12 @@
+// VALID: false
+
+method ifElse(a: Int, b: Int, c: Int) returns (x: Int)
+    requires forall <_s1> :: true // this is false with Z3 counterexample
+    ensures exists <_s1> :: (forall <_s2> :: _s1[x] >= _s2[x])
+{
+    if (c > 0) {
+        x := a
+    } else {
+        x := b
+    }
+}
