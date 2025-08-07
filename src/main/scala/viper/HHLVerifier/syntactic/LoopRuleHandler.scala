@@ -3,7 +3,6 @@ package viper.HHLVerifier.syntactic
 import com.microsoft.z3.Status
 import viper.HHLVerifier.ast._
 import viper.HHLVerifier.syntactic.SyntacticEngine.Triple
-import viper.HHLVerifier.syntactic.WeakestPrecondition.substitutePathCondition
 import viper.HHLVerifier.typing.StateType
 
 sealed trait LoopRuleHandler {
@@ -16,7 +15,7 @@ object LoopRuleHandler {
     Assertion("forall", List(AssertVarDecl(assertVar, StateType())),
       ImpliesExpr(
         StateExistsExpr(assertVar, false),
-        substitutePathCondition(expr, assertVar)))
+        LookupExpr(assertVar, expr)))
   }
 
   def low(expr: Expr): Expr = {
@@ -47,7 +46,7 @@ object ForallExistsHandler extends LoopRuleHandler {
   }
 
   private def computeLoopPost(inv: viper.HHLVerifier.ast.Expr, noForallAfterExists: Boolean = true)(implicit loopCondition: viper.HHLVerifier.ast.Expr): viper.HHLVerifier.ast.Expr = inv match {
-    case Assertion("exists", List(AssertVarDecl(vName, vType)), body) => Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(computeLoopPost(body, false), "&&", ImpliesExpr(UnaryExpr("!", substitutePathCondition(loopCondition, vName)), StateExistsExpr(vName, false)))) // cf. Hypra paper, p. 19, bottom
+    case Assertion("exists", List(AssertVarDecl(vName, vType)), body) => Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(computeLoopPost(body, false), "&&", ImpliesExpr(UnaryExpr("!", LookupExpr(vName, loopCondition)), StateExistsExpr(vName, false)))) // cf. Hypra paper, p. 19, bottom
     case Assertion("exists", _, _) => sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but found non-desugared quantifier.")
     case Assertion("forall", assertVarDecls@List(AssertVarDecl(_, vType)), body) =>
       if (!noForallAfterExists && vType.isInstanceOf[StateType]) sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but invariant \"no forall <_> after exists quantifier\" was violated.")
@@ -66,6 +65,7 @@ object SyncHandler extends LoopRuleHandler {
       val mappedInvariant = inv.map(_._2)
       val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
       val loopPostcondition = BinaryExpr(BinaryExpr(combinedInvariant, "||", LoopRuleHandler.box(BoolLit(false))), "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
+      println(loopPostcondition)
 
       // check invariant I ⊨ low(b)
       val encoder: LogicEncoderNew = new LogicEncoderNew
@@ -80,11 +80,24 @@ object SyncHandler extends LoopRuleHandler {
   }
 }
 
+object SyncTotHandler extends LoopRuleHandler {
+  def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], progVars: Seq[Id], name: String): Seq[Triple] = loop match {
+    case WhileLoopStmt(cond, body, inv, decr, rule) => {
+      println("\tVerifying loop using \"syncTotRule\"")
+      val mappedInvariant = inv.map(_._2)
+      val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
+      val loopPostcondition = BinaryExpr(combinedInvariant, "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
+
+      ???
+    }
+  }
+}
+
 object RuleSelector {
   def select(loop: WhileLoopStmt, progVars: Seq[Id]): LoopRuleHandler = loop match {
     case WhileLoopStmt(_, _, _, _, rule) => rule match {
       case "syncRule" => SyncHandler
-      case "syncTotRule" => ???
+      case "syncTotRule" => SyncTotHandler
       case "forAllExistsRule" => ForallExistsHandler
       case "existsRule" => ???
       case "desugaredRule" => ???
