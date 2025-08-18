@@ -29,7 +29,7 @@ class LogicEncoderNew {
   private val S: ArrayExpr[ArraySort[IntSort, IntSort], BoolSort] = ctx.mkConst("S", SetSort).asInstanceOf[ArrayExpr[ArraySort[IntSort, IntSort], BoolSort]]
 
   /** Environment that maps program variable names to their Z3 integer constants.
-   * Populated by [[generateProgVars]]. */
+   * Populated on the fly when encountering program variables in hyper-assertions. */
   private val progEnv: mutable.Map[String, IntExpr] = mutable.Map.empty[String, IntExpr]
 
   /** Environment that maps state variable names (introduced by quantifiers) to Z3
@@ -58,8 +58,6 @@ class LogicEncoderNew {
    *         </ul>
    */
   def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, progVars: Seq[Id]): (Status, Option[Model]) = {
-    // generate all necessary program variables in Z3 and add them to the environment
-    generateProgVars(progVars)
     // generate all necessary state variables in Z3 and add them to the environment
     generateQuantifiedVars(pre)
     generateQuantifiedVars(wp)
@@ -118,7 +116,7 @@ class LogicEncoderNew {
   }
 
   private def encodeInt(expr: viper.HHLVerifier.ast.Expr): IntExpr = expr match {
-    case LookupExpr(AssertVar(stateName), Id(varName)) => ctx.mkSelect(stateEnv(stateName), progEnv(varName)).asInstanceOf[IntExpr]
+    case LookupExpr(AssertVar(stateName), Id(varName)) => ctx.mkSelect(stateEnv(stateName), progEnv.getOrElseUpdate(varName, ctx.mkIntConst(varName))).asInstanceOf[IntExpr]
     case LookupExpr(id, index) => encodeInt(resolveLookup(index)(id.asInstanceOf[AssertVar]))
     case Num(value) => ctx.mkInt(value)
     case AssertVar(name) => quantifiedEnv(name)
@@ -131,13 +129,6 @@ class LogicEncoderNew {
     }
     case UnaryExpr("-", e) => ctx.mkUnaryMinus(encodeInt(e)).asInstanceOf[IntExpr]
     case _ => sys.error("LogicEncoder: Unexpected expression in integer conversion: " + expr.toString)
-  }
-
-  private def generateProgVars(progVars: Seq[Id]): Unit = {
-    progVars.foreach { progVar =>
-      val z3Var = ctx.mkIntConst(progVar.name)
-      progEnv += (progVar.name -> z3Var)
-    }
   }
 
   private def generateQuantifiedVars(expr: viper.HHLVerifier.ast.Expr): Unit = expr match {
