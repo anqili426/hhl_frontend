@@ -80,7 +80,7 @@ object WeakestPrecondition {
    * substituted for a [[LookupExpr]] for the particular state. This is, because we need to make sure that
    * every variable reference in the path condition is bound to a state.
    */
-  def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
+  private def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
     case Id(_) => LookupExpr(state, pc)
     case Num(_) | BoolLit(_) => pc
     case BinaryExpr(e1, op, e2) => BinaryExpr(substitutePathCondition(e1, state), op, substitutePathCondition(e2, state))
@@ -94,6 +94,10 @@ object WeakestPrecondition {
    * This normalization is later needed for computing the weakest precondition.
    */
   def desugarQuantifiers(e: Expr): Expr = e match {
+    case Assertion(quantifier, x1 :: (x2 :: xs), ImpliesExpr(stateExists, realBody)) => { // if we have multiple state assert vars, we also want to separate StateExistsExpr
+      val extracted = extractFirstFromNestedAnd(stateExists)
+      Assertion(quantifier, List(x1), ImpliesExpr(extracted._1, desugarQuantifiers(Assertion(quantifier, (x2 :: xs), ImpliesExpr(extracted._2, realBody)))))
+    }
     case Assertion(quantifier, assertVarDecls, body) => assertVarDecls match {
       case _ :: Nil => e // only one assertVar ==> already desugared, nothing more to do
       case x :: xs => Assertion(quantifier, List(x), desugarQuantifiers(Assertion(quantifier, xs, body))) // TODO: Support error states
@@ -101,6 +105,22 @@ object WeakestPrecondition {
     case BinaryExpr(e1, op, e2) => BinaryExpr(desugarQuantifiers(e1), op, desugarQuantifiers(e2))
     case UnaryExpr(op, e) => UnaryExpr(op, desugarQuantifiers(e))
     case ImpliesExpr(left, right) => ImpliesExpr(desugarQuantifiers(left), desugarQuantifiers(right))
-    case _ => e // TODO: Double-check which other Expr are possible
+    case _ => e
+  }
+
+  /**
+   * Helper function for [[desugarQuantifiers]] to extract the first element of a left-weighted
+   * binary expression.
+   *
+   * @param e The binary expression to be split
+   * @return A pair, where the first part is the extracted left-most expression, and the second part
+   *         is the rest of the binary expression without the first element.
+   */
+  private def extractFirstFromNestedAnd(e: Expr): (Expr, Expr) = e match {
+    case BinaryExpr(e1: BinaryExpr, "&&", e2) => {
+      val res = extractFirstFromNestedAnd(e1)
+      (res._1, BinaryExpr(res._2, "&&", e2))
+    }
+    case BinaryExpr(e1, "&&", e2) => (e1, e2)
   }
 }
