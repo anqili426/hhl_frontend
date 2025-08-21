@@ -6,10 +6,46 @@ import Characterizer._
 
 object SyntacticEngine {
 
-  var verificationResult: Int = 0
+  /**
+   * Global status code tracking the overall verification result. This variable
+   * is mutated during verification.
+   *
+   * Values:
+   *  - `0` if no methods were checked or the result is unknown,
+   *  - `1` if at least one verification failed,
+   *  - `2` if all verifications succeeded.
+   */
+  private var verificationResult: Int = 0
 
-  case class Triple(stmt: Stmt, pre: Seq[viper.HHLVerifier.ast.Expr], post: Seq[viper.HHLVerifier.ast.Expr], name: String = "")
+  /**
+   * Represents a verification hyper-triple consisting of a program statement, a precondition
+   * and a postcondition. It may optionally carry a name, used e.g. for diagnostic messages.
+   *
+   * @param stmt The program statement to be verified
+   * @param pre A sequence of hyper-assertions forming the precondition.
+   * @param post A sequence of hyper-assertions forming the postcondition.
+   * @param name An optional descriptive name for the triple
+   */
+  case class Triple(
+                     stmt: Stmt,
+                     pre: Seq[viper.HHLVerifier.ast.Expr],
+                     post: Seq[viper.HHLVerifier.ast.Expr],
+                     name: String = ""
+                   )
 
+  /**
+   * Verifies all methods in a given [[HHLProgram]].
+   *
+   * For each method, the corresponding hyper-triple is split into one or multiple
+   * loop-free verification triples according to the HHL proof rules. Each hyper-triple is verified
+   * by checking whether the precondition entails the syntactically derived ''weakest precondition (WP)''.
+   *
+   * @param program The HHL program to verify.
+   * @return An integer result code corresponding to [[Main.verified]]:
+   *         - `0` if no methods were checked or the result is unknown,
+   *         - `1` if at least one verification failed,
+   *         - `2` if all verifications succeeded.
+   */
   def verify(program: HHLProgram): Int = {
     verificationResult = 0
 
@@ -17,20 +53,28 @@ object SyntacticEngine {
       println("----------")
       println("Method \"" + method.mName + "\"")
 
-      val progVars = getAllProgVars(method)
-      val split = loopSplit(Triple(method.body, method.pre, method.post, "top-level"), progVars)
+      val split = loopSplit(Triple(method.body, method.pre, method.post, "top-level"))
       //println(split)
 
       // Verifying all triples
       split
-        .foreach { triple => verifyLoopFreeTriple(triple, progVars) }
+        .foreach { triple => verifyLoopFreeTriple(triple) }
 
       // verifyLoopFreeTriple(Triple(method.body, method.pre, method.post), method.params, "top-level")(method) // old version for loop-free programs
     }
     verificationResult
   }
 
-  private def verifyLoopFreeTriple(triple: Triple, progVars: Seq[Id]): Boolean = triple match {
+  /**
+   * Verifies a loop-free hyper-triple by syntactically computing the weakest precondition
+   * of the statement with respect to its postcondition and checking whether the precondition entails it.
+   *
+   * @param triple The hyper-triple consisting of a statement, preconditions, postconditions, and an optional name.
+   * @return `true` if the triple is valid (precondition entails weakest precondition),
+   *         `false` otherwise.
+   * @note Updates the global variable [[verificationResult]] accordingly as a side effect.
+   */
+  private def verifyLoopFreeTriple(triple: Triple): Boolean = triple match {
     case Triple(body, pre, post, name) => {
       if (pre.isEmpty || post.isEmpty) {
         println(f"\tError ($name): Pre and/or postcondition is empty.")
@@ -41,11 +85,12 @@ object SyntacticEngine {
         //println(characterizer)
         val weakestPrecondition: viper.HHLVerifier.ast.Expr = WeakestPrecondition.compute(characterizer, post)
         //println(weakestPrecondition)
+        //println(weakestPrecondition.toString.length)
         val combinedPrecondition: viper.HHLVerifier.ast.Expr = pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
 
         // Z3 encoding
         val encoder: LogicEncoderNew = new LogicEncoderNew
-        val result = encoder.checkEntailment(combinedPrecondition, weakestPrecondition, progVars)
+        val result = encoder.checkEntailment(combinedPrecondition, weakestPrecondition)
 
         result._1 match {
           case Status.UNSATISFIABLE =>
@@ -65,7 +110,14 @@ object SyntacticEngine {
     }
   }
 
-  private def loopSplit(triple: Triple, progVars: Seq[Id]): Seq[Triple] = triple match {
+  /**
+   * Splits a hyper-triple into multiple loop-free hyper-triples according to the HHL proof rules.
+   *
+   * @param triple The hyper-triple to split.
+   * @return A sequence of triples corresponding to the decomposed program. If no loop is found,
+   *         returns the original triple.
+   */
+  private def loopSplit(triple: Triple): Seq[Triple] = triple match {
     case Triple(stmt, pre, post, name) => {
       stmt match {
         case CompositeStmt(stmts) => {
@@ -75,14 +127,19 @@ object SyntacticEngine {
           }
           loopAndAfter match {
             case (ws@WhileLoopStmt(_, _, _, _, _)) :: after => {
-              val ruleHandler = RuleSelector.select(ws, progVars)
-              ruleHandler.handle(ws, CompositeStmt(before), CompositeStmt(after), pre, post, progVars, name)
+              val ruleHandler = RuleSelector.select(ws)
+              ruleHandler
+                .handle(ws, CompositeStmt(before), CompositeStmt(after), pre, post, name)
+                .flatMap(loopSplit)
             }
             case _ => List(triple) // no loop found in stmt
           }
         }
-        case IfElseStmt(_, ifStmt, elseStmt) => ???
-        case WhileLoopStmt(_, body, _, _, _) => ???
+        case IfElseStmt(_, ifStmt, elseStmt) => List(triple) // TODO: implement! Right now: Assuming it is loop-free
+        case ws@WhileLoopStmt(_, body, _, _, _) => {
+          val ruleHandler = RuleSelector.select(ws)
+          ruleHandler.handle(ws, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
+        }
         case _ => ???
       }
     }
