@@ -53,7 +53,6 @@ object WeakestPrecondition {
       case BinaryExpr(e1, op, e2) => BinaryExpr(computeSinglePost(c, e1), op, computeSinglePost(c, e2))
       case UnaryExpr(op, e) => UnaryExpr(op, computeSinglePost(c, e))
       case ImpliesExpr(left, right) => ImpliesExpr(computeSinglePost(c, left), computeSinglePost(c, right))
-      case LookupExpr(_, _) => sys.error("WeakestPrecondition: Unquantified LookupExpr found")
       case _ => post
     }
   }
