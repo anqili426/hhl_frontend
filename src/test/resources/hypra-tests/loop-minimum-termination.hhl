@@ -1,4 +1,4 @@
-// VALID: false
+// VALID: true
 
 method minimum (n: Int) returns (x: Int, y: Int)
     requires exists <_s> :: true
@@ -11,9 +11,10 @@ method minimum (n: Int) returns (x: Int, y: Int)
     x := 0
     y := 0
 
-    while (i < n)
+    while syncTotRule (i < n)
         invariant forall <_s1>, <_s2> :: _s1[n] == _s2[n] && _s1[i] == _s2[i]
         invariant exists <_s1> :: (forall <_s2> :: _s1[x] <= _s2[x] && _s1[y] <= _s2[y])
+        decreases n - i
     {
         r := 5 // actually nonDet, not yet implemented
 
