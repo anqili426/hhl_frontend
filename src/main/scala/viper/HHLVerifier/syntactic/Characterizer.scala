@@ -53,15 +53,19 @@ object Characterizer {
     case MultiAssignStmt(left, right) => ??? // TODO
     case IfElseStmt(cond, ifStmt, elseStmt) => {
       // we need to apply the substitution to the condition as well, but in the initial state of the if-statement
-      val ifRes = for {
-        CharPath(pcBefore, substBefore) <- acc
-        CharPath(pcAfter, substAfter) <- characterizeStmt(ifStmt, acc)
-      } yield CharPath(BinaryExpr(applySubstitution(cond, substBefore), "&&", pcAfter), substAfter)
-      val elseRes = for {
-        CharPath(pcBefore, substBefore) <- acc
-        CharPath(pcAfter, substAfter) <- characterizeStmt(elseStmt, acc)
-      } yield CharPath(BinaryExpr(UnaryExpr("!", applySubstitution(cond, substBefore)), "&&", pcAfter), substAfter)
-      ifRes ++ elseRes
+      acc.flatMap { in =>
+        val CharPath(pcBefore, substBefore) = in
+        val c = applySubstitution(cond, substBefore)
+
+        val ifRes = characterizeStmt(ifStmt, Seq(in)).map { out =>
+          CharPath(BinaryExpr(c, "&&", out.pc), out.subst)
+        }
+        val elseRes = characterizeStmt(elseStmt, Seq(in)).map { out =>
+          CharPath(BinaryExpr(UnaryExpr("!", c), "&&", out.pc), out.subst)
+        }
+
+        ifRes ++ elseRes
+      }
     }
     case AssumeStmt(e) => acc.map {
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
