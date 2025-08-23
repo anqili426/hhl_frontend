@@ -93,12 +93,12 @@ object WeakestPrecondition {
    * This normalization is later needed for computing the weakest precondition.
    */
   def desugarQuantifiers(e: Expr): Expr = e match {
-    case Assertion(quantifier, x1 :: (x2 :: xs), ImpliesExpr(stateExists, realBody)) => { // if we have multiple state assert vars, we also want to separate StateExistsExpr
+    case Assertion(quantifier, x1 :: x2 :: xs, ImpliesExpr(stateExists, realBody)) => { // if we have multiple state assert vars, we also want to separate StateExistsExpr
       val extracted = extractFirstFromNestedAnd(stateExists)
       Assertion(quantifier, List(x1), ImpliesExpr(extracted._1, desugarQuantifiers(Assertion(quantifier, (x2 :: xs), ImpliesExpr(extracted._2, realBody)))))
     }
     case Assertion(quantifier, assertVarDecls, body) => assertVarDecls match {
-      case _ :: Nil => e // only one assertVar ==> already desugared, nothing more to do
+      case _ :: Nil => Assertion(quantifier, assertVarDecls, desugarQuantifiers(body)) // only one assertVar ==> already desugared, need to desugar body
       case x :: xs => Assertion(quantifier, List(x), desugarQuantifiers(Assertion(quantifier, xs, body))) // TODO: Support error states
     }
     case BinaryExpr(e1, op, e2) => BinaryExpr(desugarQuantifiers(e1), op, desugarQuantifiers(e2))
