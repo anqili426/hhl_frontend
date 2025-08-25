@@ -44,7 +44,7 @@ object ForallExistsHandler extends LoopRuleHandler {
     case WhileLoopStmt(cond, body, inv, decr, rule) => {
       println("\tVerifying loop using \"forallExistsRule\"")
       val mappedInvariant = inv.map(_._2)
-      val loopPostcondition = computeLoopPost(mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x)))(cond)
+      val loopPostcondition = BinaryExpr(computeLoopPost(mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x)))(cond), "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
 
       val triplePrefix = Triple(
         before,
@@ -69,7 +69,10 @@ object ForallExistsHandler extends LoopRuleHandler {
   }
 
   private def computeLoopPost(inv: viper.HHLVerifier.ast.Expr, noForallAfterExists: Boolean = true)(implicit loopCondition: viper.HHLVerifier.ast.Expr): viper.HHLVerifier.ast.Expr = inv match {
-    case Assertion("exists", List(AssertVarDecl(vName, vType)), body) => Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(computeLoopPost(body, false), "&&", ImpliesExpr(UnaryExpr("!", LookupExpr(vName, loopCondition)), StateExistsExpr(vName, false)))) // cf. Hypra paper, p. 19, bottom
+    case Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(StateExistsExpr(_, false), "&&", realBody)) =>
+      Assertion("exists", List(AssertVarDecl(vName, vType)),
+        BinaryExpr(computeLoopPost(realBody, false), "&&", ImpliesExpr(UnaryExpr("!", loopCondition), StateExistsExpr(vName, false)))
+      ) // cf. Hypra paper, p. 19, bottom
     case Assertion("exists", _, _) => sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but found non-desugared quantifier.")
     case Assertion("forall", assertVarDecls@List(AssertVarDecl(_, vType)), body) =>
       if (!noForallAfterExists && vType.isInstanceOf[StateType]) sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but invariant \"no forall <_> after exists quantifier\" was violated.")
