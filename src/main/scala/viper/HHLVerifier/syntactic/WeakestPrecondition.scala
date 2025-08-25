@@ -81,11 +81,12 @@ object WeakestPrecondition {
    */
   private def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
     case Id(_) => LookupExpr(state, pc)
-    case Num(_) | BoolLit(_) => pc
+    case Num(_) | BoolLit(_) | LookupExpr(_, _) | StateExistsExpr(_, _)  => pc
     case BinaryExpr(e1, op, e2) => BinaryExpr(substitutePathCondition(e1, state), op, substitutePathCondition(e2, state))
     case UnaryExpr(op, e) => UnaryExpr(op, substitutePathCondition(e, state))
     case ImpliesExpr(left, right) => ImpliesExpr(substitutePathCondition(left, state), substitutePathCondition(right, state))
-    case _ => sys.error("WeakestPrecondition: Yet unsupported expression in path-condition substitution: " + state.toString) // TODO: Check which other expressions could be assigned
+    case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, substitutePathCondition(body, state)) // need to support assertions because of "hyperAssume" statements, which alter the path condition
+    case _ => sys.error("WeakestPrecondition: Yet unsupported expression in path-condition substitution: " + pc.toString) // TODO: Check which other expressions could be assigned
   }
 
   /**

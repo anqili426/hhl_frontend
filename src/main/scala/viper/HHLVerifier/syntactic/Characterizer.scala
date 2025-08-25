@@ -70,6 +70,9 @@ object Characterizer {
     case AssumeStmt(e) => acc.map {
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
     }
+    case HyperAssumeStmt(e) => acc.map {
+      case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
+    }
     case HavocStmt(_, _) => sys.error("Characterizer: Cannot yet handle havoc: " + stmt.toString)
     case WhileLoopStmt(_, _, _, _, _) => sys.error("Characterizer: Expected a loop-free program")
     case _ => acc
@@ -84,7 +87,9 @@ object Characterizer {
    */
   def applySubstitution(expr: Expr, map: Map[Id, Expr]): Expr = expr match {
     case id@Id(_) => map.getOrElse(id, expr)
-    case Num(_) | BoolLit(_) => expr
+    case Num(_) | BoolLit(_) | StateExistsExpr(_, _) => expr
+    case LookupExpr(id, index) => LookupExpr(id, applySubstitution(index, map))
+    case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, applySubstitution(body, map))
     case BinaryExpr(e1, op, e2) => BinaryExpr(applySubstitution(e1, map), op, applySubstitution(e2, map))
     case UnaryExpr(op, e) => UnaryExpr(op, applySubstitution(e, map))
     case ImpliesExpr(left, right) => ImpliesExpr(applySubstitution(left, map), applySubstitution(right, map))
