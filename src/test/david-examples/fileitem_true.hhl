@@ -1,5 +1,3 @@
-// VALID: true
-
 // Original benchmark:
 // Source: Marcelo Sousa and Isil Dillig. 2016. Cartesian hoare logic for verifying k-safety properties.
 // Available at: https://github.com/marcelosousa/descartes/blob/5eb0eea96200d04073d4b9edcbe333036391e66a/benchmarks/pldi-16/stackoverflow/FileItem-true.java

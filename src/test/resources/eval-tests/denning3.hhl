@@ -1,0 +1,52 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at: https://github.com/rcdickerson/orhle/blob/6f699e0809cc59e89ca2dd47a735fe1a6dc7a100/experiments/gni/denning3.imp
+
+method denning3(e_in: Int, i_in: Int, f_in: Int, x_in: Int, sum_in: Int, t: Int)
+returns (e_out: Int, i_out: Int, f_out: Int, x_out: Int, sum_out: Int, res: Int)
+requires forall <_s1>, <_s2> :: (_s1[t] == 1 && _s2[t] == 2) ==> (_s1[e_in] == _s2[e_in] && _s1[i_in] == _s2[i_in])
+requires exists <_s> :: _s[t] == 1
+requires forall <_s> :: _s[t] == 1 ==> _s[x_in] == 150
+requires forall <_s> :: _s[t] == 2 ==> _s[x_in] == 60
+requires forall <_s> :: _s[x_in] >= 1
+ensures exists <_s1> :: _s1[t] == 1 && (forall <_s2> :: _s2[t] == 2 ==> (_s1[e_out] != _s2[e_out] || _s1[i_out] != _s2[i_out]))
+{
+    var max_sum: Int
+    var err: Int
+    max_sum := 100
+    err := 0
+
+    sum_out := 0
+    i_out := 0
+    e_out := 1
+    f_out := f_in
+    x_out := x_in
+
+    while (e_out == 1 && err == 0)
+		invariant exists <_s1> :: (_s1[t] == 1 && _s1[x_out] == 150 && _s1[e_out] == 1 && _s1[max_sum] == 100 &&
+								  (_s1[err] == 0 ==> (_s1[sum_out] == 0 && _s1[i_out] == 0)) &&
+								  (_s1[err] != 0 ==> (_s1[sum_out] == 150 && _s1[i_out] == 1)) &&
+						(forall <_s2> :: _s2[t] == 2 ==> (
+							_s2[x_out] == 60 && _s2[e_out] == 1 && _s2[max_sum] == 100 &&
+							(_s2[sum_out] == _s2[i_out] * _s2[x_out]) &&
+							(_s2[i_out] <= 1 ==> _s2[err] == 0) &&
+							(_s2[err] == 0 ==> (_s2[sum_out] == 0 && _s2[i_out] == 0) || (_s2[sum_out] == 60 && _s2[i_out] == 1))
+						)))
+	    invariant forall <_s> :: (_s[err] == 1 ==> _s[sum_out] > _s[max_sum]) &&
+	                             (_s[err] == 0 ==> _s[sum_out] <= _s[max_sum]) && _s[x_out] >= 1
+		decreases max_sum + x_out - sum_out
+    {
+        sum_out := sum_out + x_out
+        i_out := i_out + 1
+        f_out := i_out
+        if (sum_out > max_sum) {
+            err := 1
+        }
+    }
+
+    if (err == 1) {
+        res := 0
+    } else {
+        res := 1
+    }
+}
