@@ -3,6 +3,7 @@ package viper.HHLVerifier.syntactic
 import com.microsoft.z3._
 import viper.HHLVerifier.ast._
 import Characterizer._
+import viper.HHLVerifier.typing.StateType
 
 object SyntacticEngine {
 
@@ -76,10 +77,11 @@ object SyntacticEngine {
    */
   private def verifyLoopFreeTriple(triple: Triple): Boolean = triple match {
     case Triple(body, pre, post, name) => {
-      if (pre.isEmpty || post.isEmpty) {
-        println(f"\tError ($name): Pre and/or postcondition is empty.")
-        verificationResult = 1
-        false
+      val trueAssertion = Assertion("forall", List(AssertVarDecl(AssertVar("_s"), StateType())), BoolLit(true))
+      if (pre.isEmpty) {
+        verifyLoopFreeTriple(Triple(body, List(trueAssertion), post, name))
+      } else if (post.isEmpty) {
+        verifyLoopFreeTriple(Triple(body, pre, List(trueAssertion), name))
       } else {
         val characterizer: Characterizer = Characterizer.characterizeStmt(body)
         //println(characterizer)
