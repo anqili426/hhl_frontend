@@ -25,6 +25,7 @@ object Main {
   var errMessages: Seq[String] = Seq("")
   var logsActive = true
   var syntactic = false
+  var outputPath = "unspecified"
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -44,7 +45,7 @@ object Main {
     programSource.close()
 
     // [DOC] Handle command line arguments
-    val outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
+    outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
     if (args.contains("--noframe")) Generator.forAllFrame = false
     if (args.contains("--ext")) Logger.setExtensionToTrue()
     if (args.contains("--existsframe")) {

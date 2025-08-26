@@ -3,6 +3,7 @@ import org.scalatest.concurrent.TimeLimits.{cancelAfter, failAfter}
 import org.scalatest.time.SpanSugar._
 import viper.HHLVerifier.generation.Generator
 import viper.HHLVerifier.symbols.SymbolChecker
+import viper.HHLVerifier.syntactic.SyntacticEngine
 import viper.HHLVerifier.typing.TypeChecker
 
 import scala.jdk.CollectionConverters._
@@ -36,6 +37,7 @@ class TestRunner extends AnyFunSuite {
           SymbolChecker.reset()
           TypeChecker.reset()
           Generator.reset()
+          SyntacticEngine.reset()
           viper.HHLVerifier.Main.logsActive = false
           viper.HHLVerifier.Main.verified = 0
           viper.HHLVerifier.Main.main(Array(file.toString) ++ args)

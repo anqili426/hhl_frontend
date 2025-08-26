@@ -4,6 +4,9 @@ import com.microsoft.z3._
 import viper.HHLVerifier.ast._
 import Characterizer._
 import viper.HHLVerifier.typing.StateType
+import viper.HHLVerifier.Main
+
+import java.nio.file.{Files, Paths}
 
 object SyntacticEngine {
 
@@ -17,6 +20,21 @@ object SyntacticEngine {
    *  - `2` if all verifications succeeded.
    */
   private var verificationResult: Int = 0
+
+  /**
+   * Buffer of Z3 boolean formulas collected during program analysis. If the corresponding flag is
+   * set, these constraints are combined and exported to an `.smt2` file, typically for external processing
+   * by an SMT solver
+   */
+  private var z3Constraints: Seq[BoolExpr] = Seq()
+
+  def addConstraint(expr: BoolExpr): Unit = {
+    z3Constraints = z3Constraints.appended(expr)
+  }
+
+  def reset(): Unit = {
+    z3Constraints = Seq()
+  }
 
   /**
    * Represents a verification hyper-triple consisting of a program statement, a precondition
@@ -61,7 +79,7 @@ object SyntacticEngine {
       split
         .foreach { triple => verifyLoopFreeTriple(triple) }
 
-      // verifyLoopFreeTriple(Triple(method.body, method.pre, method.post), method.params, "top-level")(method) // old version for loop-free programs
+      if (Main.outputPath != "unspecified") exportToSMT()
     }
     verificationResult
   }
@@ -92,7 +110,7 @@ object SyntacticEngine {
 
         // Z3 encoding
         val encoder: LogicEncoderNew = new LogicEncoderNew
-        val result = encoder.checkEntailment(combinedPrecondition, weakestPrecondition)
+        val result = encoder.checkEntailment(combinedPrecondition, weakestPrecondition, toBeExported = true)
 
         result._1 match {
           case Status.UNSATISFIABLE =>
@@ -157,6 +175,23 @@ object SyntacticEngine {
     case WhileLoopStmt(_, body, _, _, _) => getAllProgVarsHelper(body)
     case PVarDecl(vName, _) => Set(vName)
     case _ => Set.empty[Id]
+  }
+
+  def exportToSMT(): Unit = {
+    val ctx = new Context()
+    val s = ctx.mkSolver()
+    if (z3Constraints.isEmpty) sys.error("SyntacticEngine: Nothing to export")
+
+    val mappedConstraints = z3Constraints.map(_.translate(ctx).asInstanceOf[BoolExpr])
+    val finalFormula = ctx.mkNot(ctx.mkAnd(mappedConstraints: _*))
+    s.add(finalFormula)
+
+    val outputString = "(set-logic AUFLIA)\n" +
+        s.toString +
+        "\n(check-sat)\n(exit)\n"
+
+    Files.write(Paths.get(Main.outputPath), outputString.getBytes)
+    println("The corresponding SMT file has been written to " + Paths.get(Main.outputPath))
   }
 }
 

@@ -43,6 +43,9 @@ class LogicEncoderNew {
    *
    * @param pre The user-supplied precondition.
    * @param wp The weakest precondition computed by [[WeakestPrecondition.compute]]
+   * @param toBeExported Whether this entailment should be included in the export `.smt2` file
+   *                     (e.g. `false` for entailments checked by the [[RuleSelector]], `true` for
+   *                     entailments corresponding to hyper-triples that need to be verified)
    * @return Z3 [[Status]]:
    *         <ul>
    *          <li>`UNSATISFIABLE` – <code>pre ⊨ wp</code> is valid.</li>
@@ -51,7 +54,7 @@ class LogicEncoderNew {
    *          <li>`UNKNOWN` – solver aborted.</li>
    *         </ul>
    */
-  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): (Status, Option[Model]) = {
+  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, toBeExported: Boolean = false): (Status, Option[Model]) = {
     // encode the precondition and WP
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
     val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
@@ -64,6 +67,10 @@ class LogicEncoderNew {
     // solve ¬(pre ⇒ wp)
     val solver = ctx.mkSolver()
     solver.add(z3FinalFormula)
+
+    if (toBeExported) {
+      SyntacticEngine.addConstraint(ctx.mkImplies(z3Pre, z3WP)) // if this entailment should be included in the export .smt2 file
+    }
 
     val result = solver.check()
     (result, if (result == Status.SATISFIABLE) Some(solver.getModel()) else None)
