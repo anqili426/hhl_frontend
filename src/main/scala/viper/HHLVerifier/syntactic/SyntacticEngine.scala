@@ -77,7 +77,7 @@ object SyntacticEngine {
    */
   private def verifyLoopFreeTriple(triple: Triple): Boolean = triple match {
     case Triple(body, pre, post, name) => {
-      val trueAssertion = Assertion("forall", List(AssertVarDecl(AssertVar("_s"), StateType())), BoolLit(true))
+      val trueAssertion = Assertion("forall", List(AssertVarDecl(AssertVar("_s"), StateType())), ImpliesExpr(StateExistsExpr(AssertVar("_s"), false), BoolLit(true)))
       if (pre.isEmpty) {
         verifyLoopFreeTriple(Triple(body, List(trueAssertion), post, name))
       } else if (post.isEmpty) {
