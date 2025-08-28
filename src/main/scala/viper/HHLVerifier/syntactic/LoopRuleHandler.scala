@@ -71,7 +71,7 @@ object ForallExistsHandler extends LoopRuleHandler {
   private def computeLoopPost(inv: viper.HHLVerifier.ast.Expr, noForallAfterExists: Boolean = true)(implicit loopCondition: viper.HHLVerifier.ast.Expr): viper.HHLVerifier.ast.Expr = inv match {
     case Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(StateExistsExpr(_, false), "&&", realBody)) =>
       Assertion("exists", List(AssertVarDecl(vName, vType)),
-        BinaryExpr(computeLoopPost(realBody, false), "&&", ImpliesExpr(UnaryExpr("!", loopCondition), StateExistsExpr(vName, false)))
+        BinaryExpr(computeLoopPost(realBody, false), "&&", ImpliesExpr(LookupExpr(vName, UnaryExpr("!", loopCondition)), StateExistsExpr(vName, false)))
       ) // cf. Hypra paper, p. 19, bottom
     case Assertion("exists", _, _) => sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but found non-desugared quantifier.")
     case Assertion("forall", assertVarDecls@List(AssertVarDecl(_, vType)), body) =>
@@ -91,7 +91,6 @@ object SyncHandler extends LoopRuleHandler {
       val mappedInvariant = inv.map(_._2)
       val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
       val loopPostcondition = BinaryExpr(BinaryExpr(combinedInvariant, "||", LoopRuleHandler.box(BoolLit(false))), "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
-      println(loopPostcondition)
 
       // check invariant I ⊨ low(b)
       val encoder: LogicEncoderNew = new LogicEncoderNew
