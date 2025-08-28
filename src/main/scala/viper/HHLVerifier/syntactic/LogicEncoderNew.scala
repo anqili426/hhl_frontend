@@ -107,14 +107,14 @@ class LogicEncoderNew {
       }
     }
     case LookupExpr(AssertVar(stateName), Id(varName)) => sys.error("LogicEncoder: Unexpected LookupExpr in boolean conversion: " + expr.toString)
-    case LookupExpr(id, index) => encodeBool(resolveLookup(index)(id.asInstanceOf[AssertVar]))
+    case LookupExpr(id, index) => encodeBool(LogicEncoderNew.resolveLookup(index)(id.asInstanceOf[AssertVar]))
     case StateExistsExpr(AssertVar(name), _) => ctx.mkSelect(S, getStateEnv(name)).asInstanceOf[BoolExpr]
     case _ => sys.error("LogicEncoder: Unexpected expression in boolean conversion: " + expr.toString)
   }
 
   private def encodeInt(expr: viper.HHLVerifier.ast.Expr): IntExpr = expr match {
     case LookupExpr(AssertVar(stateName), Id(varName)) => ctx.mkSelect(getStateEnv(stateName), getProgEnv(varName)).asInstanceOf[IntExpr]
-    case LookupExpr(id, index) => encodeInt(resolveLookup(index)(id.asInstanceOf[AssertVar]))
+    case LookupExpr(id, index) => encodeInt(LogicEncoderNew.resolveLookup(index)(id.asInstanceOf[AssertVar]))
     case Id(name) => getProgEnv(name) // a program variable shouldn't occur outside of a LookupExpr. However, there can be free variables from the exists rule
     case Num(value) => ctx.mkInt(value)
     case AssertVar(name) => getProgEnv(name)
@@ -137,14 +137,15 @@ class LogicEncoderNew {
     stateEnv.getOrElseUpdate(s, ctx.mkConst(s, StateSort).asInstanceOf[ArrayExpr[IntSort, IntSort]])
   }
 
+}
+
+object LogicEncoderNew {
   private def resolveLookup(expr: viper.HHLVerifier.ast.Expr)(implicit assertVar: AssertVar): viper.HHLVerifier.ast.Expr = expr match {
     case Id(_) => LookupExpr(assertVar, expr)
-    case Num(_) => expr
-    case BoolLit(_) => expr
+    case Num(_) | BoolLit(_) => expr
     case BinaryExpr(e1, op, e2) => BinaryExpr(resolveLookup(e1), op, resolveLookup(e2))
     case UnaryExpr(op, e) => UnaryExpr(op, resolveLookup(e))
     case ImpliesExpr(left, right) => ImpliesExpr(resolveLookup(left), resolveLookup(right))
     case _ => sys.error("LogicEncoder: Unexpected expression in lookup expression: " + expr.toString)
   }
-
 }

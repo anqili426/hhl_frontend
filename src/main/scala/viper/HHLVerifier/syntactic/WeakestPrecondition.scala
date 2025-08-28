@@ -2,7 +2,7 @@ package viper.HHLVerifier.syntactic
 
 import viper.HHLVerifier.ast._
 import Characterizer._
-import viper.HHLVerifier.typing.StateType
+import viper.HHLVerifier.typing.{StateType, IntType}
 
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
 import scala.xml.NodeSeq
@@ -35,18 +35,24 @@ object WeakestPrecondition {
     normalizedPost match {
       case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), body) => {
         Assertion("forall", assertVarDecls,
-          characterizer
-            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(body, subst, assertVar)) }
-            .map(x => ImpliesExpr(x._1, x._2))
-            .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e))
+          addHavocQuantifiers(
+            characterizer._1
+              .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(body, subst, assertVar)) }
+              .map(x => ImpliesExpr(x._1, x._2))
+              .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e)),
+            characterizer._2, "forall", assertVar
+          )
         )
       }
       case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), body) => {
         Assertion("exists", assertVarDecls,
-          characterizer
-            .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(body, subst, assertVar)) }
-            .map(x => BinaryExpr(x._1, "&&", x._2))
-            .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e))
+          addHavocQuantifiers(
+            characterizer._1
+              .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(body, subst, assertVar)) }
+              .map(x => BinaryExpr(x._1, "&&", x._2))
+              .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e)),
+            characterizer._2, "exists", assertVar
+          )
         )
       }
       case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, computeSinglePost(c, body)) // quantifier over non-state variable
@@ -70,8 +76,9 @@ object WeakestPrecondition {
     case BinaryExpr(e1, op, e2) => BinaryExpr(substituteExprPath(e1, map, assertVar), op, substituteExprPath(e2, map, assertVar))
     case UnaryExpr(op, e) => UnaryExpr(op, substituteExprPath(e, map, assertVar))
     case ImpliesExpr(left, right) => ImpliesExpr(substituteExprPath(left, map, assertVar), substituteExprPath(right, map, assertVar))
-    case LookupExpr(id, index) if id == assertVar => LookupExpr(assertVar, Characterizer.applySubstitution(index, map)) // only perform substitution, if assertVar matches
-    case _ => expr // TODO: Double-check which other Expr are possible
+    case LookupExpr(id, index) if id == assertVar =>
+      handleHavoc(applySubstitution(index, map))(id.asInstanceOf[AssertVar]) // only perform substitution, if assertVar matches
+    case _ => expr
   }
 
   /**
@@ -81,7 +88,8 @@ object WeakestPrecondition {
    */
   private def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
     case Id(_) => LookupExpr(state, pc)
-    case Num(_) | BoolLit(_) | LookupExpr(_, _) | StateExistsExpr(_, _)  => pc
+    case HavocVar(name) => Id(name + "_" + state.name)
+    case Num(_) | BoolLit(_) | LookupExpr(_, _) | StateExistsExpr(_, _) => pc
     case BinaryExpr(e1, op, e2) => BinaryExpr(substitutePathCondition(e1, state), op, substitutePathCondition(e2, state))
     case UnaryExpr(op, e) => UnaryExpr(op, substitutePathCondition(e, state))
     case ImpliesExpr(left, right) => ImpliesExpr(substitutePathCondition(left, state), substitutePathCondition(right, state))
@@ -122,5 +130,25 @@ object WeakestPrecondition {
       (res._1, BinaryExpr(res._2, "&&", e2))
     }
     case BinaryExpr(e1, "&&", e2) => (e1, e2)
+  }
+
+  private def addHavocQuantifiers(e: Expr, q: Set[HavocVar], assertString: String, assertState: AssertVar): Expr = {
+    q.toSeq
+      .foldLeft(e) {
+        case (acc, HavocVar(name)) => {
+          val newName = name + "_" + assertState.name
+          Assertion(assertString, List(AssertVarDecl(AssertVar(newName), IntType())), acc)
+        }
+      }
+  }
+
+  private def handleHavoc(expr: viper.HHLVerifier.ast.Expr)(implicit assertVar: AssertVar): viper.HHLVerifier.ast.Expr = expr match {
+    case Id(_) => LookupExpr(assertVar, expr)
+    case HavocVar(name) => Id(name + "_" + assertVar.name)
+    case Num(_) | BoolLit(_) => expr
+    case BinaryExpr(e1, op, e2) => BinaryExpr(handleHavoc(e1), op, handleHavoc(e2))
+    case UnaryExpr(op, e) => UnaryExpr(op, handleHavoc(e))
+    case ImpliesExpr(left, right) => ImpliesExpr(handleHavoc(left), handleHavoc(right))
+    case _ => sys.error("LogicEncoder: Unexpected expression in lookup expression: " + expr.toString)
   }
 }

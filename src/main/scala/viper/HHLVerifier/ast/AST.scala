@@ -57,6 +57,13 @@ case class Id(name: String) extends Expr
  *
  * @param name name of the identifier, has to be unique */
 case class AssertVar(name: String) extends SpecialId(name)
+
+/**
+ * Artificial variable to distinguish and identify havoc statements
+ *
+ * @param name name of the identifier, has to be unique
+ */
+case class HavocVar(name: String) extends SpecialId(name)
 /** Proof variable used in Expressions
  *
  * @param name name of the identifier, has to be unique */
