@@ -65,7 +65,8 @@ class LogicEncoderNew {
     //println("Z3 encoding final formula: " + z3FinalFormula)
 
     // solve ¬(pre ⇒ wp)
-    val solver = ctx.mkSolver()
+    val t = ctx.mkTactic("auflia")
+    val solver = ctx.mkSolver(t)
     solver.add(z3FinalFormula)
 
     if (toBeExported) {
