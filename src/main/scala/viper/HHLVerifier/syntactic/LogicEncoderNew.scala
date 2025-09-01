@@ -7,7 +7,7 @@ import viper.HHLVerifier.typing._
 
 import scala.collection.mutable
 
-class LogicEncoderNew {
+class LogicEncoderNew extends AutoCloseable {
 
   /** Z3 context used to construct sorts, expressions and solvers. */
   private val ctx: Context = new Context()
@@ -69,8 +69,9 @@ class LogicEncoderNew {
     val solver = ctx.mkSolver(t)
     solver.add(z3FinalFormula)
 
-    if (toBeExported) {
-      SyntacticEngine.addConstraint(ctx.mkImplies(z3Pre, z3WP)) // if this entailment should be included in the export .smt2 file
+    if (toBeExported) { // if this entailment should be included in the export .smt2 file
+      val translatedImp = ctx.mkImplies(z3Pre, z3WP).translate(SyntacticEngine.exportCtx).asInstanceOf[BoolExpr]
+      SyntacticEngine.addConstraint(translatedImp)
     }
 
     val result = solver.check()
@@ -138,6 +139,7 @@ class LogicEncoderNew {
     stateEnv.getOrElseUpdate(s, ctx.mkConst(s, StateSort).asInstanceOf[ArrayExpr[IntSort, IntSort]])
   }
 
+  override def close(): Unit = ctx.close()
 }
 
 object LogicEncoderNew {

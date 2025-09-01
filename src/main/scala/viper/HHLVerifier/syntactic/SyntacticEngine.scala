@@ -28,11 +28,15 @@ object SyntacticEngine {
    */
   private var z3Constraints: Seq[BoolExpr] = Seq()
 
+  var exportCtx = new Context()
+
   def addConstraint(expr: BoolExpr): Unit = {
     z3Constraints = z3Constraints.appended(expr)
   }
 
   def reset(): Unit = {
+    exportCtx.close()
+    exportCtx = new Context()
     z3Constraints = Seq()
   }
 
@@ -111,6 +115,7 @@ object SyntacticEngine {
         // Z3 encoding
         val encoder: LogicEncoderNew = new LogicEncoderNew
         val result = encoder.checkEntailment(combinedPrecondition, weakestPrecondition, toBeExported = true)
+        encoder.close()
 
         result._1 match {
           case Status.UNSATISFIABLE =>
@@ -178,12 +183,10 @@ object SyntacticEngine {
   }
 
   def exportToSMT(): Unit = {
-    val ctx = new Context()
-    val s = ctx.mkSolver()
+    val s = exportCtx.mkSolver()
     if (z3Constraints.isEmpty) sys.error("SyntacticEngine: Nothing to export")
 
-    val mappedConstraints = z3Constraints.map(_.translate(ctx).asInstanceOf[BoolExpr])
-    val finalFormula = ctx.mkNot(ctx.mkAnd(mappedConstraints: _*))
+    val finalFormula = exportCtx.mkNot(exportCtx.mkAnd(z3Constraints: _*))
     s.add(finalFormula)
 
     val outputString = "(set-logic AUFLIA)\n" +

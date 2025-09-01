@@ -95,6 +95,7 @@ object SyncHandler extends LoopRuleHandler {
       // check invariant I ⊨ low(b)
       val encoder: LogicEncoderNew = new LogicEncoderNew
       val result = encoder.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
+      encoder.close()
       if (result._1 != Status.UNSATISFIABLE) sys.error("SyncHandler: Tried to apply \"syncRule\", but invariant \"I ⊨ low(b)\" was violated.")
 
       val triplePrefix = Triple(
@@ -131,6 +132,7 @@ object SyncTotHandler extends LoopRuleHandler {
       // check invariant I ⊨ low(b)
       val encoder: LogicEncoderNew = new LogicEncoderNew
       val result = encoder.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
+      encoder.close()
       if (result._1 != Status.UNSATISFIABLE) sys.error("SyncTotHandler: Tried to apply \"syncTotRule\", but invariant \"I ⊨ low(b)\" was violated.")
 
       // check termination property
@@ -261,6 +263,7 @@ object RuleSelector {
       // check invariant I ⊨ low(b)
       val encoder: LogicEncoderNew = new LogicEncoderNew
       val result = encoder.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
+      encoder.close()
 
       if (result._1 == Status.UNSATISFIABLE) { // i.e. I ⊨ low(b) holds and we need a synchronized loop rule
         if (decr.isDefined && SyncTotHandler.checkTerminationLoops(body)) {
