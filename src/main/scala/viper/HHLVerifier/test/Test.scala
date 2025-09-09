@@ -88,7 +88,7 @@ object Test {
       totalNum = totalNum + 1
       val LOCData = getDataForTestCase(f.getPath)
       print(f)
-      val argsForMain = Array(f.getPath, option, "--auto")
+      val argsForMain = Array(f.getPath, option, "--auto", "--syntactic")
       Main.test = true
       Main.logsActive = false
       Main.main(argsForMain)

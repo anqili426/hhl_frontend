@@ -38,6 +38,7 @@ object SyntacticEngine {
     exportCtx.close()
     exportCtx = new Context()
     z3Constraints = Seq()
+    verificationResult = 0
   }
 
   /**
@@ -70,7 +71,7 @@ object SyntacticEngine {
    *         - `2` if all verifications succeeded.
    */
   def verify(program: HHLProgram): Int = {
-    verificationResult = 0
+    reset()
 
     program.methods.foreach { method =>
       if (Main.logsActive) println("----------")
@@ -82,9 +83,8 @@ object SyntacticEngine {
       // Verifying all triples
       split
         .foreach { triple => verifyLoopFreeTriple(triple) }
-
-      if (Main.outputPath != "unspecified") exportToSMT()
     }
+    if (Main.outputPath != "unspecified") exportToSMT()
     verificationResult
   }
 
