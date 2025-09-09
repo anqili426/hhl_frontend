@@ -4,6 +4,7 @@ import com.microsoft.z3._
 import viper.HHLVerifier.ast._
 import viper.HHLVerifier.syntactic.WeakestPrecondition
 import viper.HHLVerifier.typing._
+import viper.HHLVerifier.Main
 
 import scala.collection.mutable
 
@@ -65,17 +66,21 @@ class LogicEncoderNew extends AutoCloseable {
     //println("Z3 encoding final formula: " + z3FinalFormula)
 
     // solve ¬(pre ⇒ wp)
-    val t = ctx.mkTactic("auflia")
-    val solver = ctx.mkSolver(t)
+    //val t = ctx.mkTactic("auflia")
+    val solver = ctx.mkSolver(/*t*/)
+    val p = ctx.mkParams()
+    p.add("timeout", 20000) // 20s timeouth
+    solver.setParameters(p)
     solver.add(z3FinalFormula)
 
-    if (toBeExported) { // if this entailment should be included in the export .smt2 file
+    if (toBeExported && Main.outputPath != "unspecified") { // if this entailment should be included in the export .smt2 file
       val translatedImp = ctx.mkImplies(z3Pre, z3WP).translate(SyntacticEngine.exportCtx).asInstanceOf[BoolExpr]
       SyntacticEngine.addConstraint(translatedImp)
     }
 
     val result = solver.check()
-    (result, if (result == Status.SATISFIABLE) Some(solver.getModel()) else None)
+    if (Main.logsActive && result == Status.UNKNOWN) println(solver.getReasonUnknown)
+    (result, if (result == Status.SATISFIABLE) Some(solver.getModel) else None)
   }
 
   private def encodeBool(expr: viper.HHLVerifier.ast.Expr): BoolExpr = expr match {

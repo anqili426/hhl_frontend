@@ -1,6 +1,7 @@
 package viper.HHLVerifier.syntactic
 
 import com.microsoft.z3.Status
+import viper.HHLVerifier.Main
 import viper.HHLVerifier.ast._
 import viper.HHLVerifier.syntactic.SyntacticEngine.Triple
 import viper.HHLVerifier.typing.StateType
@@ -42,7 +43,7 @@ object LoopRuleHandler {
 object ForallExistsHandler extends LoopRuleHandler {
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple] = loop match {
     case WhileLoopStmt(cond, body, inv, decr, rule) => {
-      println("\tVerifying loop using \"forallExistsRule\"")
+      if (Main.logsActive) println("\tVerifying loop using \"forallExistsRule\"")
       val mappedInvariant = inv.map(_._2)
       val loopPostcondition = BinaryExpr(computeLoopPost(mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x)))(cond), "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
 
@@ -87,7 +88,7 @@ object ForallExistsHandler extends LoopRuleHandler {
 object SyncHandler extends LoopRuleHandler {
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple] = loop match {
     case WhileLoopStmt(cond, body, inv, decr, rule) => {
-      println("\tVerifying loop using \"syncRule\"")
+      if (Main.logsActive) println("\tVerifying loop using \"syncRule\"")
       val mappedInvariant = inv.map(_._2)
       val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
       val loopPostcondition = BinaryExpr(BinaryExpr(combinedInvariant, "||", LoopRuleHandler.box(BoolLit(false))), "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
@@ -124,7 +125,7 @@ object SyncHandler extends LoopRuleHandler {
 object SyncTotHandler extends LoopRuleHandler {
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple] = loop match {
     case WhileLoopStmt(cond, body, inv, Some(decr), rule) => {
-      println("\tVerifying loop using \"syncTotRule\"")
+      if (Main.logsActive) println("\tVerifying loop using \"syncTotRule\"")
       val mappedInvariant = inv.map(_._2)
       val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
       val loopPostcondition = BinaryExpr(combinedInvariant, "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
@@ -181,7 +182,7 @@ object SyncTotHandler extends LoopRuleHandler {
 object ExistsHandler extends LoopRuleHandler {
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple] = loop match {
     case WhileLoopStmt(cond, body, inv, Some(decr), rule) => {
-      println("\tVerifying loop using \"existsRule\"")
+      if (Main.logsActive) println("\tVerifying loop using \"existsRule\"")
       val mappedInvariant = inv.map(_._2).map(desugarQuantifiers)
       val (existsPartOpt, restPart) = extractFirstExists(mappedInvariant)
 

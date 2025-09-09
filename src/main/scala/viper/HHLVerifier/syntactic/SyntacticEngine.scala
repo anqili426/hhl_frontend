@@ -73,8 +73,8 @@ object SyntacticEngine {
     verificationResult = 0
 
     program.methods.foreach { method =>
-      println("----------")
-      println("Method \"" + method.mName + "\"")
+      if (Main.logsActive) println("----------")
+      if (Main.logsActive) println("Method \"" + method.mName + "\"")
 
       val split = loopSplit(Triple(method.body, method.pre, method.post, "top-level"))
       //println(split)
@@ -119,15 +119,15 @@ object SyntacticEngine {
 
         result._1 match {
           case Status.UNSATISFIABLE =>
-            println(f"\tValid ($name): Precondition implies WP.")
+            if (Main.logsActive) println(f"\tValid ($name): Precondition implies WP.")
             if (verificationResult != 1) verificationResult = 2
             true
           case Status.SATISFIABLE =>
-            println(f"\tInvalid ($name): Counterexample found.")
+            if (Main.logsActive) println(f"\tInvalid ($name): Counterexample found.")
             verificationResult = 1
             false
           case Status.UNKNOWN =>
-            println(f"\tUnknown ($name): Z3 couldn't determine the result.")
+            if (Main.logsActive) println(f"\tUnknown ($name): Z3 couldn't determine the result.")
             verificationResult = 1 // for now, we handle "unknown" as invalid
             false
         }
@@ -189,12 +189,12 @@ object SyntacticEngine {
     val finalFormula = exportCtx.mkNot(exportCtx.mkAnd(z3Constraints: _*))
     s.add(finalFormula)
 
-    val outputString = "(set-logic AUFLIA)\n" +
+    val outputString = // "(set-logic AUFLIA)\n" +
         s.toString +
         "\n(check-sat)\n(exit)\n"
 
     Files.write(Paths.get(Main.outputPath), outputString.getBytes)
-    println("The corresponding SMT file has been written to " + Paths.get(Main.outputPath))
+    if (Main.logsActive) println("The corresponding SMT file has been written to " + Paths.get(Main.outputPath))
   }
 }
 

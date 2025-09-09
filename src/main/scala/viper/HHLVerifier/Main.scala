@@ -81,15 +81,15 @@ object Main {
 
         // Syntactic evaluation mode
         if (syntactic) {
-          println("Verifying file: " + programAbsPath.split("/").last)
+          if (logsActive) println("Verifying file: " + programAbsPath.split("/").last)
           verified = SyntacticEngine.verify(parsedProgram)
           val t1 = System.nanoTime()
           runtime = (t1 - t0) / 1E9
 
-          println("----------")
+          if (logsActive) println("----------")
 
-          if (verified == 2) println(f"SUCCESS: Verification succeeded in ${runtime}s")
-          if (verified == 1) println(f"ERROR: The provided program could not be verified. Runtime: ${runtime}s")
+          if (logsActive && verified == 2) println(f"SUCCESS: Verification succeeded in ${runtime}s")
+          if (logsActive && verified == 1) println(f"ERROR: The provided program could not be verified. Runtime: ${runtime}s")
           return
         }
 
