@@ -21,37 +21,42 @@ object WeakestPrecondition {
   def compute(characterizer: Characterizer, post: Seq[Expr]): Expr = post match {
     case Nil => sys.error("WeakestPrecondition: No postcondition given")
     case _ => post
-      .map(x => computeSinglePost(characterizer, x))
+      .map(x => computeSinglePost(characterizer, desugarQuantifiers(x))) // to correctly compute the WP, it is handy to have chains of single-variable quantifiers
       .reduceLeft((acc,x) => BinaryExpr(acc, "&&", x))
   }
 
   /**
    * Helper function computing the '''weakest precondition (WP)''' for a given characterizer and
-   * a ''single'' postcondition.
+   * a ''single'' desugared postcondition.
    */
   private def computeSinglePost(characterizer: Characterizer, post: Expr): Expr = {
     implicit val c: Characterizer = characterizer
-    val normalizedPost: Expr = desugarQuantifiers(post) // to correctly compute the WP, it is handy to have chains of single-variable quantifiers
-    normalizedPost match {
-      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), body) => {
+    post match {
+      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), ImpliesExpr(stateExists, realBody)) => {
         Assertion("forall", assertVarDecls,
-          addHavocQuantifiers(
-            characterizer._1
-              .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(body, subst, assertVar)) }
-              .map(x => ImpliesExpr(x._1, x._2))
-              .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e)),
-            characterizer._2, "forall", assertVar
+          ImpliesExpr(
+            stateExists,
+            addHavocQuantifiers(
+              characterizer._1
+                .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(realBody, subst, assertVar)(c, true)) }
+                .map(x => ImpliesExpr(x._1, x._2))
+                .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e)),
+              characterizer._2, "forall", assertVar
+            )
           )
         )
       }
-      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), body) => {
+      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), BinaryExpr(stateExists, "&&", realBody)) => {
         Assertion("exists", assertVarDecls,
-          addHavocQuantifiers(
-            characterizer._1
-              .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(body, subst, assertVar)) }
-              .map(x => BinaryExpr(x._1, "&&", x._2))
-              .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e)),
-            characterizer._2, "exists", assertVar
+          BinaryExpr(
+            stateExists, "&&",
+            addHavocQuantifiers(
+              characterizer._1
+                .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(realBody, subst, assertVar)(c, true)) }
+                .map(x => BinaryExpr(x._1, "&&", x._2))
+                .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e)),
+              characterizer._2, "exists", assertVar
+            )
           )
         )
       }
@@ -68,11 +73,14 @@ object WeakestPrecondition {
    * The substitution is only taking place if we encounter a [[LookupExpr]] for the `assertVar`.
    * Otherwise, the substitution will be (or has been) handled by another quantifier.
    */
-  private def substituteExprPath(expr: Expr, map: Map[Id, Expr], assertVar: AssertVar)(implicit c: Characterizer): Expr = expr match {
-    case Assertion(quantifier, assertVarDecls, body) => {
-      val substitutedOuter = Assertion(quantifier, assertVarDecls, substituteExprPath(body, map, assertVar))
-      computeSinglePost(c, substitutedOuter)
+  private def substituteExprPath(expr: Expr, map: Map[Id, Expr], assertVar: AssertVar)(implicit c: Characterizer, deepRec: Boolean): Expr = expr match {
+    case Assertion(quantifier, assertVarDecls@List(AssertVarDecl(_, StateType())), body) => {
+      val substitutedOuter =
+        Assertion(quantifier, assertVarDecls, substituteExprPath(body, map, assertVar)(c, false))
+      if (deepRec) computeSinglePost(c, substitutedOuter)
+      else substitutedOuter
     }
+    case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, substituteExprPath(body, map, assertVar))
     case BinaryExpr(e1, op, e2) => BinaryExpr(substituteExprPath(e1, map, assertVar), op, substituteExprPath(e2, map, assertVar))
     case UnaryExpr(op, e) => UnaryExpr(op, substituteExprPath(e, map, assertVar))
     case ImpliesExpr(left, right) => ImpliesExpr(substituteExprPath(left, map, assertVar), substituteExprPath(right, map, assertVar))
@@ -102,13 +110,17 @@ object WeakestPrecondition {
    * This normalization is later needed for computing the weakest precondition.
    */
   def desugarQuantifiers(e: Expr): Expr = e match {
-    case Assertion(quantifier, x1 :: x2 :: xs, ImpliesExpr(stateExists, realBody)) => { // if we have multiple state assert vars, we also want to separate StateExistsExpr
+    case Assertion("forall", (x1@AssertVarDecl(_, StateType())) :: (x2@AssertVarDecl(_, StateType())) :: xs, ImpliesExpr(stateExists, realBody)) => { // if we have multiple state assert vars, we also want to separate StateExistsExpr
       val extracted = extractFirstFromNestedAnd(stateExists)
-      Assertion(quantifier, List(x1), ImpliesExpr(extracted._1, desugarQuantifiers(Assertion(quantifier, (x2 :: xs), ImpliesExpr(extracted._2, realBody)))))
+      Assertion("forall", List(x1), ImpliesExpr(extracted._1, desugarQuantifiers(Assertion("forall", (x2 :: xs), ImpliesExpr(extracted._2, realBody)))))
+    }
+    case Assertion("exists", (x1@AssertVarDecl(_, StateType())) :: (x2@AssertVarDecl(_, StateType())) :: xs, BinaryExpr(stateExists, "&&", realBody)) => { // if we have multiple state assert vars, we also want to separate StateExistsExpr
+      val extracted = extractFirstFromNestedAnd(stateExists)
+      Assertion("exists", List(x1), BinaryExpr(extracted._1, "&&", desugarQuantifiers(Assertion("exists", (x2 :: xs), BinaryExpr(extracted._2, "&&", realBody)))))
     }
     case Assertion(quantifier, assertVarDecls, body) => assertVarDecls match {
       case _ :: Nil => Assertion(quantifier, assertVarDecls, desugarQuantifiers(body)) // only one assertVar ==> already desugared, need to desugar body
-      case x :: xs => Assertion(quantifier, List(x), desugarQuantifiers(Assertion(quantifier, xs, body))) // TODO: Support error states
+      case x :: xs => Assertion(quantifier, List(x), desugarQuantifiers(Assertion(quantifier, xs, body))) // non-state quantifier
     }
     case BinaryExpr(e1, op, e2) => BinaryExpr(desugarQuantifiers(e1), op, desugarQuantifiers(e2))
     case UnaryExpr(op, e) => UnaryExpr(op, desugarQuantifiers(e))
@@ -149,6 +161,6 @@ object WeakestPrecondition {
     case BinaryExpr(e1, op, e2) => BinaryExpr(handleHavoc(e1), op, handleHavoc(e2))
     case UnaryExpr(op, e) => UnaryExpr(op, handleHavoc(e))
     case ImpliesExpr(left, right) => ImpliesExpr(handleHavoc(left), handleHavoc(right))
-    case _ => sys.error("LogicEncoder: Unexpected expression in lookup expression: " + expr.toString)
+    case _ => sys.error("WeakestPrecondition: Unexpected expression: " + expr.toString)
   }
 }
