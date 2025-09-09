@@ -90,6 +90,9 @@ object Main {
 
           if (logsActive && verified == 2) println(f"SUCCESS: Verification succeeded in ${runtime}s")
           if (logsActive && verified == 1) println(f"ERROR: The provided program could not be verified. Runtime: ${runtime}s")
+
+          SymbolChecker.reset()
+          TypeChecker.reset()
           return
         }
 
