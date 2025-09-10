@@ -45,12 +45,12 @@ object TypeChecker {
     var isHyperAssertion = true
     isPre = true
     m.pre.foreach(p => {
-      isHyperAssertion = isHyperAssertion && typeCheckExpr(p, true)
+      isHyperAssertion = isHyperAssertion && (typeCheckExpr(p, true) || p.isInstanceOf[BoolLit])
       if (!isHyperAssertion) throw new Logger(s"The precondition ${p.toString()} of method " + m.mName + " is not a hyper assertion", Logger.ERR).addTitle(errorCategory).addOffset((p.offsetLeft, p.offsetRight))
     })
     isPre = false
     m.post.foreach(p => {
-      isHyperAssertion = isHyperAssertion && typeCheckExpr(p, true)
+      isHyperAssertion = isHyperAssertion && (typeCheckExpr(p, true) || p.isInstanceOf[BoolLit])
       if (!isHyperAssertion) throw new Logger(s"The postcondition ${p.toString()} of method " + m.mName + " is not a hyper assertion", Logger.ERR).addTitle(errorCategory).addOffset((p.offsetLeft, p.offsetRight))
     })
     typeCheckStmt(m.body, false)
