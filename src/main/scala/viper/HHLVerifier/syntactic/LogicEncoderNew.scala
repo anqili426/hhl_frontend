@@ -79,7 +79,7 @@ class LogicEncoderNew extends AutoCloseable {
     }
 
     val result = solver.check()
-    if (Main.logsActive && result == Status.UNKNOWN) println(solver.getReasonUnknown)
+    if (Main.debugLogsActive && result == Status.UNKNOWN) println("\tReason for unknown: " + solver.getReasonUnknown)
     (result, if (result == Status.SATISFIABLE) Some(solver.getModel) else None)
   }
 

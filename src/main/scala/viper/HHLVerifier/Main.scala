@@ -24,6 +24,7 @@ object Main {
   var testWithLogs = false
   var errMessages: Seq[String] = Seq("")
   var logsActive = true
+  var debugLogsActive = false // extensive logs for debugging in syntactic mode
   var syntactic = false
   var outputPath = "unspecified"
 
@@ -58,6 +59,7 @@ object Main {
     else if (args.contains("--exists") && !args.contains("--forall")) Generator.verifierOption = 1
     else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
     if (args.contains("--syntactic")) syntactic = true
+    if (args.contains("--debug")) debugLogsActive = true
 
     new Logger(f"The input program is read from $programAbsPath.").log()
 
