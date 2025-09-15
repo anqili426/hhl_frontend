@@ -20,14 +20,17 @@ class LogicEncoderNew extends AutoCloseable {
    * indices to their value in this state. */
   private val StateSort: Sort = ctx.mkArraySort(IntSort, IntSort)
 
-  /** Sort that represents a ''set of program states'': An array from
+  /** Deprecated (now applied as a function): Sort that represents a ''set of program states'': An array from
    * [[StateSort]] to a boolean membership flag. Usually, we only need
    * one object of this sort (defined below). */
   private val SetSort: Sort = ctx.mkArraySort(StateSort, BoolSort)
 
   /** Fresh Z3 constant of sort [[SetSort]] that denotes the abstract set '''S'''.
-   * Cf. HHL paper, definition 3. */
-  private val S: ArrayExpr[ArraySort[IntSort, IntSort], BoolSort] = ctx.mkConst("S", SetSort).asInstanceOf[ArrayExpr[ArraySort[IntSort, IntSort], BoolSort]]
+   * Cf. HHL paper, definition 3.
+   * New: Instead of an array using a function to represent the set of program states
+   */
+  //private val S: ArrayExpr[ArraySort[IntSort, IntSort], BoolSort] = ctx.mkConst("S", SetSort).asInstanceOf[ArrayExpr[ArraySort[IntSort, IntSort], BoolSort]]
+  private val S: FuncDecl[BoolSort] = ctx.mkFuncDecl("S", StateSort, BoolSort.asInstanceOf[BoolSort])
 
   /** Environment that maps program variable names and logical variable names to their Z3 integer constants.
    * Populated on the fly when encountering program variables in hyper-assertions. */
@@ -66,10 +69,9 @@ class LogicEncoderNew extends AutoCloseable {
     //println("Z3 encoding final formula: " + z3FinalFormula)
 
     // solve ¬(pre ⇒ wp)
-    //val t = ctx.mkTactic("auflia")
-    val solver = ctx.mkSolver(/*t*/)
+    val solver = ctx.mkSolver(/*"AUFLIA"*/)
     val p = ctx.mkParams()
-    p.add("timeout", 20000) // 20s timeouth
+    p.add("timeout", 20000) // 20s timeout
     solver.setParameters(p)
     solver.add(z3FinalFormula)
 
@@ -115,7 +117,9 @@ class LogicEncoderNew extends AutoCloseable {
     }
     case LookupExpr(AssertVar(stateName), Id(varName)) => sys.error("LogicEncoder: Unexpected LookupExpr in boolean conversion: " + expr.toString)
     case LookupExpr(id, index) => encodeBool(LogicEncoderNew.resolveLookup(index)(id.asInstanceOf[AssertVar]))
-    case StateExistsExpr(AssertVar(name), _) => ctx.mkSelect(S, getStateEnv(name)).asInstanceOf[BoolExpr]
+    case StateExistsExpr(AssertVar(name), _) =>
+      //ctx.mkSelect(S, getStateEnv(name)).asInstanceOf[BoolExpr]
+      ctx.mkApp(S, getStateEnv(name)).asInstanceOf[BoolExpr]
     case _ => sys.error("LogicEncoder: Unexpected expression in boolean conversion: " + expr.toString)
   }
 
