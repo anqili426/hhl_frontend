@@ -23,26 +23,36 @@ object PathBuilder {
    */
   case class Characterizer(
     paths: Seq[CharPath],
-    havocs: Set[HavocVar]
+    havocs: Set[HavocVar],
+    asserts: Map[Stmt, Seq[CharPath]]
   ) {
     def ++(that: Characterizer): Characterizer =
-      Characterizer(paths ++ that.paths, havocs ++ that.havocs)
+      Characterizer(paths ++ that.paths, havocs ++ that.havocs, asserts ++ that.asserts)
 
     def mapPaths(f: CharPath => CharPath): Characterizer =
       copy(paths = paths.map(f))
-  }
-  object Characterizer {
-    val empty: Characterizer = Characterizer(Seq(CharPath(BoolLit(true), Map.empty)), Set.empty)
+
+    def withHavoc(newVar: HavocVar): Characterizer =
+      copy(havocs = havocs + newVar)
+
+    def withAssert(assert: Stmt, paths: Seq[CharPath]): Characterizer = {
+      copy(asserts = asserts + (assert -> paths))
+    }
   }
 
-  /**
-   * An accumulator for [[AssertStmt]] and [[HyperAssertStmt]]. Needed to compute the weakest precondition for
-   * error states.
-   */
-  type AssertAcc = Seq[(Stmt, Characterizer)]
+  object Characterizer {
+    val empty: Characterizer = Characterizer(Seq(CharPath(BoolLit(true), Map.empty)), Set.empty, Map.empty)
+  }
 
   var genSymCounter: Int = 0
 
+  /**
+   * Generates a unique symbol by appending a counter to a given string. Each time the function is called,
+   * [[genSymCounter]] increments to ensure that the resulting symbol is unique.
+   *
+   * @param s The base string to which a unique suffix will be added.
+   * @return A new string formed by concatenating the input string with an underscore (`_`) and a counter value.
+   */
   private def genSym(s: String): String = {
     genSymCounter += 1
     s + "_" + genSymCounter
@@ -85,13 +95,13 @@ object PathBuilder {
     case MultiAssignStmt(left, right) => ??? // TODO
     case IfElseStmt(cond, ifStmt, elseStmt) => {
       // Fold over all incoming paths and accumulate both paths and havoc-vars
-      acc.paths.foldLeft(Characterizer(Seq.empty, acc.havocs)) {
+      acc.paths.foldLeft(Characterizer(Seq.empty, acc.havocs, acc.asserts)) {
         case (accum, in@CharPath(pcBefore, substBefore)) =>
           val c = applySubstitution(cond, substBefore)
 
           // Run each branch starting from this single incoming path.
-          val ifResRaw   = characterizeStmt(ifStmt, Characterizer(Seq(in), accum.havocs))
-          val elseResRaw = characterizeStmt(elseStmt, Characterizer(Seq(in), accum.havocs))
+          val ifResRaw   = characterizeStmt(ifStmt, Characterizer(Seq(in), accum.havocs, accum.asserts))
+          val elseResRaw = characterizeStmt(elseStmt, Characterizer(Seq(in), accum.havocs, accum.asserts))
 
           // Add the current branch condition to the path condition
           val ifRes = ifResRaw.mapPaths(out =>
@@ -113,17 +123,17 @@ object PathBuilder {
     case AssertStmt(e) => acc.mapPaths {
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
     }
+      .withAssert(stmt, acc.paths)
     case HyperAssertStmt(e) => acc.mapPaths {
+      // TODO: Think about correct handling ==> splitting up program (similar to loops and function calls)
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
     }
     case HavocStmt(stmt:Id, _) => {
       val newVar = HavocVar(genSym("*havoc"))
-      Characterizer(
-        acc.paths.map {
-          case CharPath(pc, subst) => CharPath(pc, subst + (stmt -> newVar))
-        },
-        acc.havocs + newVar
-      )
+      acc.mapPaths {
+        case CharPath(pc, subst) => CharPath(pc, subst + (stmt -> newVar))
+      }
+        .withHavoc(newVar)
     }
     case WhileLoopStmt(_, _, _, _, _) => sys.error("Characterizer: Expected a loop-free program")
     case _ => acc

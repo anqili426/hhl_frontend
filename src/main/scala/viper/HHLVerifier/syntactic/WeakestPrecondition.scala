@@ -62,11 +62,53 @@ object WeakestPrecondition {
         )
       }
       // quantifiers over error states
-      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), ImpliesExpr(stateExists@StateExistsExpr(_, true), realBody)) => {
-        ???
+      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), ImpliesExpr(StateExistsExpr(specialId, true), realBody)) => {
+        Assertion("forall", assertVarDecls,
+          ImpliesExpr(
+            StateExistsExpr(specialId, false), // error states get transformed to normal states
+            addHavocQuantifiers(
+              characterizer.asserts
+                .map {
+                  case (AssertStmt(e), paths) =>
+                    paths.map {
+                      case CharPath(pc, subst) => (
+                        substitutePathCondition(pc, assertVar),
+                        substitutePathCondition(applySubstitution(e, subst), assertVar),
+                        substituteExprPath(realBody, subst, assertVar)(c, true)
+                      )
+                    }
+                    .map(x => ImpliesExpr(BinaryExpr(x._1, "&&", UnaryExpr("!", x._2)), x._3))
+                    .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e))
+                }
+                .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e)),
+              characterizer.havocs, "forall", assertVar
+            )
+          )
+        )
       }
-      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), BinaryExpr(stateExists@StateExistsExpr(_, true), "&&", realBody)) => {
-        ???
+      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), BinaryExpr(StateExistsExpr(specialId, true), "&&", realBody)) => {
+        Assertion("exists", assertVarDecls,
+          BinaryExpr(
+            StateExistsExpr(specialId, false), "&&", // error states get transformed to normal states
+            addHavocQuantifiers(
+              characterizer.asserts
+                .map {
+                  case (AssertStmt(e), paths) =>
+                    paths.map {
+                        case CharPath(pc, subst) => (
+                          substitutePathCondition(pc, assertVar),
+                          substitutePathCondition(applySubstitution(e, subst), assertVar),
+                          substituteExprPath(realBody, subst, assertVar)(c, true)
+                        )
+                      }
+                      .map(x => BinaryExpr(BinaryExpr(x._1, "&&", UnaryExpr("!", x._2)), "&&", x._3))
+                      .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e))
+                }
+                .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e)),
+              characterizer.havocs, "exists", assertVar
+            )
+          )
+        )
       }
       // quantifiers over non-state variables
       case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, computeSinglePost(c, body))

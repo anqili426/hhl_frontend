@@ -106,6 +106,7 @@ object SyntacticEngine {
         verifyLoopFreeTriple(Triple(body, pre, List(trueAssertion), name))
       } else {
         val characterizer: Characterizer = PathBuilder.characterizeStmt(body)
+        if (Main.debugLogsActive) println("Characterizer: " + characterizer)
         if (Main.debugLogsActive) println("#paths: " + characterizer.paths.length)
         val weakestPrecondition: viper.HHLVerifier.ast.Expr = WeakestPrecondition.compute(characterizer, post)
         if (Main.debugLogsActive) println("WP: " + weakestPrecondition)
