@@ -2,7 +2,7 @@ package viper.HHLVerifier.syntactic
 
 import com.microsoft.z3._
 import viper.HHLVerifier.ast._
-import Characterizer._
+import PathBuilder._
 import viper.HHLVerifier.typing.StateType
 import viper.HHLVerifier.Main
 
@@ -105,8 +105,8 @@ object SyntacticEngine {
       } else if (post.isEmpty) {
         verifyLoopFreeTriple(Triple(body, pre, List(trueAssertion), name))
       } else {
-        val characterizer: Characterizer = Characterizer.characterizeStmt(body)
-        if (Main.debugLogsActive) println("#paths: " + characterizer._1.length)
+        val characterizer: Characterizer = PathBuilder.characterizeStmt(body)
+        if (Main.debugLogsActive) println("#paths: " + characterizer.paths.length)
         val weakestPrecondition: viper.HHLVerifier.ast.Expr = WeakestPrecondition.compute(characterizer, post)
         if (Main.debugLogsActive) println("WP: " + weakestPrecondition)
         val combinedPrecondition: viper.HHLVerifier.ast.Expr = pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))

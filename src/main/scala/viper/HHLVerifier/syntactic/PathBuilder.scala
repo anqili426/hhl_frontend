@@ -2,7 +2,7 @@ package viper.HHLVerifier.syntactic
 
 import viper.HHLVerifier.ast._
 
-object Characterizer {
+object PathBuilder {
 
   /**
    * A path of the characterizer representing one path of a (loop-free) program
@@ -15,13 +15,31 @@ object Characterizer {
   case class CharPath(pc: Expr, subst: Map[Id, Expr])
 
   /**
-   * A `Characterizer` is a pair consisting of:
+   * A `Characterizer` is an element consisting of:
    *    - A list of [[CharPath]] objects, each element representing all paths of a program. The characterizer
    *    itself covers exactly all paths of the program.
    *    - A set of [[HavocVar]] objects introduced by `havoc` statements along all explored paths. They are tracked
    *    globally and are required later when computing the weakest precondition, as they require special treatement.
    */
-  type Characterizer = (Seq[CharPath], Set[HavocVar])
+  case class Characterizer(
+    paths: Seq[CharPath],
+    havocs: Set[HavocVar]
+  ) {
+    def ++(that: Characterizer): Characterizer =
+      Characterizer(paths ++ that.paths, havocs ++ that.havocs)
+
+    def mapPaths(f: CharPath => CharPath): Characterizer =
+      copy(paths = paths.map(f))
+  }
+  object Characterizer {
+    val empty: Characterizer = Characterizer(Seq(CharPath(BoolLit(true), Map.empty)), Set.empty)
+  }
+
+  /**
+   * An accumulator for [[AssertStmt]] and [[HyperAssertStmt]]. Needed to compute the weakest precondition for
+   * error states.
+   */
+  type AssertAcc = Seq[(Stmt, Characterizer)]
 
   var genSymCounter: Int = 0
 
@@ -41,7 +59,7 @@ object Characterizer {
    *                                    method (feature not yet implemented)
    */
   def characterizeLoopFreeProgram(program: HHLProgram): Characterizer = program.methods match {
-    case Nil => (Nil, Set.empty)
+    case Nil => Characterizer.empty
     case x :: Nil => characterizeStmt(x.body)
     case _ => sys.error("Characterizer: Cannot yet handle multiple methods") // TODO: Add support
   }
@@ -55,48 +73,57 @@ object Characterizer {
    *                a list of [[CharPath]]s, where each element of the list covers one path of the program.
    *                The characterizer itself then covers exactly all paths of the program.
    */
-  def characterizeStmt(stmt: Stmt, acc: Characterizer = (Seq(CharPath(BoolLit(true), Map.empty)), Set.empty)): Characterizer = stmt match {
+  def characterizeStmt(stmt: Stmt, acc: Characterizer = Characterizer.empty): Characterizer = stmt match {
     case CompositeStmt(Nil) => acc
     case CompositeStmt(x :: xs) => {
       val firstRes = characterizeStmt(x, acc)
       characterizeStmt(CompositeStmt(xs), firstRes)
     }
-    case AssignStmt(left, right) => (acc._1.map {
+    case AssignStmt(left, right) => acc.mapPaths {
       case CharPath(pc, subst) => CharPath(pc, subst + (left -> applySubstitution(right, subst)))
-    }, acc._2)
+    }
     case MultiAssignStmt(left, right) => ??? // TODO
     case IfElseStmt(cond, ifStmt, elseStmt) => {
       // Fold over all incoming paths and accumulate both paths and havoc-vars
-      acc._1.foldLeft[(Seq[CharPath], Set[HavocVar])]((Seq.empty, acc._2)) {
-        case ((pathsAcc, havocAcc), in@CharPath(pcBefore, substBefore)) =>
+      acc.paths.foldLeft(Characterizer(Seq.empty, acc.havocs)) {
+        case (accum, in@CharPath(pcBefore, substBefore)) =>
           val c = applySubstitution(cond, substBefore)
 
           // Run each branch starting from this single incoming path.
-          val (ifPathsRaw, ifHavoc)   = characterizeStmt(ifStmt, (Seq(in), havocAcc))
-          val (elsePathsRaw, elseHavoc) = characterizeStmt(elseStmt, (Seq(in), havocAcc))
+          val ifResRaw   = characterizeStmt(ifStmt, Characterizer(Seq(in), accum.havocs))
+          val elseResRaw = characterizeStmt(elseStmt, Characterizer(Seq(in), accum.havocs))
 
           // Add the current branch condition to the path condition
-          val ifPaths = ifPathsRaw.map(out =>
+          val ifRes = ifResRaw.mapPaths(out =>
             CharPath(BinaryExpr(c, "&&", out.pc), out.subst)
           )
-          val elsePaths = elsePathsRaw.map(out =>
+          val elseRes = elseResRaw.mapPaths(out =>
             CharPath(BinaryExpr(UnaryExpr("!", c), "&&", out.pc), out.subst)
           )
 
-          (pathsAcc ++ ifPaths ++ elsePaths, havocAcc ++ ifHavoc ++ elseHavoc)
+          accum ++ ifRes ++ elseRes
       }
     }
-    case AssumeStmt(e) => (acc._1.map {
+    case AssumeStmt(e) => acc.mapPaths {
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
-    }, acc._2)
-    case HyperAssumeStmt(e) => (acc._1.map {
+    }
+    case HyperAssumeStmt(e) => acc.mapPaths {
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
-    }, acc._2)
+    }
+    case AssertStmt(e) => acc.mapPaths {
+      case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
+    }
+    case HyperAssertStmt(e) => acc.mapPaths {
+      case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
+    }
     case HavocStmt(stmt:Id, _) => {
       val newVar = HavocVar(genSym("*havoc"))
-      (acc._1.map {
-        case CharPath(pc, subst) => CharPath(pc, subst + (stmt -> newVar))
-      }, acc._2 + newVar)
+      Characterizer(
+        acc.paths.map {
+          case CharPath(pc, subst) => CharPath(pc, subst + (stmt -> newVar))
+        },
+        acc.havocs + newVar
+      )
     }
     case WhileLoopStmt(_, _, _, _, _) => sys.error("Characterizer: Expected a loop-free program")
     case _ => acc

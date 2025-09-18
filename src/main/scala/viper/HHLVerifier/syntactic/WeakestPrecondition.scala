@@ -1,7 +1,7 @@
 package viper.HHLVerifier.syntactic
 
 import viper.HHLVerifier.ast._
-import Characterizer._
+import PathBuilder._
 import viper.HHLVerifier.typing.{StateType, IntType}
 
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
@@ -32,35 +32,44 @@ object WeakestPrecondition {
   private def computeSinglePost(characterizer: Characterizer, post: Expr): Expr = {
     implicit val c: Characterizer = characterizer
     post match {
-      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), ImpliesExpr(stateExists, realBody)) => {
+      // quantifiers over normal states
+      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), ImpliesExpr(stateExists@StateExistsExpr(_, false), realBody)) => {
         Assertion("forall", assertVarDecls,
           ImpliesExpr(
             stateExists,
             addHavocQuantifiers(
-              characterizer._1
+              characterizer.paths
                 .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(realBody, subst, assertVar)(c, true)) }
                 .map(x => ImpliesExpr(x._1, x._2))
                 .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e)),
-              characterizer._2, "forall", assertVar
+              characterizer.havocs, "forall", assertVar
             )
           )
         )
       }
-      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), BinaryExpr(stateExists, "&&", realBody)) => {
+      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), BinaryExpr(stateExists@StateExistsExpr(_, false), "&&", realBody)) => {
         Assertion("exists", assertVarDecls,
           BinaryExpr(
             stateExists, "&&",
             addHavocQuantifiers(
-              characterizer._1
+              characterizer.paths
                 .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(realBody, subst, assertVar)(c, true)) }
                 .map(x => BinaryExpr(x._1, "&&", x._2))
                 .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e)),
-              characterizer._2, "exists", assertVar
+              characterizer.havocs, "exists", assertVar
             )
           )
         )
       }
-      case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, computeSinglePost(c, body)) // quantifier over non-state variable
+      // quantifiers over error states
+      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), ImpliesExpr(stateExists@StateExistsExpr(_, true), realBody)) => {
+        ???
+      }
+      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), BinaryExpr(stateExists@StateExistsExpr(_, true), "&&", realBody)) => {
+        ???
+      }
+      // quantifiers over non-state variables
+      case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, computeSinglePost(c, body))
       case BinaryExpr(e1, op, e2) => BinaryExpr(computeSinglePost(c, e1), op, computeSinglePost(c, e2))
       case UnaryExpr(op, e) => UnaryExpr(op, computeSinglePost(c, e))
       case ImpliesExpr(left, right) => ImpliesExpr(computeSinglePost(c, left), computeSinglePost(c, right))
