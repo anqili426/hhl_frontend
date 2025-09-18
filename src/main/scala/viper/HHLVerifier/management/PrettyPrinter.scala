@@ -88,7 +88,7 @@ object PrettyPrinter {
       case CombExpr(lhs, rhs, op) => f"${formatExpr(lhs)} $op ${formatExpr(rhs)}"
       case UpdateMapExpr(base, update) => f"${formatExpr(base)}[${formatExpr(update)}]"
       case MapTupleExpr(k, v) => f"$k := $v"
-      case _ => throw new Logger(s"PrettyPrinter.formatExpr: Unknown expression type: $expr", Logger.ERR).addTitle("Internal Error").addOffset((expr.offsetLeft, expr.offsetRight))
+      case _ => throw new Logger("PrettyPrinter.formatExpr: Unknown expression type", Logger.ERR).addTitle("Internal Error").addOffset((expr.offsetLeft, expr.offsetRight))
     }
   }
 
