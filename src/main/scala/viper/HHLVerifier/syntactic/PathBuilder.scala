@@ -26,8 +26,15 @@ object PathBuilder {
     havocs: Set[HavocVar],
     asserts: Map[Stmt, Seq[CharPath]]
   ) {
-    def ++(that: Characterizer): Characterizer =
-      Characterizer(paths ++ that.paths, havocs ++ that.havocs, asserts ++ that.asserts)
+    def ++(that: Characterizer): Characterizer = {
+      val mergedAsserts = (this.asserts.toSeq ++ that.asserts.toSeq)
+        .groupMapReduce(_._1)(_._2)(_ ++ _)
+        .view
+        .mapValues(_.distinctBy(p => (p.pc, p.subst)))
+        .toMap
+
+      Characterizer(this.paths ++ that.paths, this.havocs ++ that.havocs, mergedAsserts)
+    }
 
     def mapPaths(f: CharPath => CharPath): Characterizer =
       copy(paths = paths.map(f))
@@ -36,7 +43,8 @@ object PathBuilder {
       copy(havocs = havocs + newVar)
 
     def withAssert(assert: Stmt, paths: Seq[CharPath]): Characterizer = {
-      copy(asserts = asserts + (assert -> paths))
+      val merged = asserts.getOrElse(assert, Seq.empty) ++ paths
+      copy(asserts = asserts + (assert -> merged))
     }
   }
 
@@ -96,20 +104,16 @@ object PathBuilder {
     case IfElseStmt(cond, ifStmt, elseStmt) => {
       // Fold over all incoming paths and accumulate both paths and havoc-vars
       acc.paths.foldLeft(Characterizer(Seq.empty, acc.havocs, acc.asserts)) {
-        case (accum, in@CharPath(pcBefore, substBefore)) =>
+        case (accum, CharPath(pcBefore, substBefore)) =>
           val c = applySubstitution(cond, substBefore)
 
-          // Run each branch starting from this single incoming path.
-          val ifResRaw   = characterizeStmt(ifStmt, Characterizer(Seq(in), accum.havocs, accum.asserts))
-          val elseResRaw = characterizeStmt(elseStmt, Characterizer(Seq(in), accum.havocs, accum.asserts))
+          // Add path condition before going into recursion
+          val inIf = CharPath(BinaryExpr(c, "&&", pcBefore), substBefore)
+          val inElse = CharPath(BinaryExpr(UnaryExpr("!", c), "&&", pcBefore), substBefore)
 
-          // Add the current branch condition to the path condition
-          val ifRes = ifResRaw.mapPaths(out =>
-            CharPath(BinaryExpr(c, "&&", out.pc), out.subst)
-          )
-          val elseRes = elseResRaw.mapPaths(out =>
-            CharPath(BinaryExpr(UnaryExpr("!", c), "&&", out.pc), out.subst)
-          )
+          // Run each branch starting from this single incoming path.
+          val ifRes = characterizeStmt(ifStmt, Characterizer(Seq(inIf), accum.havocs, accum.asserts))
+          val elseRes = characterizeStmt(elseStmt, Characterizer(Seq(inElse), accum.havocs, accum.asserts))
 
           accum ++ ifRes ++ elseRes
       }
