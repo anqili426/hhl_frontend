@@ -80,7 +80,7 @@ object WeakestPrecondition {
                     .map(x => ImpliesExpr(BinaryExpr(x._1, "&&", UnaryExpr("!", x._2)), x._3))
                     .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e))
                 }
-                .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e)),
+                .foldLeft[Expr](BoolLit(true))((acc, e) => BinaryExpr(acc, "&&", e)),
               characterizer.havocs, "forall", assertVar
             )
           )
@@ -104,7 +104,7 @@ object WeakestPrecondition {
                       .map(x => BinaryExpr(BinaryExpr(x._1, "&&", UnaryExpr("!", x._2)), "&&", x._3))
                       .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e))
                 }
-                .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e)),
+                .foldLeft[Expr](BoolLit(false))((acc, e) => BinaryExpr(acc, "||", e)),
               characterizer.havocs, "exists", assertVar
             )
           )
