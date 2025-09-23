@@ -9,6 +9,7 @@ val fastParse = "com.lihaoyi" %% "fastparse" % "2.2.2"
 val csvWriter = "au.com.bytecode" % "opencsv" % "2.4"
 val play = "com.typesafe.play" %% "play-json" % "2.10.0"
 val z3 = "tools.aqua" % "z3-turnkey" % "4.14.1"
+val cvc5 = "tools.aqua" % "cvc5-turnkey" % "1.2.0"
 val scalatest = "org.scalatest" %% "scalatest" % "3.2.18" % Test
 
 lazy val silicon = (project in file("silicon"))
@@ -29,6 +30,7 @@ lazy val impcon_frontend = (project in file("."))
     libraryDependencies += csvWriter,
     libraryDependencies += play,
     libraryDependencies += z3,
+    libraryDependencies += cvc5,
     libraryDependencies += scalatest,
 
     Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-reports", "-oD"),

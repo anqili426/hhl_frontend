@@ -152,7 +152,7 @@ class LogicEncoderNew extends AutoCloseable {
 }
 
 object LogicEncoderNew {
-  private def resolveLookup(expr: viper.HHLVerifier.ast.Expr)(implicit assertVar: AssertVar): viper.HHLVerifier.ast.Expr = expr match {
+  def resolveLookup(expr: viper.HHLVerifier.ast.Expr)(implicit assertVar: AssertVar): viper.HHLVerifier.ast.Expr = expr match {
     case Id(_) => LookupExpr(assertVar, expr)
     case Num(_) | BoolLit(_) => expr
     case BinaryExpr(e1, op, e2) => BinaryExpr(resolveLookup(e1), op, resolveLookup(e2))
