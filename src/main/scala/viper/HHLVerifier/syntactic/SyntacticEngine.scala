@@ -7,6 +7,8 @@ import viper.HHLVerifier.typing.StateType
 import viper.HHLVerifier.Main
 
 import java.nio.file.{Files, Paths}
+import scala.collection.immutable.{AbstractSeq, LinearSeq}
+import scala.xml.NodeSeq
 
 object SyntacticEngine {
 
@@ -81,8 +83,11 @@ object SyntacticEngine {
       //println(split)
 
       // Verifying all triples
-      split
-        .foreach { triple => verifyLoopFreeTriple(triple) }
+      split match {
+        case h +: t =>
+          verifyLoopFreeTriple(h, wpPlus = false)  // first triple without extended WP
+          t.foreach(tr => verifyLoopFreeTriple(tr, wpPlus = true))  // rest of the triples need extended WP
+      }
     }
     if (Main.outputPath != "unspecified") exportToSMT()
     verificationResult
@@ -93,22 +98,25 @@ object SyntacticEngine {
    * of the statement with respect to its postcondition and checking whether the precondition entails it.
    *
    * @param triple The hyper-triple consisting of a statement, preconditions, postconditions, and an optional name.
+   * @param wpPlus boolean flag whether we want to compute extended WP for error states. The extended WP
+   *               has the purpose of propagating errors happening in triples before. Should be true for all triples
+   *               except the first one.
    * @return `true` if the triple is valid (precondition entails weakest precondition),
    *         `false` otherwise.
    * @note Updates the global variable [[verificationResult]] accordingly as a side effect.
    */
-  private def verifyLoopFreeTriple(triple: Triple): Boolean = triple match {
+  private def verifyLoopFreeTriple(triple: Triple, wpPlus: Boolean): Boolean = triple match {
     case Triple(body, pre, post, name) => {
       val trueAssertion = Assertion("forall", List(AssertVarDecl(AssertVar("_s"), StateType())), ImpliesExpr(StateExistsExpr(AssertVar("_s"), false), BoolLit(true)))
       if (pre.isEmpty) {
-        verifyLoopFreeTriple(Triple(body, List(trueAssertion), post, name))
+        verifyLoopFreeTriple(Triple(body, List(trueAssertion), post, name), wpPlus)
       } else if (post.isEmpty) {
-        verifyLoopFreeTriple(Triple(body, pre, List(trueAssertion), name))
+        verifyLoopFreeTriple(Triple(body, pre, List(trueAssertion), name), wpPlus)
       } else {
         val characterizer: Characterizer = PathBuilder.characterizeStmt(body)
         if (Main.debugLogsActive) println("Characterizer: " + characterizer)
         if (Main.debugLogsActive) println("#paths: " + characterizer.paths.length)
-        val weakestPrecondition: viper.HHLVerifier.ast.Expr = WeakestPrecondition.compute(characterizer, post)
+        val weakestPrecondition: viper.HHLVerifier.ast.Expr = WeakestPrecondition.compute(characterizer, post, wpPlus)
         if (Main.debugLogsActive) println("WP: " + weakestPrecondition)
         val combinedPrecondition: viper.HHLVerifier.ast.Expr = pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
 

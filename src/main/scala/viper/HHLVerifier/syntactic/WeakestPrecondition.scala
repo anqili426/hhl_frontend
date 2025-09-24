@@ -14,14 +14,16 @@ object WeakestPrecondition {
    *
    * @param characterizer characterizer, characterizing all execution paths of a program.
    * @param post          non-empty sequence of postconditions.
+   * @param wpPlus        boolean flag whether we want to compute extended WP for error states. The extended WP
+   *                      has the purpose of propagating errors happening in triples before.
    * @return              an [[Expr]] that is the '''weakest precondition''' for the given
    *                      program and postconditions.
    * @throws java.lang.RuntimeException if `post` is empty.
    */
-  def compute(characterizer: Characterizer, post: Seq[Expr]): Expr = post match {
+  def compute(characterizer: Characterizer, post: Seq[Expr], wpPlus: Boolean): Expr = post match {
     case Nil => sys.error("WeakestPrecondition: No postcondition given")
     case _ => post
-      .map(x => computeSinglePost(characterizer, desugarQuantifiers(x))) // to correctly compute the WP, it is handy to have chains of single-variable quantifiers
+      .map(x => computeSinglePost(characterizer, desugarQuantifiers(x))(wpPlus)) // to correctly compute the WP, it is handy to have chains of single-variable quantifiers
       .reduceLeft((acc,x) => BinaryExpr(acc, "&&", x))
   }
 
@@ -29,7 +31,7 @@ object WeakestPrecondition {
    * Helper function computing the '''weakest precondition (WP)''' for a given characterizer and
    * a ''single'' desugared postcondition.
    */
-  private def computeSinglePost(characterizer: Characterizer, post: Expr): Expr = {
+  private def computeSinglePost(characterizer: Characterizer, post: Expr)(implicit wpPlus: Boolean): Expr = {
     implicit val c: Characterizer = characterizer
     post match {
       // quantifiers over normal states
@@ -62,8 +64,8 @@ object WeakestPrecondition {
         )
       }
       // quantifiers over error states
-      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), ImpliesExpr(StateExistsExpr(specialId, true), realBody)) => {
-        Assertion("forall", assertVarDecls,
+      case Assertion("forall", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), ImpliesExpr(stateExists@StateExistsExpr(specialId, true), realBody)) => {
+        val classicWP = Assertion("forall", assertVarDecls,
           ImpliesExpr(
             StateExistsExpr(specialId, false), // error states get transformed to normal states
             addHavocQuantifiers(
@@ -85,9 +87,26 @@ object WeakestPrecondition {
             )
           )
         )
+        if (wpPlus) {
+          BinaryExpr(
+            classicWP, "&&",
+            Assertion("forall", assertVarDecls,
+              ImpliesExpr(
+                stateExists,
+                addHavocQuantifiers(
+                  characterizer.paths
+                    .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(realBody, subst, assertVar)(c, true)) }
+                    .map(x => ImpliesExpr(x._1, x._2))
+                    .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e)),
+                  characterizer.havocs, "forall", assertVar
+                )
+              )
+            )
+          )
+        } else classicWP
       }
-      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), BinaryExpr(StateExistsExpr(specialId, true), "&&", realBody)) => {
-        Assertion("exists", assertVarDecls,
+      case Assertion("exists", assertVarDecls@List(AssertVarDecl(assertVar, StateType())), BinaryExpr(stateExists@StateExistsExpr(specialId, true), "&&", realBody)) => {
+        val classicWP = Assertion("exists", assertVarDecls,
           BinaryExpr(
             StateExistsExpr(specialId, false), "&&", // error states get transformed to normal states
             addHavocQuantifiers(
@@ -109,6 +128,23 @@ object WeakestPrecondition {
             )
           )
         )
+        if (wpPlus) {
+          BinaryExpr(
+            classicWP, "||",
+            Assertion("exists", assertVarDecls,
+              BinaryExpr(
+                stateExists, "&&",
+                addHavocQuantifiers(
+                  characterizer.paths
+                    .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(realBody, subst, assertVar)(c, true)) }
+                    .map(x => BinaryExpr(x._1, "&&", x._2))
+                    .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e)),
+                  characterizer.havocs, "exists", assertVar
+                )
+              )
+            )
+          )
+        } else classicWP
       }
       // quantifiers over non-state variables
       case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, computeSinglePost(c, body))

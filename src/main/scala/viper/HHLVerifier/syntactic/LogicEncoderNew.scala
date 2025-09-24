@@ -32,6 +32,12 @@ class LogicEncoderNew extends AutoCloseable {
   //private val S: ArrayExpr[ArraySort[IntSort, IntSort], BoolSort] = ctx.mkConst("S", SetSort).asInstanceOf[ArrayExpr[ArraySort[IntSort, IntSort], BoolSort]]
   private val S: FuncDecl[BoolSort] = ctx.mkFuncDecl("S", StateSort, BoolSort.asInstanceOf[BoolSort])
 
+  /**
+   * Fresh Z3 constant of sort [[SetSort]] that denotes the abstract set tracking error states.
+   * Cf. Hypra paper, definition 1.
+   */
+  private val S_err: FuncDecl[BoolSort] = ctx.mkFuncDecl("S_err", StateSort, BoolSort.asInstanceOf[BoolSort])
+
   /** Environment that maps program variable names and logical variable names to their Z3 integer constants.
    * Populated on the fly when encountering program variables in hyper-assertions. */
   private val progEnv: mutable.Map[String, IntExpr] = mutable.Map.empty[String, IntExpr]
@@ -117,9 +123,8 @@ class LogicEncoderNew extends AutoCloseable {
     }
     case LookupExpr(AssertVar(stateName), Id(varName)) => sys.error("LogicEncoder: Unexpected LookupExpr in boolean conversion: " + expr.toString)
     case LookupExpr(id, index) => encodeBool(LogicEncoderNew.resolveLookup(index)(id.asInstanceOf[AssertVar]))
-    case StateExistsExpr(AssertVar(name), _) =>
-      //ctx.mkSelect(S, getStateEnv(name)).asInstanceOf[BoolExpr]
-      ctx.mkApp(S, getStateEnv(name)).asInstanceOf[BoolExpr]
+    case StateExistsExpr(AssertVar(name), false) => ctx.mkApp(S, getStateEnv(name)).asInstanceOf[BoolExpr] // non-error state
+    case StateExistsExpr(AssertVar(name), true) => ctx.mkApp(S_err, getStateEnv(name)).asInstanceOf[BoolExpr] // error states
     case _ => sys.error("LogicEncoder: Unexpected expression in boolean conversion: " + expr.toString)
   }
 
