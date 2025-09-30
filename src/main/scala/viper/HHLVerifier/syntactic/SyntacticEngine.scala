@@ -5,6 +5,7 @@ import viper.HHLVerifier.ast._
 import PathBuilder._
 import viper.HHLVerifier.typing.StateType
 import viper.HHLVerifier.Main
+import viper.HHLVerifier.syntactic.smt.{ParallelRunner, SMTStatus}
 
 import java.nio.file.{Files, Paths}
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
@@ -120,24 +121,24 @@ object SyntacticEngine {
         if (Main.debugLogsActive) println("WP: " + weakestPrecondition)
         val combinedPrecondition: viper.HHLVerifier.ast.Expr = pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
 
-        // Z3 encoding
-        val encoder: LogicEncoderNew = new LogicEncoderNew
-        val result = encoder.checkEntailment(combinedPrecondition, weakestPrecondition, toBeExported = true)
-        encoder.close()
+        val result = ParallelRunner.checkEntailment(combinedPrecondition, weakestPrecondition, toBeExported = true)
 
         result._1 match {
-          case Status.UNSATISFIABLE =>
-            if (Main.logsActive) println(f"\tValid ($name): Precondition implies WP.")
-            if (verificationResult != 1) verificationResult = 2
-            true
-          case Status.SATISFIABLE =>
-            if (Main.logsActive) println(f"\tInvalid ($name): Counterexample found.")
+          case SMTStatus.Satisfiable => {
+            if (Main.logsActive) println(f"\t${result._2} > Invalid ($name): Counterexample found.")
             verificationResult = 1
             false
-          case Status.UNKNOWN =>
-            if (Main.logsActive) println(f"\tUnknown ($name): Z3 couldn't determine the result.")
-            verificationResult = 1 // for now, we handle "unknown" as invalid
+          }
+          case SMTStatus.Unsatisfiable => {
+            if (Main.logsActive) println(f"\t${result._2} > Valid ($name): Precondition implies WP.")
+            if (verificationResult != 1) verificationResult = 2
+            true
+          }
+          case SMTStatus.Unknown => {
+            if (Main.logsActive) println(f"\t${result._2} > Unknown ($name): SMT solver couldn't determine the result.")
+            verificationResult = 1 // we handle "unknown" as invalid
             false
+          }
         }
       }
     }

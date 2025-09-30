@@ -183,7 +183,7 @@ object WeakestPrecondition {
    */
   private def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
     case Id(_) => LookupExpr(state, pc)
-    case HavocVar(name) => Id(name + "_" + state.name)
+    case HavocVar(name) => AssertVar(name + "_" + state.name)
     case Num(_) | BoolLit(_) | LookupExpr(_, _) | StateExistsExpr(_, _) => pc
     case BinaryExpr(e1, op, e2) => BinaryExpr(substitutePathCondition(e1, state), op, substitutePathCondition(e2, state))
     case UnaryExpr(op, e) => UnaryExpr(op, substitutePathCondition(e, state))
@@ -243,7 +243,7 @@ object WeakestPrecondition {
 
   private def handleHavoc(expr: viper.HHLVerifier.ast.Expr)(implicit assertVar: AssertVar): viper.HHLVerifier.ast.Expr = expr match {
     case Id(_) => LookupExpr(assertVar, expr)
-    case HavocVar(name) => Id(name + "_" + assertVar.name)
+    case HavocVar(name) => AssertVar(name + "_" + assertVar.name)
     case Num(_) | BoolLit(_) => expr
     case BinaryExpr(e1, op, e2) => BinaryExpr(handleHavoc(e1), op, handleHavoc(e2))
     case UnaryExpr(op, e) => UnaryExpr(op, handleHavoc(e))

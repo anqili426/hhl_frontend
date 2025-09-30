@@ -1,12 +1,14 @@
-package viper.HHLVerifier.syntactic
+package viper.HHLVerifier.syntactic.smt
 
 import io.github.cvc5._
-
-import scala.collection.mutable
+import viper.HHLVerifier.Main
 import viper.HHLVerifier.ast._
+import viper.HHLVerifier.syntactic.WeakestPrecondition
 import viper.HHLVerifier.typing._
 
-class CVC5Backend {
+import scala.collection.mutable
+
+class CVC5Backend extends SMTBackend {
   private val tm = new TermManager()
   private val solver = new Solver(tm)
 
@@ -16,6 +18,7 @@ class CVC5Backend {
 
   private val SFunSort = tm.mkFunctionSort(StateSort, BoolSort)
   private val S = tm.mkConst(SFunSort, "S")
+  private val S_err = tm.mkConst(SFunSort, "S_err")
 
   private val constEnv: mutable.Map[String, Term] = mutable.Map.empty[String, Term]
   private val varEnv: mutable.Map[String, Term] = mutable.Map.empty[String, Term]
@@ -25,7 +28,25 @@ class CVC5Backend {
   }
 
   private def getVarEnv(s: String, state: Boolean): Term = {
-    varEnv.getOrElseUpdate(s, tm.mkConst(if(state) StateSort else IntSort, s))
+    varEnv.getOrElseUpdate(s, tm.mkVar(if(state) StateSort else IntSort, s))
+  }
+
+  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): SMTStatus = {
+    val cvc5Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
+    val cvc5WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
+    val cvc5FinalFormula = tm.mkTerm(Kind.NOT, tm.mkTerm(Kind.IMPLIES, cvc5Pre, cvc5WP))
+
+    // solve ¬(pre ⇒ wp)
+    solver.setOption("tlimit-per", Main.smtSolverTimeLimitMs.toString)
+    solver.setLogic("ALL")
+    //solver.setOption("output-language", "smt2")
+    //solver.setOption("output", "pre-asserts")
+    solver.assertFormula(cvc5FinalFormula)
+    val result = solver.checkSat()
+
+    if (result.isSat) SMTStatus.Satisfiable
+    else if (result.isUnsat) SMTStatus.Unsatisfiable
+    else SMTStatus.Unknown
   }
 
   private def encodeBool(expr: Expr): Term = expr match {
@@ -60,16 +81,17 @@ class CVC5Backend {
       }
       tm.mkTerm(q, varList, encodeBool(body))
     }
-    case LookupExpr(AssertVar(_), Id(_)) => sys.error("LogicEncoder: Unexpected LookupExpr in boolean conversion: " + expr.toString)
-    case LookupExpr(id, index) => encodeBool(LogicEncoderNew.resolveLookup(index)(id.asInstanceOf[AssertVar]))
-    case StateExistsExpr(AssertVar(name), _) => tm.mkTerm(Kind.APPLY_UF, S, getVarEnv(name, state = true))
+    case LookupExpr(AssertVar(_), Id(_)) => sys.error("CVC5Backend: Unexpected LookupExpr in boolean conversion: " + expr.toString)
+    case LookupExpr(id, index) => encodeBool(ParallelRunner.resolveLookup(index)(id.asInstanceOf[AssertVar]))
+    case StateExistsExpr(AssertVar(name), false) => tm.mkTerm(Kind.APPLY_UF, S, getVarEnv(name, state = true))
+    case StateExistsExpr(AssertVar(name), true) => tm.mkTerm(Kind.APPLY_UF, S_err, getVarEnv(name, state = true))
     case _ => sys.error("CVC5Backend: Unexpected expression in boolean conversion: " + expr.toString)
   }
 
   private def encodeInt(expr: Expr): Term = expr match {
     case LookupExpr(AssertVar(stateName), Id(varName)) => tm.mkTerm(Kind.SELECT, getVarEnv(stateName, state = true), getConstEnv(varName))
-    case LookupExpr(id, index) => encodeInt(LogicEncoderNew.resolveLookup(index)(id.asInstanceOf[AssertVar]))
-    case Id(name) => getVarEnv(name, state = false)
+    case LookupExpr(id, index) => encodeInt(ParallelRunner.resolveLookup(index)(id.asInstanceOf[AssertVar]))
+    case Id(name) => getConstEnv(name)
     case Num(value) => tm.mkInteger(value)
     case AssertVar(name) => getVarEnv(name, state = false)
     case BinaryExpr(e1, op, e2) => {

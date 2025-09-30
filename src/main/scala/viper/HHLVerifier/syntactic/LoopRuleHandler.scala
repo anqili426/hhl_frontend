@@ -6,6 +6,7 @@ import viper.HHLVerifier.ast._
 import viper.HHLVerifier.syntactic.SyntacticEngine.Triple
 import viper.HHLVerifier.typing.StateType
 import viper.HHLVerifier.syntactic.WeakestPrecondition.desugarQuantifiers
+import viper.HHLVerifier.syntactic.smt.{ParallelRunner, SMTStatus}
 
 sealed trait LoopRuleHandler {
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple]
@@ -94,10 +95,8 @@ object SyncHandler extends LoopRuleHandler {
       val loopPostcondition = BinaryExpr(BinaryExpr(combinedInvariant, "||", LoopRuleHandler.box(BoolLit(false))), "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
 
       // check invariant I ⊨ low(b)
-      val encoder: LogicEncoderNew = new LogicEncoderNew
-      val result = encoder.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
-      encoder.close()
-      if (result._1 != Status.UNSATISFIABLE) sys.error("SyncHandler: Tried to apply \"syncRule\", but invariant \"I ⊨ low(b)\" was violated.")
+      val result = ParallelRunner.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
+      if (result._1 != SMTStatus.Unsatisfiable) sys.error("SyncHandler: Tried to apply \"syncRule\", but invariant \"I ⊨ low(b)\" was violated.")
 
       val triplePrefix = Triple(
         before,
@@ -131,10 +130,8 @@ object SyncTotHandler extends LoopRuleHandler {
       val loopPostcondition = BinaryExpr(combinedInvariant, "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
 
       // check invariant I ⊨ low(b)
-      val encoder: LogicEncoderNew = new LogicEncoderNew
-      val result = encoder.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
-      encoder.close()
-      if (result._1 != Status.UNSATISFIABLE) sys.error("SyncTotHandler: Tried to apply \"syncTotRule\", but invariant \"I ⊨ low(b)\" was violated.")
+      val result = ParallelRunner.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
+      if (result._1 != SMTStatus.Unsatisfiable) sys.error("SyncTotHandler: Tried to apply \"syncTotRule\", but invariant \"I ⊨ low(b)\" was violated.")
 
       // check termination property
       if (!checkTerminationLoops(body)) {
@@ -262,11 +259,9 @@ object RuleSelector {
       val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
 
       // check invariant I ⊨ low(b)
-      val encoder: LogicEncoderNew = new LogicEncoderNew
-      val result = encoder.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
-      encoder.close()
+      val result = ParallelRunner.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
 
-      if (result._1 == Status.UNSATISFIABLE) { // i.e. I ⊨ low(b) holds and we need a synchronized loop rule
+      if (result._1 == SMTStatus.Unsatisfiable) { // i.e. I ⊨ low(b) holds and we need a synchronized loop rule
         if (decr.isDefined && SyncTotHandler.checkTerminationLoops(body)) {
           SyncTotHandler
         } else {

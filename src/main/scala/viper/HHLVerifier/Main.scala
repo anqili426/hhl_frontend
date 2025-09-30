@@ -8,6 +8,7 @@ import viper.HHLVerifier.parsing.Parser
 import viper.HHLVerifier.symbols.SymbolChecker
 import viper.HHLVerifier.typing.TypeChecker
 import viper.HHLVerifier.syntactic.SyntacticEngine
+import viper.HHLVerifier.syntactic.smt.BackendMode
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
@@ -27,6 +28,8 @@ object Main {
   var debugLogsActive = false // extensive logs for debugging in syntactic mode
   var syntactic = false
   var outputPath = "unspecified"
+  var smtBackendMode: BackendMode = BackendMode.Z3 // standard SMT solver that is used in syntactic mode (if the argument "--smtmode" is set, this will be overridden)
+  val smtSolverTimeLimitMs = 20000
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -60,6 +63,14 @@ object Main {
     else Generator.verifierOption = 2 // Both forall & exists encodings will be emitted
     if (args.contains("--syntactic")) syntactic = true
     if (args.contains("--debug")) debugLogsActive = true
+    if (args.contains("--smtmode")) {
+      args(args.indexOf("--smtmode") + 1) match {
+        case "z3" | "Z3" => smtBackendMode = BackendMode.Z3
+        case "cvc5" | "CVC5" => smtBackendMode = BackendMode.CVC5
+        case "both" => smtBackendMode = BackendMode.Both
+        case _ => throw new Logger("Unknown SMT backend mode, choose either \"z3\", \"cvc5\" or \"both\" (default).", Logger.ERR)
+      }
+    }
 
     new Logger(f"The input program is read from $programAbsPath.").log()
 

@@ -1,15 +1,14 @@
-package viper.HHLVerifier.syntactic
+package viper.HHLVerifier.syntactic.smt
 
 import com.microsoft.z3._
-import viper.HHLVerifier.ast._
-import viper.HHLVerifier.syntactic.WeakestPrecondition
-import viper.HHLVerifier.typing._
 import viper.HHLVerifier.Main
+import viper.HHLVerifier.ast._
+import viper.HHLVerifier.syntactic.{SyntacticEngine, WeakestPrecondition}
+import viper.HHLVerifier.typing._
 
 import scala.collection.mutable
 
-class LogicEncoderNew extends AutoCloseable {
-
+class Z3Backend extends SMTBackend {
   /** Z3 context used to construct sorts, expressions and solvers. */
   private val ctx: Context = new Context()
 
@@ -20,16 +19,10 @@ class LogicEncoderNew extends AutoCloseable {
    * indices to their value in this state. */
   private val StateSort: Sort = ctx.mkArraySort(IntSort, IntSort)
 
-  /** Deprecated (now applied as a function): Sort that represents a ''set of program states'': An array from
-   * [[StateSort]] to a boolean membership flag. Usually, we only need
-   * one object of this sort (defined below). */
-  private val SetSort: Sort = ctx.mkArraySort(StateSort, BoolSort)
-
   /** Fresh Z3 constant of sort [[SetSort]] that denotes the abstract set '''S'''.
    * Cf. HHL paper, definition 3.
    * New: Instead of an array using a function to represent the set of program states
    */
-  //private val S: ArrayExpr[ArraySort[IntSort, IntSort], BoolSort] = ctx.mkConst("S", SetSort).asInstanceOf[ArrayExpr[ArraySort[IntSort, IntSort], BoolSort]]
   private val S: FuncDecl[BoolSort] = ctx.mkFuncDecl("S", StateSort, BoolSort.asInstanceOf[BoolSort])
 
   /**
@@ -46,49 +39,33 @@ class LogicEncoderNew extends AutoCloseable {
    * array constants of sort [[StateSort]]. Populated on the fly when encountering state variables in hyper-assertions. */
   private val stateEnv: mutable.Map[String, ArrayExpr[IntSort, IntSort]] = mutable.Map.empty[String, ArrayExpr[IntSort, IntSort]]
 
-  /**
-   * Checks whether the precondition `pre` ''logically entails'' the weakest
-   * precondition `wp`. This is done by utilizing the ''Z3 solver'' to check the
-   * satisfiability of <code>¬(pre ⇒ wp)</code>.
-   *
-   * @param pre The user-supplied precondition.
-   * @param wp The weakest precondition computed by [[WeakestPrecondition.compute]]
-   * @param toBeExported Whether this entailment should be included in the export `.smt2` file
-   *                     (e.g. `false` for entailments checked by the [[RuleSelector]], `true` for
-   *                     entailments corresponding to hyper-triples that need to be verified)
-   * @return Z3 [[Status]]:
-   *         <ul>
-   *          <li>`UNSATISFIABLE` – <code>pre ⊨ wp</code> is valid.</li>
-   *          <li>`SATISFIABLE` – implication does <strong>not</strong> hold
-   *            (a model serves as counter‑example).</li>
-   *          <li>`UNKNOWN` – solver aborted.</li>
-   *         </ul>
-   */
-  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, toBeExported: Boolean = false): (Status, Option[Model]) = {
+  def generateSMTEncoding(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): Unit = {
+    val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
+    val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
+    val translatedImp = ctx.mkImplies(z3Pre, z3WP).translate(SyntacticEngine.exportCtx).asInstanceOf[BoolExpr]
+    SyntacticEngine.addConstraint(translatedImp)
+  }
+
+  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): SMTStatus = {
     // encode the precondition and WP
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
     val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
     val z3FinalFormula = ctx.mkNot(ctx.mkImplies(z3Pre, z3WP))
 
-    //println("Z3 encoding Pre: " + z3Pre)
-    //println("Z3 encoding WP: " + z3WP)
-    //println("Z3 encoding final formula: " + z3FinalFormula)
-
     // solve ¬(pre ⇒ wp)
     val solver = ctx.mkSolver(/*"AUFLIA"*/)
     val p = ctx.mkParams()
-    p.add("timeout", 20000) // 20s timeout
+    p.add("timeout", Main.smtSolverTimeLimitMs) // 20s timeout
     solver.setParameters(p)
     solver.add(z3FinalFormula)
 
-    if (toBeExported && Main.outputPath != "unspecified") { // if this entailment should be included in the export .smt2 file
-      val translatedImp = ctx.mkImplies(z3Pre, z3WP).translate(SyntacticEngine.exportCtx).asInstanceOf[BoolExpr]
-      SyntacticEngine.addConstraint(translatedImp)
-    }
-
     val result = solver.check()
     if (Main.debugLogsActive && result == Status.UNKNOWN) println("\tReason for unknown: " + solver.getReasonUnknown)
-    (result, if (result == Status.SATISFIABLE) Some(solver.getModel) else None)
+    result match {
+      case Status.SATISFIABLE => SMTStatus.Satisfiable
+      case Status.UNSATISFIABLE => SMTStatus.Unsatisfiable
+      case Status.UNKNOWN => SMTStatus.Unknown
+    }
   }
 
   private def encodeBool(expr: viper.HHLVerifier.ast.Expr): BoolExpr = expr match {
@@ -122,7 +99,7 @@ class LogicEncoderNew extends AutoCloseable {
       }
     }
     case LookupExpr(AssertVar(stateName), Id(varName)) => sys.error("LogicEncoder: Unexpected LookupExpr in boolean conversion: " + expr.toString)
-    case LookupExpr(id, index) => encodeBool(LogicEncoderNew.resolveLookup(index)(id.asInstanceOf[AssertVar]))
+    case LookupExpr(id, index) => encodeBool(ParallelRunner.resolveLookup(index)(id.asInstanceOf[AssertVar]))
     case StateExistsExpr(AssertVar(name), false) => ctx.mkApp(S, getStateEnv(name)).asInstanceOf[BoolExpr] // non-error state
     case StateExistsExpr(AssertVar(name), true) => ctx.mkApp(S_err, getStateEnv(name)).asInstanceOf[BoolExpr] // error states
     case _ => sys.error("LogicEncoder: Unexpected expression in boolean conversion: " + expr.toString)
@@ -130,7 +107,7 @@ class LogicEncoderNew extends AutoCloseable {
 
   private def encodeInt(expr: viper.HHLVerifier.ast.Expr): IntExpr = expr match {
     case LookupExpr(AssertVar(stateName), Id(varName)) => ctx.mkSelect(getStateEnv(stateName), getProgEnv(varName)).asInstanceOf[IntExpr]
-    case LookupExpr(id, index) => encodeInt(LogicEncoderNew.resolveLookup(index)(id.asInstanceOf[AssertVar]))
+    case LookupExpr(id, index) => encodeInt(ParallelRunner.resolveLookup(index)(id.asInstanceOf[AssertVar]))
     case Id(name) => getProgEnv(name) // a program variable shouldn't occur outside of a LookupExpr. However, there can be free variables from the exists rule
     case Num(value) => ctx.mkInt(value)
     case AssertVar(name) => getProgEnv(name)
@@ -151,18 +128,5 @@ class LogicEncoderNew extends AutoCloseable {
 
   private def getStateEnv(s: String): com.microsoft.z3.ArrayExpr[IntSort, IntSort] = {
     stateEnv.getOrElseUpdate(s, ctx.mkConst(s, StateSort).asInstanceOf[ArrayExpr[IntSort, IntSort]])
-  }
-
-  override def close(): Unit = ctx.close()
-}
-
-object LogicEncoderNew {
-  def resolveLookup(expr: viper.HHLVerifier.ast.Expr)(implicit assertVar: AssertVar): viper.HHLVerifier.ast.Expr = expr match {
-    case Id(_) => LookupExpr(assertVar, expr)
-    case Num(_) | BoolLit(_) => expr
-    case BinaryExpr(e1, op, e2) => BinaryExpr(resolveLookup(e1), op, resolveLookup(e2))
-    case UnaryExpr(op, e) => UnaryExpr(op, resolveLookup(e))
-    case ImpliesExpr(left, right) => ImpliesExpr(resolveLookup(left), resolveLookup(right))
-    case _ => sys.error("LogicEncoder: Unexpected expression in lookup expression: " + expr.toString)
   }
 }
