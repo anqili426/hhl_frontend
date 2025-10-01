@@ -90,18 +90,7 @@ object WeakestPrecondition {
         if (wpPlus) {
           BinaryExpr(
             classicWP, "&&",
-            Assertion("forall", assertVarDecls,
-              ImpliesExpr(
-                stateExists,
-                addHavocQuantifiers(
-                  characterizer.paths
-                    .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(realBody, subst, assertVar)(c, true)) }
-                    .map(x => ImpliesExpr(x._1, x._2))
-                    .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "&&", e)),
-                  characterizer.havocs, "forall", assertVar
-                )
-              )
-            )
+            post
           )
         } else classicWP
       }
@@ -131,18 +120,7 @@ object WeakestPrecondition {
         if (wpPlus) {
           BinaryExpr(
             classicWP, "||",
-            Assertion("exists", assertVarDecls,
-              BinaryExpr(
-                stateExists, "&&",
-                addHavocQuantifiers(
-                  characterizer.paths
-                    .map { case CharPath(pc, subst) => (substitutePathCondition(pc, assertVar), substituteExprPath(realBody, subst, assertVar)(c, true)) }
-                    .map(x => BinaryExpr(x._1, "&&", x._2))
-                    .reduceLeft[Expr]((acc, e) => BinaryExpr(acc, "||", e)),
-                  characterizer.havocs, "exists", assertVar
-                )
-              )
-            )
+            post
           )
         } else classicWP
       }
