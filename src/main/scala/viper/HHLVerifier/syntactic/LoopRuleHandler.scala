@@ -75,7 +75,8 @@ object ForallExistsHandler extends LoopRuleHandler {
       Assertion("exists", List(AssertVarDecl(vName, vType)),
         BinaryExpr(computeLoopPost(realBody, false), "&&", ImpliesExpr(LookupExpr(vName, UnaryExpr("!", loopCondition)), stateExists))
       ) // cf. Hypra paper, p. 19, bottom
-    case Assertion("exists", list@List(AssertVarDecl(_, _)), body) => Assertion("exists", list, computeLoopPost(body, noForallAfterExists)) // no special treatment for exists over integers and error states
+    case Assertion("exists", list@List(AssertVarDecl(_, StateType())), body@BinaryExpr(StateExistsExpr(_, true), "&&", _)) => Assertion("exists", list, computeLoopPost(body, false)) // no special treatment for exists over error states, still no forall <_> should come after
+    case Assertion("exists", list@List(AssertVarDecl(_, StateType())), body) => Assertion("exists", list, computeLoopPost(body, noForallAfterExists)) // no special treatment for exists over integers
     case Assertion("exists", _, _) => sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but found non-desugared quantifier.")
     case Assertion("forall", assertVarDecls@List(AssertVarDecl(_, vType)), body) =>
       if (!noForallAfterExists && vType.isInstanceOf[StateType]) sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but invariant \"no forall <_> after exists quantifier\" was violated.")
