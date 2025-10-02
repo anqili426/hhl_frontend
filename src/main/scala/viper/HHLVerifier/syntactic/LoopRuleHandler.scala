@@ -71,10 +71,11 @@ object ForallExistsHandler extends LoopRuleHandler {
   }
 
   private def computeLoopPost(inv: viper.HHLVerifier.ast.Expr, noForallAfterExists: Boolean = true)(implicit loopCondition: viper.HHLVerifier.ast.Expr): viper.HHLVerifier.ast.Expr = inv match {
-    case Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(stateExists@StateExistsExpr(_, _), "&&", realBody)) =>
+    case Assertion("exists", List(AssertVarDecl(vName, vType)), BinaryExpr(stateExists@StateExistsExpr(_, false), "&&", realBody)) => // the substitution applies only to normal states
       Assertion("exists", List(AssertVarDecl(vName, vType)),
         BinaryExpr(computeLoopPost(realBody, false), "&&", ImpliesExpr(LookupExpr(vName, UnaryExpr("!", loopCondition)), stateExists))
       ) // cf. Hypra paper, p. 19, bottom
+    case Assertion("exists", list@List(AssertVarDecl(_, _)), body) => Assertion("exists", list, computeLoopPost(body, noForallAfterExists)) // no special treatment for exists over integers and error states
     case Assertion("exists", _, _) => sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but found non-desugared quantifier.")
     case Assertion("forall", assertVarDecls@List(AssertVarDecl(_, vType)), body) =>
       if (!noForallAfterExists && vType.isInstanceOf[StateType]) sys.error("ForallExistsHandler: Tried to apply \"forallExistsRule\", but invariant \"no forall <_> after exists quantifier\" was violated.")
