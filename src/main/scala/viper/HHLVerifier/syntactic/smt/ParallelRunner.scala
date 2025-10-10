@@ -3,7 +3,7 @@ package viper.HHLVerifier.syntactic.smt
 import viper.HHLVerifier.Main
 import viper.HHLVerifier.ast._
 
-import java.util.concurrent.{Callable, ExecutorCompletionService, Executors, Future, TimeUnit}
+import java.util.concurrent.{Callable, ExecutorCompletionService, Executors, Future, ThreadFactory, TimeUnit}
 import scala.util.control.NonFatal
 
 object ParallelRunner {
@@ -24,7 +24,16 @@ object ParallelRunner {
         (cvc5.checkEntailment(pre, wp), BackendMode.CVC5)
       }
       case BackendMode.Both => {
-        val executor = Executors.newFixedThreadPool(2)
+        val daemonFactory = new ThreadFactory {
+          private val d = Executors.defaultThreadFactory()
+          override def newThread(r: Runnable): Thread = {
+            val t = d.newThread(r)
+            t.setDaemon(true)
+            t.setName(s"SMT-${t.getId}")
+            t
+          }
+        }
+        val executor = Executors.newFixedThreadPool(2, daemonFactory)
         val executorService = new ExecutorCompletionService[(SMTStatus, BackendMode)](executor)
         var z3Future: Future[(SMTStatus, BackendMode)] = null
         var cvc5Future: Future[(SMTStatus, BackendMode)] = null
