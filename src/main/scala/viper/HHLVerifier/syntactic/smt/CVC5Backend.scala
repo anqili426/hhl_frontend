@@ -32,7 +32,7 @@ class CVC5Backend extends SMTBackend {
       val newVar = tm.mkVar(IntSort, name)
       (copy(intVars = intVars + (name -> newVar)), newVar)
     }
-    def getState(name: String): Term = stateVars.getOrElse(name, stateEnv.getOrElseUpdate(name, tm.mkConst(StateSort, name))) // some loop rules have free states, which need to be treated as constants
+    def getState(name: String): Term = stateVars.getOrElse(name, stateEnv.getOrElseUpdate(name, tm.mkConst(StateSort, name + "_const"))) // some loop rules have free states, which need to be treated as constants
     def getInt(name: String): Term = intVars.getOrElse(name, sys.error(s"CVC5Backend: Unbound integer variable '$name'"))
   }
   private object VarEnv {
