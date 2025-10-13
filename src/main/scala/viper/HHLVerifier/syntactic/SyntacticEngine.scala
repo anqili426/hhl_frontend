@@ -118,8 +118,9 @@ object SyntacticEngine {
         if (Main.debugLogsActive) println("Characterizer: " + characterizer)
         if (Main.debugLogsActive) println("#paths: " + characterizer.paths.length)
         val weakestPrecondition: viper.HHLVerifier.ast.Expr = WeakestPrecondition.compute(characterizer, post, wpPlus)
-        if (Main.debugLogsActive) println("WP: " + weakestPrecondition)
         val combinedPrecondition: viper.HHLVerifier.ast.Expr = pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
+        if (Main.debugLogsActive) println("Pre: " + combinedPrecondition)
+        if (Main.debugLogsActive) println("WP: " + weakestPrecondition)
 
         val result = ParallelRunner.checkEntailment(combinedPrecondition, weakestPrecondition, toBeExported = true)
 
@@ -191,7 +192,7 @@ object SyntacticEngine {
     case _ => Set.empty[Id]
   }
 
-  def exportToSMT(): Unit = {
+  private def exportToSMT(): Unit = {
     val s = exportCtx.mkSolver()
     if (z3Constraints.isEmpty) sys.error("SyntacticEngine: Nothing to export")
 

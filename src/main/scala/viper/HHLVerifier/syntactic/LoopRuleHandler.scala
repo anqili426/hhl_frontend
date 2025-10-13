@@ -9,6 +9,19 @@ import viper.HHLVerifier.syntactic.WeakestPrecondition.desugarQuantifiers
 import viper.HHLVerifier.syntactic.smt.{ParallelRunner, SMTStatus}
 
 sealed trait LoopRuleHandler {
+  /**
+   * Processes a `while` loop into a sequence of verification triples based on the respective loop rule.
+   * An overview over the different loop rules can be found in the Hypra paper, Fig. 8 (page 15).
+   *
+   * @param loop the loop statment to handle
+   * @param before statements executed '''before''' the loop (prefix)
+   * @param after statements executed '''after''' the loop (suffix)
+   * @param pre precondition for the whole program `before | loop | after`
+   * @param post postcondition for the whole program `before | loop | after`
+   * @param name human-readable name used for logging/reporting.
+   * @return independent verification triples for the prefix, the loop body, and the suffix. The exact shape of the
+   *         triples depends on the applied loop rule.
+   */
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple]
 }
 

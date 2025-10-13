@@ -15,17 +15,29 @@ object PathBuilder {
   case class CharPath(pc: Expr, subst: Map[Id, Expr])
 
   /**
-   * A `Characterizer` is an element consisting of:
-   *    - A list of [[CharPath]] objects, each element representing all paths of a program. The characterizer
-   *    itself covers exactly all paths of the program.
+   * A `Characterizer` compactly represents the (symbolic) behaviors of a program fragment. It can be computed
+   * for a statement using the function [[characterizeStmt]] and consists of the following parts:
+   *    - A list of [[CharPath]] objects, each representing a single path of a program. A program path is characterized with its
+   *    path condition and a variable substitution. The characterizer itself covers exactly all paths of the program.
    *    - A set of [[HavocVar]] objects introduced by `havoc` statements along all explored paths. They are tracked
-   *    globally and are required later when computing the weakest precondition, as they require special treatement.
+   *    globally for all paths and are required later when computing the weakest precondition, as they require special treatment.
+   *    - A map from assertion statements to the [[CharPath]] objects present at the time of their occurrence. This is later used
+   *    to compute the WP for error states, as we need to know the substitution and path condition at the time of the error.
    */
   case class Characterizer(
     paths: Seq[CharPath],
     havocs: Set[HavocVar],
     asserts: Map[Stmt, Seq[CharPath]]
   ) {
+    /**
+     * Combine two characterizers.
+     *  - Concatenates `paths` from both operands.
+     *  - Unions `havocs`.
+     *  - Merges `asserts` by key and deduplicates per-assert paths based on
+     *   `CharPath` equality.
+     *
+     * @return a characterizer containing the union of information from `this` and `that`.
+     */
     def ++(that: Characterizer): Characterizer = {
       val mergedAsserts = (this.asserts.toSeq ++ that.asserts.toSeq)
         .groupMapReduce(_._1)(_._2)(_ ++ _)
@@ -36,12 +48,32 @@ object PathBuilder {
       Characterizer(this.paths ++ that.paths, this.havocs ++ that.havocs, mergedAsserts)
     }
 
+    /**
+     * Apply a transformation to every path in `paths`.
+     *
+     * @param f the path transformation function
+     * @return a new characterizer with transformed top-level `paths`.
+     */
     def mapPaths(f: CharPath => CharPath): Characterizer =
       copy(paths = paths.map(f))
 
+    /**
+     * Add a freshly-introduced havoc variable to the global set.
+     *
+     * @param newVar the havoc variable to track
+     * @return a new characterizer with `newVar` included in `havocs`.
+     */
     def withHavoc(newVar: HavocVar): Characterizer =
       copy(havocs = havocs + newVar)
 
+    /**
+     * Add an assertion statement and a snapchat of the currently active paths to the characterizer.
+     * If an equivalent `assert` statement has already been seen, the new paths are appended in the map.
+     *
+     * @param assert the assertion statement, ideally an [[AssertStmt]]
+     * @param paths the paths active at the time the assertion is encountered.
+     * @return a new characterizer with the updated `asserts` mapping.
+     */
     def withAssert(assert: Stmt, paths: Seq[CharPath]): Characterizer = {
       val merged = asserts.getOrElse(assert, Seq.empty) ++ paths
       copy(asserts = asserts + (assert -> merged))
@@ -49,10 +81,13 @@ object PathBuilder {
   }
 
   object Characterizer {
+    /**
+     * The identity characterizer
+     */
     val empty: Characterizer = Characterizer(Seq(CharPath(BoolLit(true), Map.empty)), Set.empty, Map.empty)
   }
 
-  var genSymCounter: Int = 0
+  private var genSymCounter: Int = 0
 
   /**
    * Generates a unique symbol by appending a counter to a given string. Each time the function is called,
@@ -76,6 +111,7 @@ object PathBuilder {
    * @throws java.lang.RuntimeException if the program contains more than one
    *                                    method (feature not yet implemented)
    */
+  @deprecated("Not needed anymore – use the general method SyntacticEngine.verify")
   def characterizeLoopFreeProgram(program: HHLProgram): Characterizer = program.methods match {
     case Nil => Characterizer.empty
     case x :: Nil => characterizeStmt(x.body)
