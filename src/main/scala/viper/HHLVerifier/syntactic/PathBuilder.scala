@@ -102,9 +102,9 @@ object PathBuilder {
   }
 
   /**
-   * Derives a [[Characterizer]] for a '''loop-free''' [[HHLProgram]].
+   * Derives a [[Characterizer]] for a '''split-free''' [[HHLProgram]].
    *
-   * @param program a loop-free [[HHLProgram]] to analyze
+   * @param program a split-free [[HHLProgram]] to analyze
    * @return        a characterizer capturing all paths of a program. A characterizer is defined as
    *                a list of [[CharPath]]s, where each element of the list covers one path of the program.
    *                The characterizer itself then covers exactly all paths of the program.
@@ -112,17 +112,17 @@ object PathBuilder {
    *                                    method (feature not yet implemented)
    */
   @deprecated("Not needed anymore – use the general method SyntacticEngine.verify")
-  def characterizeLoopFreeProgram(program: HHLProgram): Characterizer = program.methods match {
+  def characterizeSplitFreeProgram(program: HHLProgram): Characterizer = program.methods match {
     case Nil => Characterizer.empty
     case x :: Nil => characterizeStmt(x.body)
     case _ => sys.error("Characterizer: Cannot yet handle multiple methods") // TODO: Add support
   }
 
   /**
-   * Derives a [[Characterizer]] for a '''loop-free''' [[Stmt]]. Recursively
+   * Derives a [[Characterizer]] for a '''split-free''' [[Stmt]]. Recursively
    * '''symbolically characterizes''' a single statement, yielding all feasible execution paths as [[CharPath]] objects.
    *
-   * @param stmt a loop-free [[Stmt]] to analyze
+   * @param stmt a split-free [[Stmt]] to analyze
    * @return        a characterizer capturing all paths of the statement. A characterizer is defined as
    *                a list of [[CharPath]]s, where each element of the list covers one path of the program.
    *                The characterizer itself then covers exactly all paths of the program.

@@ -5,6 +5,7 @@ import viper.HHLVerifier.ast._
 import PathBuilder._
 import viper.HHLVerifier.typing.StateType
 import viper.HHLVerifier.Main
+import viper.HHLVerifier.syntactic.handler.LoopRuleSelector
 import viper.HHLVerifier.syntactic.smt.{ParallelRunner, SMTStatus}
 
 import java.nio.file.{Files, Paths}
@@ -80,7 +81,7 @@ object SyntacticEngine {
       if (Main.logsActive) println("----------")
       if (Main.logsActive) println("Method \"" + method.mName + "\"")
 
-      val split = loopSplit(Triple(method.body, method.pre, method.post, "top-level"))
+      val split = structuralSplit(Triple(method.body, method.pre, method.post, "top-level"))
       //println(split)
 
       // Verifying all triples
@@ -95,7 +96,7 @@ object SyntacticEngine {
   }
 
   /**
-   * Verifies a loop-free hyper-triple by syntactically computing the weakest precondition
+   * Verifies a split-free hyper-triple by syntactically computing the weakest precondition
    * of the statement with respect to its postcondition and checking whether the precondition entails it.
    *
    * @param triple The hyper-triple consisting of a statement, preconditions, postconditions, and an optional name.
@@ -146,36 +147,53 @@ object SyntacticEngine {
   }
 
   /**
-   * Splits a hyper-triple into multiple loop-free hyper-triples according to the HHL proof rules.
+   * Splits a hyper-triple into multiple split-free hyper-triples according to the HHL proof rules.
    *
    * @param triple The hyper-triple to split.
-   * @return A sequence of triples corresponding to the decomposed program. If no loop is found,
+   * @return A sequence of triples corresponding to the decomposed program. If no split-point is found,
    *         returns the original triple.
    */
-  private def loopSplit(triple: Triple): Seq[Triple] = triple match {
+  private def structuralSplit(triple: Triple): Seq[Triple] = triple match {
     case Triple(stmt, pre, post, name) => {
       stmt match {
         case CompositeStmt(stmts) => {
-          val (before, loopAndAfter) = stmts.span {
+          val (before, targetAndAfter) = stmts.span {
+            case _: MethodCallStmt => false
             case _: WhileLoopStmt => false
+            case _: IfElseStmt => ??? // TODO: tbd
             case _ => true
           }
-          loopAndAfter match {
-            case (ws@WhileLoopStmt(_, _, _, _, _)) :: after => {
-              val ruleHandler = RuleSelector.select(ws)
+          targetAndAfter match {
+            // Handle while loop according to the corresponding loop rule
+            case (ws @ WhileLoopStmt(_, _, _, _, _)) :: after => {
+              val ruleHandler = LoopRuleSelector.select(ws)
               ruleHandler
                 .handle(ws, CompositeStmt(before), CompositeStmt(after), pre, post, name)
-                .flatMap(loopSplit)
+                .flatMap(structuralSplit)
             }
-            case _ => List(triple) // no loop found in stmt
+            // Handle a method call
+            case (mc @ MethodCallStmt(_, _)) :: after => {
+              ??? // TODO: tbd
+            }
+            // Handle an if-else statement
+            case (ifs @ IfElseStmt(_, _, _)):: after => {
+              ??? // TODO: tbd
+            }
+            // No split point found in sequence, just return the original triple
+            case _ => List(triple)
           }
         }
-        case IfElseStmt(_, ifStmt, elseStmt) => List(triple) // TODO: implement! Right now: Assuming it is loop-free
-        case ws@WhileLoopStmt(_, body, _, _, _) => {
-          val ruleHandler = RuleSelector.select(ws)
+        case IfElseStmt(cond, ifStmt, elseStmt) => {
+          ??? // TODO: tbd
+        }
+        case MethodCallStmt(methodName, args) => {
+          ??? // TODO: tbd
+        }
+        case ws@WhileLoopStmt(_, _, _, _, _) => {
+          val ruleHandler = LoopRuleSelector.select(ws)
           ruleHandler.handle(ws, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
         }
-        case _ => ???
+        case _ => List(triple)
       }
     }
   }

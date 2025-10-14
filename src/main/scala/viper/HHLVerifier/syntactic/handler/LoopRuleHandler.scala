@@ -1,12 +1,11 @@
-package viper.HHLVerifier.syntactic
+package viper.HHLVerifier.syntactic.handler
 
-import com.microsoft.z3.Status
 import viper.HHLVerifier.Main
 import viper.HHLVerifier.ast._
 import viper.HHLVerifier.syntactic.SyntacticEngine.Triple
-import viper.HHLVerifier.typing.StateType
 import viper.HHLVerifier.syntactic.WeakestPrecondition.desugarQuantifiers
 import viper.HHLVerifier.syntactic.smt.{ParallelRunner, SMTStatus}
+import viper.HHLVerifier.typing.StateType
 
 sealed trait LoopRuleHandler {
   /**
@@ -25,41 +24,12 @@ sealed trait LoopRuleHandler {
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple]
 }
 
-object LoopRuleHandler {
-  private var genSymCounter: Int = 0
-
-  def box(expr: Expr): Expr = {
-    val assertVar = AssertVar(genSym("_intState"))
-    Assertion("forall", List(AssertVarDecl(assertVar, StateType())),
-      ImpliesExpr(
-        StateExistsExpr(assertVar, false),
-        LookupExpr(assertVar, expr)))
-  }
-
-  def low(expr: Expr): Expr = {
-    val assertVar1 = AssertVar(genSym("_intState"))
-    val assertVar2 = AssertVar(genSym("_intState"))
-    //Assertion("forall", List(AssertVarDecl(assertVar1, StateType()), AssertVarDecl(assertVar2, StateType())), BinaryExpr(LookupExpr(assertVar1, expr), "==", LookupExpr(assertVar2, expr))) // TODO: right now, == operator is only defined for integers
-    Assertion("forall", List(AssertVarDecl(assertVar1, StateType()), AssertVarDecl(assertVar2, StateType())),
-      ImpliesExpr(
-        BinaryExpr(StateExistsExpr(assertVar1, false), "&&", StateExistsExpr(assertVar2, false)),
-        BinaryExpr(
-          BinaryExpr(LookupExpr(assertVar1, expr), "&&", LookupExpr(assertVar2, expr)), "||",
-          BinaryExpr(UnaryExpr("!", LookupExpr(assertVar1, expr)), "&&", UnaryExpr("!", LookupExpr(assertVar2, expr))))))
-  }
-
-  def genSym(s: String): String = {
-    genSymCounter += 1
-    s + "_" + genSymCounter
-  }
-}
-
 object ForallExistsHandler extends LoopRuleHandler {
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple] = loop match {
     case WhileLoopStmt(cond, body, inv, decr, rule) => {
       if (Main.logsActive) println("\tVerifying loop using \"forallExistsRule\"")
       val mappedInvariant = inv.map(_._2)
-      val loopPostcondition = BinaryExpr(computeLoopPost(mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x)))(cond), "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
+      val loopPostcondition = BinaryExpr(computeLoopPost(mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x)))(cond), "&&", LoopUtils.box(UnaryExpr("!", cond)))
 
       val triplePrefix = Triple(
         before,
@@ -107,10 +77,10 @@ object SyncHandler extends LoopRuleHandler {
       if (Main.logsActive) println("\tVerifying loop using \"syncRule\"")
       val mappedInvariant = inv.map(_._2)
       val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
-      val loopPostcondition = BinaryExpr(BinaryExpr(combinedInvariant, "||", LoopRuleHandler.box(BoolLit(false))), "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
+      val loopPostcondition = BinaryExpr(BinaryExpr(combinedInvariant, "||", LoopUtils.box(BoolLit(false))), "&&", LoopUtils.box(UnaryExpr("!", cond)))
 
       // check invariant I ⊨ low(b)
-      val result = ParallelRunner.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
+      val result = ParallelRunner.checkEntailment(combinedInvariant, LoopUtils.low(cond))
       if (result._1 != SMTStatus.Unsatisfiable) sys.error("SyncHandler: Tried to apply \"syncRule\", but invariant \"I ⊨ low(b)\" was violated.")
 
       val triplePrefix = Triple(
@@ -121,7 +91,7 @@ object SyncHandler extends LoopRuleHandler {
 
       val tripleBody = Triple(
         body,
-        List(BinaryExpr(combinedInvariant, "&&", LoopRuleHandler.box(cond))),
+        List(BinaryExpr(combinedInvariant, "&&", LoopUtils.box(cond))),
         mappedInvariant,
         name + " > [I ∧ □b] body [I]")
 
@@ -142,10 +112,10 @@ object SyncTotHandler extends LoopRuleHandler {
       if (Main.logsActive) println("\tVerifying loop using \"syncTotRule\"")
       val mappedInvariant = inv.map(_._2)
       val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
-      val loopPostcondition = BinaryExpr(combinedInvariant, "&&", LoopRuleHandler.box(UnaryExpr("!", cond)))
+      val loopPostcondition = BinaryExpr(combinedInvariant, "&&", LoopUtils.box(UnaryExpr("!", cond)))
 
       // check invariant I ⊨ low(b)
-      val result = ParallelRunner.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
+      val result = ParallelRunner.checkEntailment(combinedInvariant, LoopUtils.low(cond))
       if (result._1 != SMTStatus.Unsatisfiable) sys.error("SyncTotHandler: Tried to apply \"syncTotRule\", but invariant \"I ⊨ low(b)\" was violated.")
 
       // check termination property
@@ -159,14 +129,14 @@ object SyncTotHandler extends LoopRuleHandler {
         mappedInvariant,
         name + " > [P] prefix [I]")
 
-      val freshVar = Id(LoopRuleHandler.genSym("*t"))
+      val freshVar = Id(LoopUtils.genSym("*t"))
 
       val tripleBody = Triple(
         body,
-        List(BinaryExpr(combinedInvariant, "&&", LoopRuleHandler.box(
+        List(BinaryExpr(combinedInvariant, "&&", LoopUtils.box(
           BinaryExpr(cond, "&&", BinaryExpr(decr, "==", freshVar))
         ))),
-        List(BinaryExpr(combinedInvariant, "&&", LoopRuleHandler.box(
+        List(BinaryExpr(combinedInvariant, "&&", LoopUtils.box(
           BinaryExpr(BinaryExpr(decr, ">=", Num(0)), "&&", BinaryExpr(decr, "<", freshVar))
         ))),
         name + " > [I ∧ □b] body [I]")
@@ -208,7 +178,7 @@ object ExistsHandler extends LoopRuleHandler {
         mappedInvariant,
         name + " > [P] prefix [I]")
 
-      val freshVar = Id(LoopRuleHandler.genSym("*t"))
+      val freshVar = Id(LoopUtils.genSym("*t"))
       val existsPart = existsPartOpt.get
       val existsPartAssertVar = existsPart.assertVarDecls.head.vName
       val existsPartBody = existsPart.body match {
@@ -235,7 +205,7 @@ object ExistsHandler extends LoopRuleHandler {
 
       val tripleSuffix = Triple(
         after,
-        mappedInvariant.appended(LoopRuleHandler.box(UnaryExpr("!", cond))),
+        mappedInvariant.appended(LoopUtils.box(UnaryExpr("!", cond))),
         post,
         name + " > [I ∧ □(¬b)] suffix [Q]")
 
@@ -252,44 +222,6 @@ object ExistsHandler extends LoopRuleHandler {
     suffix match {
       case x :: xs => (Some(x.asInstanceOf[Assertion]), prefix ++ xs)
       case Nil => (None, inv)
-    }
-  }
-}
-
-object RuleSelector {
-  def select(loop: WhileLoopStmt): LoopRuleHandler = loop match {
-    case WhileLoopStmt(_, _, _, _, rule) => rule match {
-      case "syncRule" => SyncHandler
-      case "syncTotRule" => SyncTotHandler
-      case "forAllExistsRule" => ForallExistsHandler
-      case "existsRule" => ExistsHandler
-      case "desugaredRule" => sys.error("RuleSelector: \"desugaredRule\" is deprecated.")
-      case "unspecified" => autoRuleInference(loop)
-    }
-  }
-
-  private def autoRuleInference(loop: WhileLoopStmt): LoopRuleHandler = loop match {
-    case WhileLoopStmt(cond, body, inv, decr, rule) => {
-      val mappedInvariant = inv.map(_._2)
-      val combinedInvariant = mappedInvariant.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
-
-      // check invariant I ⊨ low(b)
-      val result = ParallelRunner.checkEntailment(combinedInvariant, LoopRuleHandler.low(cond))
-
-      if (result._1 == SMTStatus.Unsatisfiable) { // i.e. I ⊨ low(b) holds and we need a synchronized loop rule
-        if (decr.isDefined && SyncTotHandler.checkTerminationLoops(body)) {
-          SyncTotHandler
-        } else {
-          SyncHandler
-        }
-      }
-      else { // i.e. I ⊨ low(b) doesn't hold and we need a non-synchronized loop rule
-        if (decr.isDefined && ExistsHandler.extractFirstExists(mappedInvariant)._1.isDefined) {  // i.e. there is a decreases clause and the invariant contains an state exists assertion
-          ExistsHandler
-        } else {
-          ForallExistsHandler
-        }
-      }
     }
   }
 }
