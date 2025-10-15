@@ -19,7 +19,8 @@ sealed trait LoopRuleHandler {
    * @param post postcondition for the whole program `before | loop | after`
    * @param name human-readable name used for logging/reporting.
    * @return independent verification triples for the prefix, the loop body, and the suffix. The exact shape of the
-   *         triples depends on the applied loop rule.
+   *         triples depends on the applied loop rule. The first triple of the list always corresponds to the prefix
+   *         of the loop, whereas the last triple corresponds to the suffix of the loop.
    */
   def handle(loop: WhileLoopStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple]
 }

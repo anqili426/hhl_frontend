@@ -136,7 +136,6 @@ object PathBuilder {
     case AssignStmt(left, right) => acc.mapPaths {
       case CharPath(pc, subst) => CharPath(pc, subst + (left -> applySubstitution(right, subst)))
     }
-    case MultiAssignStmt(left, right) => ??? // TODO
     case IfElseStmt(cond, ifStmt, elseStmt) => {
       // Fold over all incoming paths and accumulate both paths and havoc-vars
       acc.paths.foldLeft(Characterizer(Seq.empty, acc.havocs, acc.asserts)) {
@@ -158,6 +157,7 @@ object PathBuilder {
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
     }
     case HyperAssumeStmt(e) => acc.mapPaths {
+      // TODO: Think about correct handling ==> needs to be treated in splitting?
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
     }
     case AssertStmt(e) => acc.mapPaths {
@@ -175,7 +175,7 @@ object PathBuilder {
       }
         .withHavoc(newVar)
     }
-    case WhileLoopStmt(_, _, _, _, _) => sys.error("Characterizer: Expected a loop-free program")
+    case _: WhileLoopStmt | _: MethodCallStmt | _: MultiAssignStmt => sys.error("Characterizer: Expected a split-free program")
     case _ => acc
   }
 
@@ -194,7 +194,7 @@ object PathBuilder {
     case BinaryExpr(e1, op, e2) => BinaryExpr(applySubstitution(e1, map), op, applySubstitution(e2, map))
     case UnaryExpr(op, e) => UnaryExpr(op, applySubstitution(e, map))
     case ImpliesExpr(left, right) => ImpliesExpr(applySubstitution(left, map), applySubstitution(right, map))
-    case MethodCallExpr(methodName, args) => ??? // TODO: For MultiAssignStmt
-    case _ => sys.error("Characterizer: Yet unsupported expression in substitution: " + expr.toString) // TODO: Check which other expressions could be assigned
+    case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, applySubstitution(body, map))
+    case _ => sys.error("PathBuilder: Yet unsupported expression in substitution: " + expr.toString) // TODO: Check which other expressions could be assigned
   }
 }

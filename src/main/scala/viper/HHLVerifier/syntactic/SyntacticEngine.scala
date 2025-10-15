@@ -5,7 +5,7 @@ import viper.HHLVerifier.ast._
 import PathBuilder._
 import viper.HHLVerifier.typing.StateType
 import viper.HHLVerifier.Main
-import viper.HHLVerifier.syntactic.handler.LoopRuleSelector
+import viper.HHLVerifier.syntactic.handler._
 import viper.HHLVerifier.syntactic.smt.{ParallelRunner, SMTStatus}
 
 import java.nio.file.{Files, Paths}
@@ -87,8 +87,8 @@ object SyntacticEngine {
       // Verifying all triples
       split match {
         case h +: t =>
-          verifyLoopFreeTriple(h, wpPlus = false)  // first triple without extended WP
-          t.foreach(tr => verifyLoopFreeTriple(tr, wpPlus = true))  // rest of the triples need extended WP
+          verifySplitFreeTriple(h, wpPlus = false)  // first triple without extended WP
+          t.foreach(tr => verifySplitFreeTriple(tr, wpPlus = true))  // rest of the triples need extended WP
       }
     }
     if (Main.outputPath != "unspecified") exportToSMT()
@@ -107,13 +107,13 @@ object SyntacticEngine {
    *         `false` otherwise.
    * @note Updates the global variable [[verificationResult]] accordingly as a side effect.
    */
-  private def verifyLoopFreeTriple(triple: Triple, wpPlus: Boolean): Boolean = triple match {
+  private def verifySplitFreeTriple(triple: Triple, wpPlus: Boolean): Boolean = triple match {
     case Triple(body, pre, post, name) => {
       val trueAssertion = Assertion("forall", List(AssertVarDecl(AssertVar("_s"), StateType())), ImpliesExpr(StateExistsExpr(AssertVar("_s"), false), BoolLit(true)))
       if (pre.isEmpty) {
-        verifyLoopFreeTriple(Triple(body, List(trueAssertion), post, name), wpPlus)
+        verifySplitFreeTriple(Triple(body, List(trueAssertion), post, name), wpPlus)
       } else if (post.isEmpty) {
-        verifyLoopFreeTriple(Triple(body, pre, List(trueAssertion), name), wpPlus)
+        verifySplitFreeTriple(Triple(body, pre, List(trueAssertion), name), wpPlus)
       } else {
         val characterizer: Characterizer = PathBuilder.characterizeStmt(body)
         if (Main.debugLogsActive) println("Characterizer: " + characterizer)
@@ -147,6 +147,21 @@ object SyntacticEngine {
   }
 
   /**
+   * Decide whether a statement must be split and in further consequence be accordingly transformed by a handler.
+   *
+   * @param stmt the statement on which the check should be performed
+   * @return `true` iff a split is necessary for this statement
+   */
+  def hasStructuralSplit(s: Stmt): Boolean = s match {
+    case CompositeStmt(xs) => xs.exists(hasStructuralSplit)
+    case _: WhileLoopStmt => true
+    case _: MethodCallStmt => true
+    case _: MultiAssignStmt => true
+    case IfElseStmt(_, ifStmt, elseStmt) => hasStructuralSplit(ifStmt) || hasStructuralSplit(elseStmt)
+    case _ => false
+  }
+
+  /**
    * Splits a hyper-triple into multiple split-free hyper-triples according to the HHL proof rules.
    *
    * @param triple The hyper-triple to split.
@@ -157,12 +172,7 @@ object SyntacticEngine {
     case Triple(stmt, pre, post, name) => {
       stmt match {
         case CompositeStmt(stmts) => {
-          val (before, targetAndAfter) = stmts.span {
-            case _: MethodCallStmt => false
-            case _: WhileLoopStmt => false
-            case _: IfElseStmt => ??? // TODO: tbd
-            case _ => true
-          }
+          val (before, targetAndAfter) = stmts.span(!hasStructuralSplit(_))
           targetAndAfter match {
             // Handle while loop according to the corresponding loop rule
             case (ws @ WhileLoopStmt(_, _, _, _, _)) :: after => {
@@ -172,26 +182,32 @@ object SyntacticEngine {
                 .flatMap(structuralSplit)
             }
             // Handle a method call
-            case (mc @ MethodCallStmt(_, _)) :: after => {
-              ??? // TODO: tbd
+            case (call @ (MethodCallStmt(_, _) | MultiAssignStmt(_, _))) :: after => {
+              MethodCallHandler
+                .handle(call, CompositeStmt(before), CompositeStmt(after), pre, post, name)
+                .flatMap(structuralSplit)
             }
             // Handle an if-else statement
-            case (ifs @ IfElseStmt(_, _, _)):: after => {
+            case (ifs @ IfElseStmt(_, _, _)) :: after => {
               ??? // TODO: tbd
             }
             // No split point found in sequence, just return the original triple
             case _ => List(triple)
           }
         }
-        case IfElseStmt(cond, ifStmt, elseStmt) => {
+        case IfElseStmt(_, _, _) => {
           ??? // TODO: tbd
         }
-        case MethodCallStmt(methodName, args) => {
-          ??? // TODO: tbd
+        case MethodCallStmt(_, _) | MultiAssignStmt(_, _) => {
+          MethodCallHandler
+            .handle(stmt, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
+            .flatMap(structuralSplit)
         }
         case ws@WhileLoopStmt(_, _, _, _, _) => {
           val ruleHandler = LoopRuleSelector.select(ws)
-          ruleHandler.handle(ws, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
+          ruleHandler
+            .handle(ws, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
+            .flatMap(structuralSplit)
         }
         case _ => List(triple)
       }
