@@ -33,7 +33,7 @@ object PrettyPrinter {
         // If statement, creates condition and executable statement
         // May include else statement
         val ifStmtStr = "if ( " + formatExpr(cond) + " ) {\n" + formatStmt(ifStmt) + "\n}"
-        val elseStmtStr = if (elseStmt.stmts.nonEmpty) "" else " else {\n" + formatStmt(elseStmt) + "\n}"
+        val elseStmtStr = if (elseStmt.stmts.isEmpty) "" else " else {\n" + formatStmt(elseStmt) + "\n}"
         ifStmtStr + elseStmtStr
       case WhileLoopStmt(cond, body, inv, decr, rule) =>
         // While Statement, includes (possibly) specified rule, condition, invariant, variant, body
