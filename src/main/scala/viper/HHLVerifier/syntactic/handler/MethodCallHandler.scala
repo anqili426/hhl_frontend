@@ -13,7 +13,6 @@ object MethodCallHandler {
 
       val paramSub: Map[Id, Id] = method.params.zip(params).toMap
       val resSub: Map[Id, Id] = method.res.zip(res).toMap
-      // TODO: Handle cases like y := f(y) ==> is this even allowed?
       val postSubstMap = paramSub ++ resSub
 
       val methodPreMapped = method.pre.map(PathBuilder.applySubstitution(_, paramSub))

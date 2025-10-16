@@ -82,7 +82,7 @@ object SyntacticEngine {
       if (Main.logsActive) println("Method \"" + method.mName + "\"")
 
       val split = structuralSplit(Triple(method.body, method.pre, method.post, "top-level"))
-      //println(split)
+      if (Main.debugLogsActive) println("Split: " + split)
 
       // Verifying all triples
       split match {
@@ -132,7 +132,7 @@ object SyntacticEngine {
             false
           }
           case SMTStatus.Unsatisfiable => {
-            if (Main.logsActive) println(f"\t${result._2} > Valid ($name): Precondition implies WP.")
+            if (Main.logsActive) println(f"\t${result._2} > Valid ($name): Precondition entails WP.")
             if (verificationResult != 1) verificationResult = 2
             true
           }
@@ -189,21 +189,24 @@ object SyntacticEngine {
             }
             // Handle an if-else statement
             case (ifs @ IfElseStmt(_, _, _)) :: after => {
-              ??? // TODO: tbd
+              IfElseHandler
+                .handle(ifs, CompositeStmt(before), CompositeStmt(after), pre, post, name)
+                .flatMap(structuralSplit)
             }
             // No split point found in sequence, just return the original triple
             case _ => List(triple)
           }
         }
-        case IfElseStmt(_, _, _) => {
-          ??? // TODO: tbd
+        case ifs @ IfElseStmt(_, _, _) => {
+          IfElseHandler
+            .handle(ifs, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
         }
         case MethodCallStmt(_, _) | MultiAssignStmt(_, _) => {
           MethodCallHandler
             .handle(stmt, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
             .flatMap(structuralSplit)
         }
-        case ws@WhileLoopStmt(_, _, _, _, _) => {
+        case ws @ WhileLoopStmt(_, _, _, _, _) => {
           val ruleHandler = LoopRuleSelector.select(ws)
           ruleHandler
             .handle(ws, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
