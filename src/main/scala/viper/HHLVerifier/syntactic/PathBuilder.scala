@@ -194,7 +194,6 @@ object PathBuilder {
     case BinaryExpr(e1, op, e2) => BinaryExpr(applySubstitution(e1, map), op, applySubstitution(e2, map))
     case UnaryExpr(op, e) => UnaryExpr(op, applySubstitution(e, map))
     case ImpliesExpr(left, right) => ImpliesExpr(applySubstitution(left, map), applySubstitution(right, map))
-    case Assertion(quantifier, assertVarDecls, body) => Assertion(quantifier, assertVarDecls, applySubstitution(body, map))
     case _ => sys.error("PathBuilder: Yet unsupported expression in substitution: " + expr.toString) // TODO: Check which other expressions could be assigned
   }
 }
