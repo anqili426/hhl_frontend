@@ -39,11 +39,30 @@ class Z3Backend extends SMTBackend {
    * array constants of sort [[StateSort]]. Populated on the fly when encountering state variables in hyper-assertions. */
   private val stateEnv: mutable.Map[String, ArrayExpr[IntSort, IntSort]] = mutable.Map.empty[String, ArrayExpr[IntSort, IntSort]]
 
-  def generateSMTEncoding(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): Unit = {
+  def addToGlobalSMTPool(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): Unit = {
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
     val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
     val translatedImp = ctx.mkImplies(z3Pre, z3WP).translate(SyntacticEngine.exportCtx).asInstanceOf[BoolExpr]
     SyntacticEngine.addConstraint(translatedImp)
+  }
+
+  def generateSingleSMTEncoding(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): String = {
+    val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
+    val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
+
+    val solver = ctx.mkSolver()
+    val p = ctx.mkParams()
+    p.add("timeout", Main.smtSolverTimeLimitMs)
+    solver.setParameters(p)
+
+    val negImp = ctx.mkNot(ctx.mkImplies(z3Pre, z3WP))
+    solver.add(negImp)
+
+    val sb = new StringBuilder
+    sb.append("(set-logic ALL)\n") // for CVC5
+    sb.append(solver.toString)
+    sb.append("\n(check-sat)\n(exit)\n")
+    sb.toString
   }
 
   def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): SMTStatus = {
@@ -55,7 +74,7 @@ class Z3Backend extends SMTBackend {
     // solve ¬(pre ⇒ wp)
     val solver = ctx.mkSolver(/*"AUFLIA"*/)
     val p = ctx.mkParams()
-    p.add("timeout", Main.smtSolverTimeLimitMs) // 20s timeout
+    p.add("timeout", Main.smtSolverTimeLimitMs)
     solver.setParameters(p)
     solver.add(z3FinalFormula)
 

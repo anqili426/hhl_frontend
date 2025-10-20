@@ -31,6 +31,7 @@ object SMTStatus {
 sealed trait BackendMode
 object BackendMode {
   case object Z3 extends BackendMode
-  case object CVC5 extends BackendMode
+  case object CVC5 extends BackendMode // native CVC5 Java API
+  case object CVC5Proc extends BackendMode // Run CVC5 on an .smt2 file
   case object Both extends BackendMode
 }

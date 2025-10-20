@@ -4,6 +4,8 @@ import viper.HHLVerifier.Main
 import viper.HHLVerifier.ast._
 
 import java.util.concurrent.{Callable, ExecutorCompletionService, Executors, Future, ThreadFactory, TimeUnit}
+import java.nio.file.{Files, Path}
+import scala.sys.process._
 import scala.util.control.NonFatal
 
 object ParallelRunner {
@@ -12,7 +14,7 @@ object ParallelRunner {
   def checkEntailment(pre: Expr, wp: Expr, mode: BackendMode = Main.smtBackendMode, toBeExported: Boolean = false): (SMTStatus, BackendMode) = {
     if (toBeExported && Main.outputPath != "unspecified") {
       val z3 = new Z3Backend
-      z3.generateSMTEncoding(pre, wp)
+      z3.addToGlobalSMTPool(pre, wp)
     }
     mode match {
       case BackendMode.Z3 => {
@@ -22,6 +24,9 @@ object ParallelRunner {
       case BackendMode.CVC5 => {
         val cvc5 = new CVC5Backend
         (cvc5.checkEntailment(pre, wp), BackendMode.CVC5)
+      }
+      case BackendMode.CVC5Proc => {
+        (runCVC5Process(pre, wp), BackendMode.CVC5Proc)
       }
       case BackendMode.Both => {
         val daemonFactory = new ThreadFactory {
@@ -90,6 +95,45 @@ object ParallelRunner {
           executor.shutdownNow()
         }
       }
+    }
+  }
+
+  private def runCVC5Process(pre: Expr, wp: Expr): SMTStatus = {
+    val z3 = new Z3Backend
+    val smtEncoding = z3.generateSingleSMTEncoding(pre, wp)
+
+    val tmpPath: Path = Files.createTempFile("hhl-entailment-", ".smt2")
+    Files.write(tmpPath, smtEncoding.getBytes)
+
+    try {
+      val cmd = Seq(
+        Main.cvc5Path,
+        "--lang", "smt2",
+        "--tlimit-per=" + Main.smtSolverTimeLimitMs.toString,
+        tmpPath.toString
+      )
+
+      val out = new StringBuilder
+      val err = new StringBuilder
+
+      cmd.!(ProcessLogger(o => out.append(o).append('\n'), e => err.append(e).append('\n')))
+
+      val firstLine = out
+        .toString
+        .split("\\R")
+        .iterator
+        .map(_.trim)
+        .find(_.nonEmpty)
+        .getOrElse("")
+
+      firstLine match {
+        case "sat" => SMTStatus.Satisfiable
+        case "unsat" => SMTStatus.Unsatisfiable
+        case "unknown" => SMTStatus.Unknown
+        case _ => sys.error(err.toString)
+      }
+    } finally {
+      if (!Main.keepSmtFiles) Files.deleteIfExists(tmpPath)
     }
   }
 

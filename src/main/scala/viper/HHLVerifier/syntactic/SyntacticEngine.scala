@@ -198,8 +198,13 @@ object SyntacticEngine {
           }
         }
         case ifs @ IfElseStmt(_, _, _) => {
-          IfElseHandler
-            .handle(ifs, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
+          if (hasStructuralSplit(ifs)) {
+            IfElseHandler
+              .handle(ifs, CompositeStmt(Nil), CompositeStmt(Nil), pre, post, name)
+              .flatMap(structuralSplit)
+          } else {
+            List(triple)
+          }
         }
         case MethodCallStmt(_, _) | MultiAssignStmt(_, _) => {
           MethodCallHandler

@@ -9,6 +9,7 @@ import viper.HHLVerifier.symbols.SymbolChecker
 import viper.HHLVerifier.typing.TypeChecker
 import viper.HHLVerifier.syntactic.SyntacticEngine
 import viper.HHLVerifier.syntactic.smt.BackendMode
+import viper.HHLVerifier.syntactic.smt.BackendMode.CVC5Proc
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
@@ -30,6 +31,8 @@ object Main {
   var outputPath = "unspecified"
   var smtBackendMode: BackendMode = BackendMode.Z3 // standard SMT solver that is used in syntactic mode (if the argument "--smtmode" is set, this will be overridden)
   val smtSolverTimeLimitMs = 20000
+  var cvc5Path: String = "cvc5"
+  var keepSmtFiles: Boolean = false
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -68,6 +71,7 @@ object Main {
         case "z3" | "Z3" => smtBackendMode = BackendMode.Z3
         case "cvc5" | "CVC5" => smtBackendMode = BackendMode.CVC5
         case "both" => smtBackendMode = BackendMode.Both
+        case "cvc5-proc" | "CVC5-proc" => smtBackendMode = CVC5Proc
         case _ => throw new Logger("Unknown SMT backend mode, choose either \"z3\", \"cvc5\" or \"both\" (default).", Logger.ERR)
       }
     }
