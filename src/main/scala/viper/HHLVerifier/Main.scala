@@ -30,9 +30,10 @@ object Main {
   var syntactic = false
   var outputPath = "unspecified"
   var smtBackendMode: BackendMode = BackendMode.Z3 // standard SMT solver that is used in syntactic mode (if the argument "--smtmode" is set, this will be overridden)
+  val smtRaceModes: (BackendMode, BackendMode) = (BackendMode.Z3, BackendMode.CVC5Proc) // SMT modes that are being run in parallel, if parallel mode is set
   val smtSolverTimeLimitMs = 20000
-  var cvc5Path: String = "cvc5"
-  var keepSmtFiles: Boolean = false
+  val cvc5Path: String = "cvc5"
+  val keepSmtFiles: Boolean = false
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
