@@ -1,6 +1,7 @@
 package viper.HHLVerifier.syntactic.handler
 
 import viper.HHLVerifier.ast._
+import viper.HHLVerifier.syntactic.PathBuilder.{CharPath, Characterizer}
 import viper.HHLVerifier.syntactic.SyntacticEngine.Triple
 import viper.HHLVerifier.syntactic.{SyntacticEngine, WeakestPrecondition}
 import viper.HHLVerifier.typing.StateType
@@ -41,8 +42,14 @@ object IfElseHandler {
         case CompositeStmt(xs) => CompositeStmt(blockSuffix.toSeq ++ xs)
       }
 
-      // TODO: Can we incorporate the branch condition here? Would make it weaker
-      val blockPre = thenPre ++ elsePre
+      // We use the WP construction to include the branch condition into the precondition, for which we need a characterizer
+      val characterizerThen = Characterizer(Seq(CharPath(cond, Map.empty)))
+      val characterizerElse = Characterizer(Seq(CharPath(UnaryExpr("!", cond), Map.empty)))
+
+      val blockPre = Seq(
+        WeakestPrecondition.compute(characterizerThen, thenPre, false),
+        WeakestPrecondition.compute(characterizerElse, elsePre, false)
+      )
 
       // TODO: This needs to be generalized: How can we do it for arbitrary postconditions? Right now only forall quantified...
       val blockPost = constructCombinedPostcondition(thenPost, elsePost)

@@ -82,6 +82,12 @@ object PathBuilder {
 
   object Characterizer {
     /**
+     * Convenience constructor: only `paths`; `havocs` and `asserts` are empty.
+     */
+    def apply(paths: Seq[CharPath]): Characterizer =
+      new Characterizer(paths, Set.empty, Map.empty)
+
+    /**
      * The identity characterizer
      */
     val empty: Characterizer = Characterizer(Seq(CharPath(BoolLit(true), Map.empty)), Set.empty, Map.empty)

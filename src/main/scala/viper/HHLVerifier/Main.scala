@@ -29,10 +29,10 @@ object Main {
   var debugLogsActive = false // extensive logs for debugging in syntactic mode
   var syntactic = false
   var outputPath = "unspecified"
-  var smtBackendMode: BackendMode = BackendMode.Z3 // standard SMT solver that is used in syntactic mode (if the argument "--smtmode" is set, this will be overridden)
-  val smtRaceModes: (BackendMode, BackendMode) = (BackendMode.Z3, BackendMode.CVC5Proc) // SMT modes that are being run in parallel, if parallel mode is set
+  var smtBackendMode: BackendMode = BackendMode.Both // standard SMT solver mode that is used in syntactic mode (if the argument "--smtmode" is set, this will be overridden)
+  val smtRaceModes: (BackendMode, BackendMode) = (BackendMode.Z3, BackendMode.CVC5Proc) // SMT modes that are being run in parallel, if smt mode "Both" is set
   val smtSolverTimeLimitMs = 20000
-  val cvc5Path: String = "cvc5"
+  val cvc5Path: String = "cvc5" // executable path of local cvc5 installation (usually just "cvc5") ==> needed for smt mode "CVC5Proc"
   val keepSmtFiles: Boolean = false
 
   def main(args: Array[String]): Unit = {
@@ -73,7 +73,7 @@ object Main {
         case "cvc5" | "CVC5" => smtBackendMode = BackendMode.CVC5
         case "both" => smtBackendMode = BackendMode.Both
         case "cvc5-proc" | "CVC5-proc" => smtBackendMode = CVC5Proc
-        case _ => throw new Logger("Unknown SMT backend mode, choose either \"z3\", \"cvc5\" or \"both\" (default).", Logger.ERR)
+        case _ => throw new Logger("Unknown SMT backend mode, choose either \"z3\", \"cvc5\", \"cvc5-proc\" or \"both\" (default).", Logger.ERR)
       }
     }
 
