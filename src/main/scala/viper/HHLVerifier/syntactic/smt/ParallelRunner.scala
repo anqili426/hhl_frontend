@@ -72,7 +72,7 @@ object ParallelRunner {
       first._1 match {
         case SMTStatus.Satisfiable | SMTStatus.Unsatisfiable => {
           // We have a clear result, cancel the other
-          cancelOther(first._2, mode1Future, mode2Future)
+          cancelOther(first._2, mode1, mode1Future, mode2, mode2Future)
           first
         }
         case SMTStatus.Unknown => {
@@ -86,7 +86,7 @@ object ParallelRunner {
           second._1 match {
             case SMTStatus.Satisfiable | SMTStatus.Unsatisfiable => {
               // We have a clear result, cancel the other
-              cancelOther(second._2, mode1Future, mode2Future)
+              cancelOther(second._2, mode1, mode1Future, mode2, mode2Future)
               second
             }
             case SMTStatus.Unknown => (SMTStatus.Unknown, BackendMode.Both)
@@ -114,9 +114,18 @@ object ParallelRunner {
     }
   }
 
-  private def cancelOther(winner: BackendMode, z3Future: Future[(SMTStatus, BackendMode)], cvc5Future: Future[(SMTStatus, BackendMode)]): Unit = winner match {
-    case BackendMode.Z3 => if (cvc5Future != null) cvc5Future.cancel(true)
-    case BackendMode.CVC5 => if (z3Future != null) z3Future.cancel(true)
+  private def cancelOther(winner: BackendMode,
+                          mode1: BackendMode, mode1Future: Future[(SMTStatus, BackendMode)],
+                          mode2: BackendMode, mode2Future: Future[(SMTStatus, BackendMode)]): Unit = {
+    if (winner == mode1) {
+      if (mode2Future != null) mode2Future.cancel(true)
+    } else if (winner == mode2) {
+      if (mode1Future != null) mode1Future.cancel(true)
+    } else {
+      // Shouldn't happen, but better safe than sorry
+      if (mode1Future != null) mode1Future.cancel(true)
+      if (mode2Future != null) mode2Future.cancel(true)
+    }
   }
 
   def resolveLookup(expr: Expr)(implicit assertVar: AssertVar): Expr = expr match {
