@@ -17,7 +17,7 @@ class CVC5ProcBackend extends SMTBackend {
       val cmd = Seq(
         Main.cvc5Path,
         "--lang", "smt2",
-        "--tlimit-per=" + Main.smtSolverTimeLimitMs.toString,
+        "--tlimit=" + Main.smtSolverTimeLimitMs.toString,
         tmpPath.toString
       )
 
@@ -38,7 +38,7 @@ class CVC5ProcBackend extends SMTBackend {
         case "sat" => SMTStatus.Satisfiable
         case "unsat" => SMTStatus.Unsatisfiable
         case "unknown" => SMTStatus.Unknown
-        case _ => sys.error(err.toString)
+        case _ => SMTStatus.Unknown
       }
     } finally {
       if (!Main.keepSmtFiles) Files.deleteIfExists(tmpPath)
