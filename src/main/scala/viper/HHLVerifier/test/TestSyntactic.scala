@@ -1,13 +1,13 @@
 package viper.HHLVerifier.test
 
-import viper.HHLVerifier.Main
 import au.com.bytecode.opencsv.CSVWriter
+import viper.HHLVerifier.Main
 import viper.HHLVerifier.parsing.Parser
 
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.jdk.CollectionConverters._
 
-object Test {
+object TestSyntactic {
   var failedForAll: List[String] = List.empty
   var failedExists: List[String] = List.empty
   var failedOther: List[String] = List.empty
@@ -19,6 +19,7 @@ object Test {
   val otherKeyword = List("assume", "assert", "while", "if", "else", "}", "{", "havoc")
   val commentKeyword = List("//", "/*") // The current implementation doesn't support the counting of block comments
   val defaultNumOfRep = 1
+  val smtMode = "z3"
 
   def partOfCurrStmt(lineInd: Int, allNonemptyLines: Array[String]): Boolean = {
 
@@ -88,7 +89,8 @@ object Test {
       totalNum = totalNum + 1
       val LOCData = getDataForTestCase(f.getPath)
       print(f)
-      val argsForMain = Array(f.getPath, option, "--auto")
+      val argsForMain = Array(f.getPath, option, "--auto", "--syntactic", "--smtmode", smtMode)
+      Main.timeStamps = Array.fill(5)(List.empty[Long]) // reset timestamps
       Main.test = true
       Main.logsActive = false
       Main.main(argsForMain)
@@ -106,11 +108,39 @@ object Test {
         res = "Passed"
       }
 
-      val data = Array(f.getPath, option, Main.runtime.toString, res) ++ LOCData.map(i => i.toString)
+      // compute timestamps
+      val durationCharacterizer = computeAverageDurationMs(Main.timeStamps(0), Main.timeStamps(1))
+      val durationWP = computeAverageDurationMs(Main.timeStamps(1), Main.timeStamps(2))
+      val durationSMTEncoding = computeAverageDurationMs(Main.timeStamps(2), Main.timeStamps(3))
+      val durationSMTSolver = computeAverageDurationMs(Main.timeStamps(3), Main.timeStamps(4))
+
+      val data = Array(
+        f.getPath,
+        smtMode,
+        Main.runtime.toString,
+        durationCharacterizer,
+        durationWP,
+        durationSMTEncoding,
+        durationSMTSolver,
+        res
+      ) ++ LOCData.map(i => i.toString)
       allData = allData :+ data
       Thread.sleep(5000)
     }
     allData
+  }
+
+  def computeAverageDurationMs(ts1: List[Long], ts2: List[Long]): String = {
+    assert(ts1.length == ts2.length)
+    if (ts1.isEmpty) {
+      return "NaN"
+    }
+    val sumNano = ts1
+      .zip(ts2)
+      .map(x => x._2 - x._1)
+      .sum
+    val avgNano = sumNano / ts1.length
+    (avgNano / 1E9).toString
   }
 
   def main(args: Array[String]): Unit = {
@@ -128,26 +158,26 @@ object Test {
     val pathOfForAllExistsTests = "src/test/evaluation/forall-exists"
     val pathOfExistsForAllTests = "src/test/evaluation/exists-forall"
     val pathOfErrorTests = "src/test/evaluation/errors/hypra"
-    val pathOfTypeTests = "src/test/evaluation/types/hypra"
+    //val pathOfTypeTests = "src/test/evaluation/types/hypra"
 
     val forAllTests = getListOfFiles(pathOfForAllTests)
     val existsTests = getListOfFiles(pathOfExistsTests)
     val forAllExistsTests = getListOfFiles(pathOfForAllExistsTests)
     val existsForAllTests = getListOfFiles(pathOfExistsForAllTests)
     val errorTests = getListOfFiles(pathOfErrorTests)
-    val typeTests = getListOfFiles(pathOfTypeTests)
+    //val typeTests = getListOfFiles(pathOfTypeTests)
 
     var i = 0
     for (i <- 0 to numOfRep - 1) {
       println("Evaluation No. " + i + " starts")
 
       var allTestData: List[Array[String]] = List.empty
-      allTestData = allTestData ++ runTests(forAllTests, "--forall")
+      allTestData = allTestData ++ runTests(forAllTests, "")
       allTestData = allTestData ++ runTests(existsTests, "")
       allTestData = allTestData ++ runTests(forAllExistsTests, "")
       allTestData = allTestData ++ runTests(existsForAllTests, "")
       allTestData = allTestData ++ runTests(errorTests, "")
-      allTestData = allTestData ++ runTests(typeTests, "")
+      //allTestData = allTestData ++ runTests(typeTests, "")
       val failedNum = failedForAll.length + failedExists.length + failedOther.length
 
       println("---------------------")
@@ -166,7 +196,7 @@ object Test {
       val outputFilePath = "src/test/evaluation/output" + i + ".csv"
       val outputFile = new BufferedWriter(new FileWriter(outputFilePath))
       val csvWriter = new CSVWriter(outputFile)
-      val schema = Array("Test case name", "Option", "Runtime (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC")
+      val schema = Array("Test case name", "SMT mode", "Runtime total (s)", "Runtime Characterizer avg (s)", "Runtime WP avg (s)", "Runtime SMT encoding avg (s)", "Runtime SMT solving avg (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC")
       val dataToWrite = List(schema) ++ allTestData
       csvWriter.writeAll(dataToWrite.map(_.toArray).asJava)
       outputFile.close()

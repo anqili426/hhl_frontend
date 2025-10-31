@@ -9,8 +9,6 @@ import viper.HHLVerifier.syntactic.handler._
 import viper.HHLVerifier.syntactic.smt.{ParallelRunner, SMTStatus}
 
 import java.nio.file.{Files, Paths}
-import scala.collection.immutable.{AbstractSeq, LinearSeq}
-import scala.xml.NodeSeq
 
 object SyntacticEngine {
 
@@ -115,15 +113,20 @@ object SyntacticEngine {
       } else if (post.isEmpty) {
         verifySplitFreeTriple(Triple(body, pre, List(trueAssertion), name), wpPlus)
       } else {
+        Main.timeStamps(0) = Main.timeStamps(0).appended(System.nanoTime()) // timestamp start of triple
         val characterizer: Characterizer = PathBuilder.characterizeStmt(body)
+        Main.timeStamps(1) = Main.timeStamps(1).appended(System.nanoTime()) // timestamp after characterizer
         if (Main.debugLogsActive) println("Characterizer: " + characterizer)
         if (Main.debugLogsActive) println("#paths: " + characterizer.paths.length)
+
         val weakestPrecondition: viper.HHLVerifier.ast.Expr = WeakestPrecondition.compute(characterizer, post, wpPlus)
+        Main.timeStamps(2) = Main.timeStamps(2).appended(System.nanoTime()) // timestamp after WP
         val combinedPrecondition: viper.HHLVerifier.ast.Expr = pre.reduceLeft((acc, x) => BinaryExpr(acc, "&&", x))
         if (Main.debugLogsActive) println("Pre: " + combinedPrecondition)
         if (Main.debugLogsActive) println("WP: " + weakestPrecondition)
 
         val result = ParallelRunner.checkEntailment(combinedPrecondition, weakestPrecondition, toBeExported = true)
+        Main.timeStamps(4) = Main.timeStamps(4).appended(System.nanoTime()) // timestamp after SMT solving
 
         result._1 match {
           case SMTStatus.Satisfiable => {

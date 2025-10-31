@@ -19,23 +19,23 @@ object ParallelRunner {
     mode match {
       case BackendMode.Z3 => {
         val z3 = new Z3Backend
-        (z3.checkEntailment(pre, wp), BackendMode.Z3)
+        (z3.checkEntailment(pre, wp, toBeExported), BackendMode.Z3)
       }
       case BackendMode.CVC5 => {
         val cvc5 = new CVC5Backend
-        (cvc5.checkEntailment(pre, wp), BackendMode.CVC5)
+        (cvc5.checkEntailment(pre, wp, toBeExported), BackendMode.CVC5)
       }
       case BackendMode.CVC5Proc => {
         val cvc5proc = new CVC5ProcBackend
-        (cvc5proc.checkEntailment(pre, wp), BackendMode.CVC5Proc)
+        (cvc5proc.checkEntailment(pre, wp, toBeExported), BackendMode.CVC5Proc)
       }
       case BackendMode.Both => {
-        race(pre, wp, Main.smtRaceModes._1, Main.smtRaceModes._2)
+        race(pre, wp, Main.smtRaceModes._1, Main.smtRaceModes._2, toBeExported)
       }
     }
   }
 
-  private def race(pre: Expr, wp: Expr, mode1: BackendMode, mode2: BackendMode): (SMTStatus, BackendMode) = {
+  private def race(pre: Expr, wp: Expr, mode1: BackendMode, mode2: BackendMode, usedForEval: Boolean = false): (SMTStatus, BackendMode) = {
     val daemonFactory = new ThreadFactory {
       private val d = Executors.defaultThreadFactory()
       override def newThread(r: Runnable): Thread = {
@@ -55,8 +55,8 @@ object ParallelRunner {
     def remainingNs: Long = Math.max(0L, deadlineNs - System.nanoTime())
 
     try {
-      mode1Future = executorService.submit(runOne(pre, wp, mode1))
-      mode2Future = executorService.submit(runOne(pre, wp, mode2))
+      mode1Future = executorService.submit(runOne(pre, wp, mode1, usedForEval))
+      mode2Future = executorService.submit(runOne(pre, wp, mode2, usedForEval))
 
       // Get first completed result (could be unknown)
       val firstFuture = executorService.poll(remainingNs, TimeUnit.NANOSECONDS)
@@ -103,14 +103,14 @@ object ParallelRunner {
     }
   }
 
-  private def runOne(pre: Expr, wp: Expr, mode: BackendMode): Callable[(SMTStatus, BackendMode)] = {
+  private def runOne(pre: Expr, wp: Expr, mode: BackendMode, usedForEval: Boolean = false): Callable[(SMTStatus, BackendMode)] = {
     () => {
       val backend = mode match {
         case BackendMode.Z3 => new Z3Backend
         case BackendMode.CVC5 => new CVC5Backend
         case BackendMode.CVC5Proc => new CVC5ProcBackend
       }
-      (backend.checkEntailment(pre, wp), mode)
+      (backend.checkEntailment(pre, wp, usedForEval), mode)
     }
   }
 

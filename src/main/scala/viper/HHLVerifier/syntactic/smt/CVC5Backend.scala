@@ -45,10 +45,12 @@ class CVC5Backend extends SMTBackend {
     constEnv.getOrElseUpdate(s, tm.mkConst(IntSort, s))
   }
 
-  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): SMTStatus = {
+  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, usedForEval: Boolean = false): SMTStatus = {
     val cvc5Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))(VarEnv.empty)
     val cvc5WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))(VarEnv.empty)
     val cvc5FinalFormula = tm.mkTerm(Kind.NOT, tm.mkTerm(Kind.IMPLIES, cvc5Pre, cvc5WP))
+
+    if (usedForEval) Main.timeStamps(3) = Main.timeStamps(3).appended(System.nanoTime()) // timestamp after SMT encoding
 
     // solve ¬(pre ⇒ wp)
     solver.setOption("tlimit-per", Main.smtSolverTimeLimitMs.toString)

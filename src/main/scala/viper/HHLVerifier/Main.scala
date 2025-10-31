@@ -9,12 +9,9 @@ import viper.HHLVerifier.symbols.SymbolChecker
 import viper.HHLVerifier.typing.TypeChecker
 import viper.HHLVerifier.syntactic.SyntacticEngine
 import viper.HHLVerifier.syntactic.smt.BackendMode
-import viper.HHLVerifier.syntactic.smt.BackendMode.CVC5Proc
 
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
-
-import scala.collection.mutable
 
 /** Main Method */
 object Main {
@@ -22,6 +19,7 @@ object Main {
   // [DOC] Variables
   var verified = 0  // 0: unknown, 1: failure, 2: success
   var runtime = 0.0
+  var timeStamps: Array[List[Long]] = Array.fill(5)(List.empty[Long]) // timestamps to compute the duration of each syntactic step in evaluation
   var test = false
   var testWithLogs = false
   var errMessages: Seq[String] = Seq("")
@@ -33,7 +31,7 @@ object Main {
   val smtRaceModes: (BackendMode, BackendMode) = (BackendMode.Z3, BackendMode.CVC5Proc) // SMT modes that are being run in parallel, if smt mode "Both" is set
   val smtSolverTimeLimitMs = 20000
   val cvc5Path: String = "cvc5" // executable path of local cvc5 installation (usually just "cvc5") ==> needed for smt mode "CVC5Proc"
-  val keepSmtFiles: Boolean = false
+  val keepSmtFiles: Boolean = false // only relevant for CVC5Proc smt mode, where temp files are created
 
   def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
@@ -72,7 +70,7 @@ object Main {
         case "z3" | "Z3" => smtBackendMode = BackendMode.Z3
         case "cvc5" | "CVC5" => smtBackendMode = BackendMode.CVC5
         case "both" => smtBackendMode = BackendMode.Both
-        case "cvc5-proc" | "CVC5-proc" => smtBackendMode = CVC5Proc
+        case "cvc5-proc" | "CVC5-proc" => smtBackendMode = BackendMode.CVC5Proc
         case _ => throw new Logger("Unknown SMT backend mode, choose either \"z3\", \"cvc5\", \"cvc5-proc\" or \"both\" (default).", Logger.ERR)
       }
     }

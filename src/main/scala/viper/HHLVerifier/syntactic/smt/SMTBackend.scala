@@ -8,9 +8,8 @@ trait SMTBackend {
    *
    * @param pre The user-supplied precondition.
    * @param wp The weakest precondition computed by [[WeakestPrecondition.compute]]
-   * @param toBeExported Whether this entailment should be included in the export `.smt2` file
-   *                     (e.g. `false` for entailments checked by the [[RuleSelector]], `true` for
-   *                     entailments corresponding to hyper-triples that need to be verified)
+   * @param usedForEval Whether this entailment is being used for time tracking in the evaluation.
+   *                    Should only be `true` for entailments used for triples, `false` per default.
    * @return [[SMTStatus]]:
    *         <ul>
    *          <li>[[SMTStatus.Unsatisfiable]] – <code>pre ⊨ wp</code> is valid.</li>
@@ -18,7 +17,7 @@ trait SMTBackend {
    *          <li>[[SMTStatus.Unknown]] – solver aborted.</li>
    *         </ul>
    */
-  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): SMTStatus
+  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, usedForEval: Boolean = false): SMTStatus
 }
 
 sealed trait SMTStatus

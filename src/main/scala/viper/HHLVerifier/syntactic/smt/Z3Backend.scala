@@ -65,11 +65,13 @@ class Z3Backend extends SMTBackend {
     sb.toString
   }
 
-  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): SMTStatus = {
+  def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, usedForEval: Boolean = false): SMTStatus = {
     // encode the precondition and WP
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
     val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
     val z3FinalFormula = ctx.mkNot(ctx.mkImplies(z3Pre, z3WP))
+
+    if (usedForEval) Main.timeStamps(3) = Main.timeStamps(3).appended(System.nanoTime()) // timestamp after SMT encoding
 
     // solve ¬(pre ⇒ wp)
     val solver = ctx.mkSolver(/*"AUFLIA"*/)

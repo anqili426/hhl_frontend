@@ -6,9 +6,11 @@ import java.nio.file.{Files, Path}
 import scala.sys.process._
 
 class CVC5ProcBackend extends SMTBackend {
-  def checkEntailment(pre: Expr, wp: Expr): SMTStatus = {
+  def checkEntailment(pre: Expr, wp: Expr, usedForEval: Boolean = false): SMTStatus = {
     val z3 = new Z3Backend
     val smtEncoding = z3.generateSingleSMTEncoding(pre, wp)
+
+    if (usedForEval) Main.timeStamps(3) = Main.timeStamps(3).appended(System.nanoTime()) // timestamp after SMT encoding
 
     val tmpPath: Path = Files.createTempFile("hhl-entailment-", ".smt2")
     Files.write(tmpPath, smtEncoding.getBytes)

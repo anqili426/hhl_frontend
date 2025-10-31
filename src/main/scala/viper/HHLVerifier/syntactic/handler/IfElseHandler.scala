@@ -46,10 +46,11 @@ object IfElseHandler {
       val characterizerThen = Characterizer(Seq(CharPath(cond, Map.empty)))
       val characterizerElse = Characterizer(Seq(CharPath(UnaryExpr("!", cond), Map.empty)))
 
-      val blockPre = Seq(
-        WeakestPrecondition.compute(characterizerThen, thenPre, false),
-        WeakestPrecondition.compute(characterizerElse, elsePre, false)
-      )
+      val blockPre =
+        List(
+          Option.when(thenPre != Nil)(WeakestPrecondition.compute(characterizerThen, thenPre, false)),
+          Option.when(elsePre != Nil)(WeakestPrecondition.compute(characterizerElse, elsePre, false))
+        ).flatten
 
       // TODO: This needs to be generalized: How can we do it for arbitrary postconditions? Right now only forall quantified...
       val blockPost = constructCombinedPostcondition(thenPost, elsePost)
