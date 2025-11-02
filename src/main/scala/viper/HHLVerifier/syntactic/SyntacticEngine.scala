@@ -81,6 +81,7 @@ object SyntacticEngine {
 
       val split = structuralSplit(Triple(method.body, method.pre, method.post, "top-level"))
       if (Main.debugLogsActive) println("Split: " + split)
+      Main.numberOfTriples += split.length
 
       // Verifying all triples
       split match {
@@ -128,19 +129,26 @@ object SyntacticEngine {
         val result = ParallelRunner.checkEntailment(combinedPrecondition, weakestPrecondition, toBeExported = true)
         Main.timeStamps(4) = Main.timeStamps(4).appended(System.nanoTime()) // timestamp after SMT solving
 
+        val detailedRuntimes = (
+          (Main.timeStamps(1).last - Main.timeStamps(0).last) / 1E9,
+          (Main.timeStamps(2).last - Main.timeStamps(1).last) / 1E9,
+          (Main.timeStamps(3).last - Main.timeStamps(2).last) / 1E9,
+          (Main.timeStamps(4).last - Main.timeStamps(3).last) / 1E9,
+        )
+
         result._1 match {
           case SMTStatus.Satisfiable => {
-            if (Main.logsActive) println(f"\t${result._2} > Invalid ($name): Counterexample found.")
+            if (Main.logsActive) println(f"\t${result._2} > Invalid ($name): Counterexample found. $detailedRuntimes")
             verificationResult = 1
             false
           }
           case SMTStatus.Unsatisfiable => {
-            if (Main.logsActive) println(f"\t${result._2} > Valid ($name): Precondition entails WP.")
+            if (Main.logsActive) println(f"\t${result._2} > Valid ($name): Precondition entails WP. $detailedRuntimes")
             if (verificationResult != 1) verificationResult = 2
             true
           }
           case SMTStatus.Unknown => {
-            if (Main.logsActive) println(f"\t${result._2} > Unknown ($name): SMT solver couldn't determine the result.")
+            if (Main.logsActive) println(f"\t${result._2} > Unknown ($name): SMT solver couldn't determine the result. $detailedRuntimes")
             verificationResult = 1 // we handle "unknown" as invalid
             false
           }

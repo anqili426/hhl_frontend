@@ -3,6 +3,7 @@ package viper.HHLVerifier.test
 import au.com.bytecode.opencsv.CSVWriter
 import viper.HHLVerifier.Main
 import viper.HHLVerifier.parsing.Parser
+import viper.HHLVerifier.syntactic.smt.BackendMode
 
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.jdk.CollectionConverters._
@@ -90,6 +91,7 @@ object TestSyntactic {
       val LOCData = getDataForTestCase(f.getPath)
       print(f)
       val argsForMain = Array(f.getPath, option, "--auto", "--syntactic", "--smtmode", smtMode)
+      Main.numberOfTriples = 0
       Main.timeStamps = Array.fill(5)(List.empty[Long]) // reset timestamps
       Main.test = true
       Main.logsActive = false
@@ -109,13 +111,14 @@ object TestSyntactic {
       }
 
       // compute timestamps
-      val durationCharacterizer = computeAverageDurationMs(Main.timeStamps(0), Main.timeStamps(1))
-      val durationWP = computeAverageDurationMs(Main.timeStamps(1), Main.timeStamps(2))
-      val durationSMTEncoding = computeAverageDurationMs(Main.timeStamps(2), Main.timeStamps(3))
-      val durationSMTSolver = computeAverageDurationMs(Main.timeStamps(3), Main.timeStamps(4))
+      val durationCharacterizer = computeAverageDurationSeconds(Main.timeStamps(0), Main.timeStamps(1))
+      val durationWP = computeAverageDurationSeconds(Main.timeStamps(1), Main.timeStamps(2))
+      val durationSMTEncoding = computeAverageDurationSeconds(Main.timeStamps(2), Main.timeStamps(3))
+      val durationSMTSolver = computeAverageDurationSeconds(Main.timeStamps(3), Main.timeStamps(4))
 
       val data = Array(
         f.getPath,
+        Main.numberOfTriples.toString,
         smtMode,
         Main.runtime.toString,
         durationCharacterizer,
@@ -130,14 +133,16 @@ object TestSyntactic {
     allData
   }
 
-  def computeAverageDurationMs(ts1: List[Long], ts2: List[Long]): String = {
-    assert(ts1.length == ts2.length)
+  def computeAverageDurationSeconds(ts1: List[Long], ts2: List[Long]): String = {
+    if (Main.smtBackendMode == BackendMode.Both) return "---"
+    require(ts1.length == ts2.length)
     if (ts1.isEmpty) {
       return "NaN"
     }
     val sumNano = ts1
       .zip(ts2)
       .map(x => x._2 - x._1)
+      .map(_.toDouble)
       .sum
     val avgNano = sumNano / ts1.length
     (avgNano / 1E9).toString
@@ -196,7 +201,7 @@ object TestSyntactic {
       val outputFilePath = "src/test/evaluation/output" + i + ".csv"
       val outputFile = new BufferedWriter(new FileWriter(outputFilePath))
       val csvWriter = new CSVWriter(outputFile)
-      val schema = Array("Test case name", "SMT mode", "Runtime total (s)", "Runtime Characterizer avg (s)", "Runtime WP avg (s)", "Runtime SMT encoding avg (s)", "Runtime SMT solving avg (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC")
+      val schema = Array("Test case name", "Number of triples", "SMT mode", "Runtime total (s)", "Runtime Characterizer avg (s)", "Runtime WP avg (s)", "Runtime SMT encoding avg (s)", "Runtime SMT solving avg (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC")
       val dataToWrite = List(schema) ++ allTestData
       csvWriter.writeAll(dataToWrite.map(_.toArray).asJava)
       outputFile.close()

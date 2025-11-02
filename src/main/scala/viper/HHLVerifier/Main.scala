@@ -20,6 +20,7 @@ object Main {
   var verified = 0  // 0: unknown, 1: failure, 2: success
   var runtime = 0.0
   var timeStamps: Array[List[Long]] = Array.fill(5)(List.empty[Long]) // timestamps to compute the duration of each syntactic step in evaluation
+  var numberOfTriples: Int = 0
   var test = false
   var testWithLogs = false
   var errMessages: Seq[String] = Seq("")
