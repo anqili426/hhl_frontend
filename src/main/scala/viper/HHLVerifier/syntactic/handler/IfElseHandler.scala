@@ -118,21 +118,6 @@ object IfElseHandler {
   }
 
   private def pathConditionModified(stmt: IfElseStmt): Boolean = {
-    def varsRead(e: Expr): Set[Id] = e match {
-      case id@Id(_) => Set(id)
-      case Num(_) | BoolLit(_) => Set.empty
-      case BinaryExpr(e1, _, e2) => varsRead(e1) ++ varsRead(e2)
-      case UnaryExpr(_, e) => varsRead(e)
-      case ImpliesExpr(left, right) => varsRead(left) ++ varsRead(right)
-    }
-    def varsWritten(s: Stmt): Set[Id] = s match {
-      case AssignStmt(left, _) => Set(left)
-      case MultiAssignStmt(left, _) => left.toSet
-      case IfElseStmt(_, ifStmt, elseStmt) => varsWritten(ifStmt) ++ varsWritten(elseStmt)
-      case CompositeStmt(stmts) => stmts.flatMap(varsWritten).toSet
-      case _ => Set.empty
-    }
-
     stmt match {
       case IfElseStmt(cond, _, _) => {
         varsRead(cond)
@@ -140,6 +125,24 @@ object IfElseHandler {
           .nonEmpty
       }
     }
+  }
+
+  def varsRead(e: Expr): Set[Id] = e match {
+    case id@Id(_) => Set(id)
+    case Num(_) | BoolLit(_) | StateExistsExpr(_, _) => Set.empty
+    case BinaryExpr(e1, _, e2) => varsRead(e1) ++ varsRead(e2)
+    case UnaryExpr(_, e) => varsRead(e)
+    case ImpliesExpr(left, right) => varsRead(left) ++ varsRead(right)
+    case Assertion(_, _, body) => varsRead(body)
+    case LookupExpr(_, index) => varsRead(index)
+  }
+
+  def varsWritten(s: Stmt): Set[Id] = s match {
+    case AssignStmt(left, _) => Set(left)
+    case MultiAssignStmt(left, _) => left.toSet
+    case IfElseStmt(_, ifStmt, elseStmt) => varsWritten(ifStmt) ++ varsWritten(elseStmt)
+    case CompositeStmt(stmts) => stmts.flatMap(varsWritten).toSet
+    case _ => Set.empty
   }
 
   private def constructCombinedPostcondition(thenPost: Seq[Expr], elsePost: Seq[Expr]):  Seq[Expr] = (thenPost, elsePost) match {

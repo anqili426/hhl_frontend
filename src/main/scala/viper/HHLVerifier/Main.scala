@@ -28,6 +28,7 @@ object Main {
   var debugLogsActive = false // extensive logs for debugging in syntactic mode
   var syntactic = false
   var outputPath = "unspecified"
+  var noFrame: Boolean = false
   var smtBackendMode: BackendMode = BackendMode.Both // standard SMT solver mode that is used in syntactic mode (if the argument "--smtmode" is set, this will be overridden)
   val smtRaceModes: (BackendMode, BackendMode) = (BackendMode.Z3, BackendMode.CVC5Proc) // SMT modes that are being run in parallel, if smt mode "Both" is set
   val smtSolverTimeLimitMs = 20000
@@ -53,7 +54,10 @@ object Main {
 
     // [DOC] Handle command line arguments
     outputPath = if (args.contains("--output")) args(args.indexOf("--output") + 1) else "unspecified"
-    if (args.contains("--noframe")) Generator.forAllFrame = false
+    if (args.contains("--noframe")) {
+      noFrame = true
+      Generator.forAllFrame = false
+    }
     if (args.contains("--ext")) Logger.setExtensionToTrue()
     if (args.contains("--existsframe")) {
       Generator.existsFrame = true

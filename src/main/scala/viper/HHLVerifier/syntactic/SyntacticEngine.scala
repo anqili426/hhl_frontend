@@ -83,8 +83,13 @@ object SyntacticEngine {
       if (Main.debugLogsActive) println("Split: " + split)
       Main.numberOfTriples += split.length
 
+      // Apply framing
+      val framedSplit =
+        if (Main.noFrame) split
+        else Framer.frameMethod(method, split)
+
       // Verifying all triples
-      split match {
+      framedSplit match {
         case h +: t =>
           verifySplitFreeTriple(h, wpPlus = false)  // first triple without extended WP
           t.foreach(tr => verifySplitFreeTriple(tr, wpPlus = true))  // rest of the triples need extended WP
