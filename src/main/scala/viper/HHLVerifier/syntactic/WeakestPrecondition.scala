@@ -159,7 +159,7 @@ object WeakestPrecondition {
    * substituted for a [[LookupExpr]] for the particular state. This is, because we need to make sure that
    * every variable reference in the path condition is bound to a state.
    */
-  private def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
+  protected[syntactic] def substitutePathCondition(pc: Expr, state: AssertVar): Expr = pc match {
     case Id(_) => LookupExpr(state, pc)
     case HavocVar(name) => AssertVar(name + "_" + state.name)
     case Num(_) | BoolLit(_) | LookupExpr(_, _) | StateExistsExpr(_, _) => pc
@@ -174,7 +174,7 @@ object WeakestPrecondition {
    * Converts every multi-variable quantifier into an equivalent chain of single-variable quantifiers.
    * This normalization is later needed for computing the weakest precondition.
    */
-  def desugarQuantifiers(e: Expr): Expr = e match {
+  protected[syntactic] def desugarQuantifiers(e: Expr): Expr = e match {
     case Assertion("forall", (x1@AssertVarDecl(_, StateType())) :: (x2@AssertVarDecl(_, StateType())) :: xs, ImpliesExpr(stateExists, realBody)) => { // if we have multiple state assert vars, we also want to separate StateExistsExpr
       val extracted = extractFirstFromNestedAnd(stateExists)
       Assertion("forall", List(x1), ImpliesExpr(extracted._1, desugarQuantifiers(Assertion("forall", (x2 :: xs), ImpliesExpr(extracted._2, realBody)))))

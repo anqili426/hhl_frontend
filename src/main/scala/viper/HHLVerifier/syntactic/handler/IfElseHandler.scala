@@ -129,7 +129,7 @@ object IfElseHandler {
 
   def varsRead(e: Expr): Set[Id] = e match {
     case id@Id(_) => Set(id)
-    case Num(_) | BoolLit(_) | StateExistsExpr(_, _) => Set.empty
+    case Num(_) | BoolLit(_) | StateExistsExpr(_, _) | AssertVar(_) => Set.empty
     case BinaryExpr(e1, _, e2) => varsRead(e1) ++ varsRead(e2)
     case UnaryExpr(_, e) => varsRead(e)
     case ImpliesExpr(left, right) => varsRead(left) ++ varsRead(right)
@@ -142,6 +142,7 @@ object IfElseHandler {
     case MultiAssignStmt(left, _) => left.toSet
     case IfElseStmt(_, ifStmt, elseStmt) => varsWritten(ifStmt) ++ varsWritten(elseStmt)
     case CompositeStmt(stmts) => stmts.flatMap(varsWritten).toSet
+    case WhileLoopStmt(_, body, _, _, _) => varsWritten(body)
     case _ => Set.empty
   }
 
