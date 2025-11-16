@@ -7,11 +7,42 @@ import viper.HHLVerifier.syntactic.handler.IfElseHandler.{varsRead, varsWritten}
 import viper.HHLVerifier.typing.StateType
 
 object Framer {
+
+  /**
+   * Applies framing to a method's split verification triples.
+   *
+   * Framing consists of two phases:
+   *
+   *  - [[propagatePre]]: preconditions that are not invalidated by later
+   *     assignments are propagated forward across triples of the same method.
+   *     This effectively threads "stable" assumptions through the entire
+   *     method.
+   *  - [[addPrevAliases]]: path-sensitive aliases (simple equalities of the
+   *     form `x := rhs`) discovered in earlier triples are turned into
+   *     explicit preconditions for later triples. These aliasing
+   *     preconditions act as frame conditions that relate the current state
+   *     of variables to their previously computed values.
+   *
+   * @param method the method for which the triples were generated.
+   * @param split the sequence of loop-free verification triples obtained
+   *              from the method (e.g. via structural splitting).
+   * @return the same triples as were passed with `split` with enriched preconditions.
+   *         The statements and postconditions of the triples are not modified.
+   */
   def frameMethod(method: Method, split: Seq[Triple]): Seq[Triple] = {
     val withPropagatedPres = propagatePre(method, split)
     addPrevAliases(method, withPropagatedPres)
   }
 
+  /**
+   * Part 1 of framing: Propagates stable preconditions forward across a method’s triples.
+   *
+   * A precondition is considered stable and is propagated (i.e. it serves as an invariant), as long as it:
+   *  - doesn't contain a state-existential assertion (in case of a non-terminating call
+   *    the existence of a state after the call cannot be guaranteed)
+   *  - doesn't refer to a variable that is modified in the code before the triple (this modification
+   *    might invalidate the precondition).
+   */
   private def propagatePre(method: Method, split: Seq[Triple]): Seq[Triple] = {
     // We track the set of preconditions we are propagating throughout the method
     var active: Seq[(Expr, Set[Id])] = Seq.empty
@@ -37,6 +68,10 @@ object Framer {
     }
   }
 
+  /**
+   * Helper method to check whether an expression contains an existential
+   * quantification over a state variable.
+   */
   private def containsStateExistential(e: Expr): Boolean = e match {
     case Id(_) | Num(_) | BoolLit(_) | LookupExpr(_, _) | StateExistsExpr(_, _) | AssertVar(_) => false
     case BinaryExpr(e1, _, e2) => containsStateExistential(e1) || containsStateExistential(e2)
@@ -46,6 +81,22 @@ object Framer {
     case Assertion(_, _, body) => containsStateExistential(body)
   }
 
+  /**
+   * Part 2 of framing: Augments triples with alias-based frame conditions derived from
+   * previous statements in the method.
+   *
+   * For each triple:
+   *  - It identifies which aliases happening before the triple are relevant for it by checking
+   *    whether the aliased variable occurs in the triple's pre- or postcondition.
+   *  - For each relevant alias it generates a universally quantified frame assertion,
+   *    also including the path condition of the alias. This information is determined
+   *    with a [[PathBuilder.Characterizer]].
+   *  - The generated frame assertions are appended to the triple's pre.
+   *
+   * Variables that appear on the left-hand side of any [[MultiAssignStmt]] in the
+   * method body are not considered in the alias map. They originate from method calls and hence
+   * don't allow trivial syntactic reasoning.
+   */
   private def addPrevAliases(method: Method, split: Seq[Triple]): Seq[Triple] = {
     // We keep track of the aliases we have until now
     // variable -> List[(path condition, rhs expression)]
@@ -93,6 +144,10 @@ object Framer {
     }
   }
 
+  /**
+   * Helper function to collect all variables that are ever assigned
+   * through a [[MultiAssignStmt]] in a statement.
+   */
   private def assignedByMultiAssign(s: Stmt): Set[Id] = s match {
     case AssignStmt(_, _) => Set.empty
     case MultiAssignStmt(left, _) => left.toSet

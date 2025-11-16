@@ -7,6 +7,41 @@ import viper.HHLVerifier.syntactic.{SyntacticEngine, WeakestPrecondition}
 import viper.HHLVerifier.typing.StateType
 
 object IfElseHandler {
+
+  /**
+   * Performs the syntactic handling of a single `if-else` statement of which either
+   * the `ifStmt` or the `elseStmt` requires at least one split.
+   *
+   * Conceptually, this splits the surrounding statement
+   * {{{
+   *    before ; if (cond) ifStmt else elseStmt ; after
+   * }}}
+   * into multiple verification triples that can then be recursively divided further
+   * (if necessary) and finally be fed into the WP pipeline.
+   *
+   * The method works as follows:
+   *  - It first guards against illegal modifications of the path condition by
+   *    checking that the branch condition `cond` does not read variables that
+   *    are written in the `if` or `else` bodies.
+   *  - It finds the first structural split in each branch (loop, method call,
+   *    nested `if-else`, ...) via [[findFirstStructuralSplit]], and delegates
+   *    handling of that split to the appropriate handler.
+   *  - It reconstructs a (possibly empty) `if-else` "prefix" and "suffix"
+   *    from the parts before/after the structural split in each branch, and
+   *    merges them into the `before` / `after` triples.
+   *  - The precondition of the `if-else` block is just the conjunction of the two
+   *    branch preconditions incorporated with the (negated) condition as a premise.
+   *  - It combines the branch postconditions into a single hyper
+   *    postcondition with [[constructCombinedPostcondition]].
+   *
+   * @param ifs The `if-else` statement to handle.
+   * @param before Surrounding code that executes before `ifs`.
+   * @param after Surrounding code that executes after `ifs`.
+   * @param pre Incoming preconditions of the whole block.
+   * @param post Desired postconditions after the whole block.
+   * @param name A human-readable name for this context, used in triple labels.
+   * @return A sequence of triples that collectively represent the `if-else`.
+   */
   def handle(ifs: IfElseStmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple] = ifs match {
     case IfElseStmt(cond, ifStmt, elseStmt) => {
       if (pathConditionModified(ifs)) {
@@ -18,11 +53,11 @@ object IfElseHandler {
 
       val (thenPre, thenPost, thenRemaining) = thenTargetOpt
         .map(findPrePostAndRemainingTriples(_, name))
-        .getOrElse(Nil, Nil, Nil) // TODO: double-check these default values ==> depends on blockPre below
+        .getOrElse(Nil, Nil, Nil)
 
       val (elsePre, elsePost, elseRemaining) = elseTargetOpt
         .map(findPrePostAndRemainingTriples(_, name))
-        .getOrElse(Nil, Nil, Nil) // TODO: double-check these default values ==> depends on blockPost below
+        .getOrElse(Nil, Nil, Nil)
 
       val blockPrefix = (thenPrefix, elsePrefix) match {
         case (CompositeStmt(Nil), CompositeStmt(Nil)) => None
@@ -52,7 +87,6 @@ object IfElseHandler {
           Option.when(elsePre != Nil)(WeakestPrecondition.compute(characterizerElse, elsePre, false))
         ).flatten
 
-      // TODO: This needs to be generalized: How can we do it for arbitrary postconditions? Right now only forall quantified...
       val blockPost = constructCombinedPostcondition(thenPost, elsePost)
 
       val tripleBefore = Triple(
@@ -73,6 +107,17 @@ object IfElseHandler {
     }
   }
 
+  /**
+   * Helper function to find the first structurally interesting statement in a composite statement.
+   *
+   * @param s Composite statement representing a branch body.
+   * @return A triple `(prefix, targetOpt, suffix)` where:
+   *         - `prefix` is the split-free code before the first structural split,
+   *         - `targetOpt` is the first structural-split statement itself (if any),
+   *         - `suffix` is the remaining code after that statement.
+   *         If no structural split is found, `targetOpt` is `None` and `suffix`
+   *         is empty.
+   */
   private def findFirstStructuralSplit(s: CompositeStmt): (CompositeStmt, Option[Stmt], CompositeStmt) = s match {
     case CompositeStmt(stmts) => {
       val (before, targetAndAfter) = stmts.span(!SyntacticEngine.hasStructuralSplit(_))
@@ -83,6 +128,18 @@ object IfElseHandler {
     }
   }
 
+  /**
+   * Helper function to delegates handling of a statement that requires structural
+   * handling and extracts its pre/postconditions and any remaining triples.
+   *
+   * @param s The structural statement (loop, call, nested if-else, ...)
+   * @param name Context name used to label the generated triples.
+   * @return `(pre, post, remaining)` where:
+   *         - `pre`  is the precondition required before `s`,
+   *         - `post` is the postcondition provided after `s`,
+   *         - `remaining` are the triples that must be verified according to
+   *           the respective handler.
+   */
   private def findPrePostAndRemainingTriples(s: Stmt, name: String): (Seq[Expr], Seq[Expr], Seq[Triple]) = s match {
     case ws @ WhileLoopStmt(_, _, _, _, _) => {
       val triples = LoopRuleSelector
@@ -117,6 +174,10 @@ object IfElseHandler {
     }
   }
 
+  /**
+   * Helper function that checks whether the `if-else` branch condition depends on
+   * variables modified inside the `if-else` body.
+   */
   private def pathConditionModified(stmt: IfElseStmt): Boolean = {
     stmt match {
       case IfElseStmt(cond, _, _) => {
@@ -127,6 +188,15 @@ object IfElseHandler {
     }
   }
 
+  /**
+   * Collects all identifier occurrences that are read in an expression.
+   *
+   * Traverses the expression tree and returns the set of [[Id]] nodes that
+   * represent variable reads.
+   *
+   * @param e The expression to analyze.
+   * @return The set of identifiers that are read in `e`.
+   */
   def varsRead(e: Expr): Set[Id] = e match {
     case id@Id(_) => Set(id)
     case Num(_) | BoolLit(_) | StateExistsExpr(_, _) | AssertVar(_) => Set.empty
@@ -137,6 +207,15 @@ object IfElseHandler {
     case LookupExpr(_, index) => varsRead(index)
   }
 
+  /**
+   * Collects all identifiers that are written by a statement.
+   *
+   * Traverses the statement and returns the set of variables that appear on
+   * the left-hand side of assignments or multi-assignments.
+   *
+   * @param s The statement to analyze.
+   * @return The set of identifiers whose values may be modified by `s`.
+   */
   def varsWritten(s: Stmt): Set[Id] = s match {
     case AssignStmt(left, _) => Set(left)
     case MultiAssignStmt(left, _) => left.toSet
@@ -146,7 +225,37 @@ object IfElseHandler {
     case _ => Set.empty
   }
 
-  private def constructCombinedPostcondition(thenPost: Seq[Expr], elsePost: Seq[Expr]):  Seq[Expr] = (thenPost, elsePost) match {
+  /**
+   * Combines the branch postconditions of an `if-else` into a single
+   * hyper postcondition.
+   *
+   * The handler currently supports postconditions of the shape
+   * {{{
+   *    forall <_s1>, ..., <_sn> :: ...
+   * }}}
+   * in each branch (or one branch being empty). The combination is done
+   * using a disjunctive construction over a shared set of assertion variables:
+   *
+   *  - For two postconditions `thenPost` and `elsePost`, each with their own
+   *    universally quantified assertion variables (`n` for `thenPost`, `m`
+   *    for `elsePost`), we:
+   *      - choose a number `k` of shared assertion variables based on the
+   *        pigeonhole principle (`k = n + m - 1`),
+   *      - generate all subsets of size `n` and `m` over these variables,
+   *      - for each subset, substitute the branch-specific assertion
+   *        variables with the chosen subset,
+   *      - disjoin all resulting branch formulas.
+   *  - The final result is a single `forall` over the `k` shared
+   *    assertion variables whose body is this big disjunction.
+   *
+   * If only one branch has a universal postcondition, that one is returned
+   * unchanged. Any other combination shape is currently rejected.
+   *
+   * @param thenPost Postcondition(s) from the `then` branch.
+   * @param elsePost Postcondition(s) from the `else` branch.
+   * @return A single combined postcondition sequence.
+   */
+  private def constructCombinedPostcondition(thenPost: Seq[Expr], elsePost: Seq[Expr]): Seq[Expr] = (thenPost, elsePost) match {
     case (Seq(thenAss @ Assertion("forall", _, _)), Seq(elseAss @ Assertion("forall", _, _))) => {
       val (thenVars, thenCore) = flattenForall(thenAss)
       val (elseVars, elseCore) = flattenForall(elseAss)
@@ -186,6 +295,10 @@ object IfElseHandler {
     case _ => sys.error("IfElseHandler: Can only handle \"forall <_s1>, ..., <_si> :: ...\" postconditions in if-else yet.")
   }
 
+  /**
+   * Helper function to flatten nested `forall` assertions into a list of assertion variables
+   * and a quantifier-free core.
+   */
   private def flattenForall(expr: Expr): (List[AssertVar], Expr) = expr match {
     case Assertion("forall", decls, body) => {
       val (recResult, core) = flattenForall(body)
@@ -194,6 +307,18 @@ object IfElseHandler {
     case _ => (Nil, expr)
   }
 
+  /**
+   * Helper function to generate all combinations (subsets) of size `r` from a list.
+   *
+   * Used to assign different tuples of shared assertion variables to the
+   * branch-specific assertion variable lists when combining postconditions
+   * in [[constructCombinedPostcondition]].
+   *
+   * @param xs Input list of elements.
+   * @param r Desired subset size.
+   * @tparam A Element type of `xs`.
+   * @return All subsets of `xs` of size exactly `r`.
+   */
   private def generateCombinations[A](xs: List[A], r: Int): List[List[A]] = {
     if (r <= 0) List(Nil)
     else xs match {
@@ -202,16 +327,24 @@ object IfElseHandler {
     }
   }
 
+  /**
+   * Helper function to substitute assertion variables in an expression according to a mapping.
+   *
+   * @note Assertions are not expected here and are rejected.
+   */
   private def substituteAssertVars(expr: Expr)(implicit map: Map[AssertVar, AssertVar]): Expr = expr match {
     case Id(_) | Num(_) | BoolLit(_) => expr
     case StateExistsExpr(id: AssertVar, err) => StateExistsExpr(map.getOrElse(id, sys.error("IfElseHandler: Unknown assertVar found " + id)), err)
     case LookupExpr(id: AssertVar, index) => LookupExpr(map.getOrElse(id, sys.error("IfElseHandler: Unknown assertVar found " + id)), substituteAssertVars(index))
-    case a: Assertion => sys.error("IfElseHandler: Unallowed assertion found: " + a)
+    case a: Assertion => sys.error("IfElseHandler: Illegal assertion found: " + a)
     case BinaryExpr(e1, op, e2) => BinaryExpr(substituteAssertVars(e1), op, substituteAssertVars(e2))
     case UnaryExpr(op, e) => UnaryExpr(op, substituteAssertVars(e))
     case ImpliesExpr(left, right) => ImpliesExpr(substituteAssertVars(left), substituteAssertVars(right))
   }
 
+  /**
+   * Helper function to build a left-associated disjunction over a list of expressions.
+   */
   private def generateOrChain(xs: List[Expr]): Expr = xs match {
     case Nil => BoolLit(false)
     case _ => xs.reduceLeft((acc, e) => BinaryExpr(acc, "||", e))

@@ -66,6 +66,12 @@ object SyntacticEngine {
    * loop-free verification triples according to the HHL proof rules. Each hyper-triple is verified
    * by checking whether the precondition entails the syntactically derived ''weakest precondition (WP)''.
    *
+   * If framing is enabled via [[Main]], the split triples are passed to [[Framer.frameMethod]], which augments them
+   * with frame conditions.
+   *
+   * If [[Main.outputPath]] is specified, the currently accumulated SMT constraints are written out as an
+   * SMT-LIB file.
+   *
    * @param program The HHL program to verify.
    * @return An integer result code corresponding to [[Main.verified]]:
    *         - `0` if no methods were checked or the result is unknown,
@@ -238,18 +244,17 @@ object SyntacticEngine {
     }
   }
 
-  private def getAllProgVars(method: Method): Seq[Id] = {
-    method.params ++ method.res ++ getAllProgVarsHelper(method.body).toSeq
-  }
-
-  private def getAllProgVarsHelper(stmt: Stmt): Set[Id] = stmt match {
-    case CompositeStmt(x :: xs) => getAllProgVarsHelper(x) ++ getAllProgVarsHelper(CompositeStmt(xs))
-    case IfElseStmt(_, ifStmt, elseStmt) => getAllProgVarsHelper(ifStmt) ++ getAllProgVarsHelper(elseStmt)
-    case WhileLoopStmt(_, body, _, _, _) => getAllProgVarsHelper(body)
-    case PVarDecl(vName, _) => Set(vName)
-    case _ => Set.empty[Id]
-  }
-
+  /**
+   * Exports the currently accumulated SMT constraints to an SMT-LIB file.
+   * This is done using the Z3 library.
+   *
+   * If no constraints have been collected (i.e. `z3Constraints` is empty),
+   * the method aborts with a `RuntimeException`, as there is
+   * nothing meaningful to export.
+   *
+   * Any I/O errors raised while writing the file are not handled
+   * here and will propagate to the caller.
+   */
   private def exportToSMT(): Unit = {
     val s = exportCtx.mkSolver()
     if (z3Constraints.isEmpty) sys.error("SyntacticEngine: Nothing to export")

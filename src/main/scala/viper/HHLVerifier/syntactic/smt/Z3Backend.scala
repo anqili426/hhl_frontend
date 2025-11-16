@@ -39,6 +39,20 @@ class Z3Backend extends SMTBackend {
    * array constants of sort [[StateSort]]. Populated on the fly when encountering state variables in hyper-assertions. */
   private val stateEnv: mutable.Map[String, ArrayExpr[IntSort, IntSort]] = mutable.Map.empty[String, ArrayExpr[IntSort, IntSort]]
 
+  /**
+   * Adds the implication `pre ⇒ wp` to the global SMT constraint pool in
+   * [[SyntacticEngine.z3Constraints]].
+   *
+   * Both `pre` and `wp` are first normalized by
+   * [[WeakestPrecondition.desugarQuantifiers]]. They are then encoded
+   * into the internal Z3 boolean representation via [[encodeBool]].
+   *
+   * The resulting implication is translated from this backend's local Z3
+   * context (from the encoding) into [[SyntacticEngine.exportCtx]] and finally registered in the
+   * global constraint pool via [[SyntacticEngine.addConstraint]]. This
+   * method does *not* perform any satisfiability check by itself – it only
+   * accumulates constraints for later solving.
+   */
   def addToGlobalSMTPool(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): Unit = {
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
     val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
@@ -46,6 +60,14 @@ class Z3Backend extends SMTBackend {
     SyntacticEngine.addConstraint(translatedImp)
   }
 
+  /**
+   * Generates a standalone SMT-LIB 2 script encoding `¬(pre ⇒ wp)`.
+   *
+   * This method is primarily intended for backends that call an external
+   * SMT solver process (e.g., [[CVC5ProcBackend]]).
+   *
+   * @return An SMT-LIB 2 encoding of `¬(pre ⇒ wp)` suitable for external solvers.
+   */
   def generateSingleSMTEncoding(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr): String = {
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))
     val z3WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))
@@ -65,6 +87,9 @@ class Z3Backend extends SMTBackend {
     sb.toString
   }
 
+  /**
+   * Z3-based implementation of [[SMTBackend.checkEntailment]].
+   */
   def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, usedForEval: Boolean = false): SMTStatus = {
     // encode the precondition and WP
     val z3Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))

@@ -3,7 +3,7 @@ package viper.HHLVerifier.syntactic.smt
 trait SMTBackend {
   /**
    * Checks whether the precondition `pre` ''logically entails'' the weakest
-   * precondition `wp`. This is done by utilizing using an [[SMTBackend]] to check the
+   * precondition `wp`. This is done by utilizing a specific [[SMTBackend]] to check the
    * satisfiability of <code>¬(pre ⇒ wp)</code>.
    *
    * @param pre The user-supplied precondition.

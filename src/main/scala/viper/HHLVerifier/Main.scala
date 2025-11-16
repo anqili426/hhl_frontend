@@ -13,7 +13,6 @@ import viper.HHLVerifier.syntactic.smt.BackendMode
 import java.io.FileWriter
 import viper.silver.verifier.{Failure => ResFailure, Success => ResSuccess}
 
-/** Main Method */
 object Main {
 
   // [DOC] Variables
@@ -35,7 +34,62 @@ object Main {
   val cvc5Path: String = "cvc5" // executable path of local cvc5 installation (usually just "cvc5") ==> needed for smt mode "CVC5Proc"
   val keepSmtFiles: Boolean = false // only relevant for CVC5Proc smt mode, where temp files are created
 
-  def main(args: Array[String]): Unit = {
+  /**
+   * Entry point of the HHL verifier.
+   *
+   * This method orchestrates the complete verification pipeline for a single
+   * HHL source file.
+   *
+   * Command-line arguments
+   * ----------------------
+   *
+   * Required:
+   *  - `args(0)`: path to the HHL program to verify (absolute or relative).
+   *
+   * Optional flags:
+   *  - `--output <file>`
+   *      Write the generated Viper encoding (or SMT encoding in syntactic mode)
+   *      to the given file. If omitted, the Viper program is not written to disk.
+   *
+   *  - `--noframe`
+   *      Disable automatic frame generation.
+   *
+   *  - `--ext`
+   *      Enable extended logging/output via `Logger.setExtensionToTrue()`.
+   *
+   *  - `--existsframe`
+   *      Enable existential framing. Logs a warning because this option may cause non-termination.
+   *      Only applicable in default (Viper) mode.
+   *
+   *  - `--inline`
+   *      Enable inlining in the encoding by setting to `true`.
+   *      Only applicable in default (Viper) mode.
+   *
+   *  - `--auto`
+   *      Enable automatic rule selection. If the program contains a loop without a loop rule annotation
+   *      and `--auto` is not set, this results in an error.
+   *
+   *  - `--forall` / `--exists`
+   *      Select which encoding variant is emitted:
+   *        - `--forall` (without `--exists`): only universal encoding.
+   *        - `--exists` (without `--forall`): only existential encoding.
+   *        - both or neither: emit both encodings.
+   *        Only applicable in default (Viper) mode.
+   *
+   *  - `--syntactic`
+   *      Enable syntactic verification mode.
+   *
+   *  - `--debug`
+   *      Enable extensive debugging logs in syntactic mode.
+   *
+   *  - `--smtmode <mode>` (syntactic mode only)
+   *      Select the SMT backend configuration used in syntactic verification:
+   *        - `z3` / `Z3`       → [[viper.HHLVerifier.syntactic.smt.BackendMode.Z3]]
+   *        - `cvc5` / `CVC5`   → [[viper.HHLVerifier.syntactic.smt.BackendMode.CVC5]]
+   *        - `cvc5-proc`       → [[viper.HHLVerifier.syntactic.smt.BackendMode.CVC5Proc]]
+   *        - `both` (default)  → [[viper.HHLVerifier.syntactic.smt.BackendMode.Both]]
+   */
+    def main(args: Array[String]): Unit = {
     errMessages = Seq.empty
     verified = 0
 

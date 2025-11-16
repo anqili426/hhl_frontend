@@ -45,6 +45,12 @@ class CVC5Backend extends SMTBackend {
     constEnv.getOrElseUpdate(s, tm.mkConst(IntSort, s))
   }
 
+  /**
+   * CVC5-based (in-process API) implementation of [[SMTBackend.checkEntailment]].
+   *
+   * @note This in-process CVC5 backend has shown worse performance than [[CVC5ProcBackend]],
+   *       which drives `cvc5` as an external SMT-LIB process. Prefer to use [[CVC5ProcBackend]].
+   */
   def checkEntailment(pre: viper.HHLVerifier.ast.Expr, wp: viper.HHLVerifier.ast.Expr, usedForEval: Boolean = false): SMTStatus = {
     val cvc5Pre = encodeBool(WeakestPrecondition.desugarQuantifiers(pre))(VarEnv.empty)
     val cvc5WP = encodeBool(WeakestPrecondition.desugarQuantifiers(wp))(VarEnv.empty)

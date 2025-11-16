@@ -8,6 +8,7 @@ import scala.collection.immutable.{AbstractSeq, LinearSeq}
 import scala.xml.NodeSeq
 
 object WeakestPrecondition {
+
   /**
    * Computes the '''weakest precondition (WP)''' for a given program (described by a characterizer) and
    * given postconditions. Each assertion occurring in the WP quantifies over only one state variable.
@@ -209,6 +210,15 @@ object WeakestPrecondition {
     case BinaryExpr(e1, "&&", e2) => (e1, e2)
   }
 
+  /**
+   * Helper function to introduce quantifiers for a set of havoc variables.
+   *
+   * Given an expression `e` (body of an assertion) and a set of havoc variables `q`,
+   * this function wraps `e` in a chain of quantifiers, one for each havoc
+   * variable. Each havoc variable is renamed to be specific to the given assertion state:
+   * for a havoc variable `h` and state variable `s`, the bound assertion
+   * variable is named `h_s`.
+   */
   private def addHavocQuantifiers(e: Expr, q: Set[HavocVar], assertString: String, assertState: AssertVar): Expr = {
     q.toSeq
       .foldLeft(e) {
@@ -219,6 +229,16 @@ object WeakestPrecondition {
       }
   }
 
+  /**
+   * Helper function to handle occurrences of [[HavocVar]] within an assertion body
+   * (introduced by the [[Characterizer]]).
+   *
+   * This function replaces:
+   *  - plain identifiers by a lookup into the current assertion state, and
+   *  - [[HavocVar]] occurrences by state-specific assertion variables,
+   *    naming them `h_s` for a havoc variable `h` and an implicit assertion
+   *    state variable `s`.
+   */
   private def handleHavoc(expr: viper.HHLVerifier.ast.Expr)(implicit assertVar: AssertVar): viper.HHLVerifier.ast.Expr = expr match {
     case Id(_) => LookupExpr(assertVar, expr)
     case HavocVar(name) => AssertVar(name + "_" + assertVar.name)
