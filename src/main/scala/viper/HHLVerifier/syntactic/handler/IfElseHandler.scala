@@ -3,6 +3,7 @@ package viper.HHLVerifier.syntactic.handler
 import viper.HHLVerifier.ast._
 import viper.HHLVerifier.syntactic.PathBuilder.{CharPath, Characterizer}
 import viper.HHLVerifier.syntactic.SyntacticEngine.Triple
+import viper.HHLVerifier.syntactic.WeakestPrecondition.substitutePathCondition
 import viper.HHLVerifier.syntactic.{SyntacticEngine, WeakestPrecondition}
 import viper.HHLVerifier.typing.StateType
 
@@ -87,7 +88,7 @@ object IfElseHandler {
           Option.when(elsePre != Nil)(WeakestPrecondition.compute(characterizerElse, elsePre, false))
         ).flatten
 
-      val blockPost = constructCombinedPostcondition(thenPost, elsePost)
+      val blockPost = constructCombinedPostcondition(thenPost, elsePost, ifs)
 
       val tripleBefore = Triple(
         newBefore,
@@ -253,9 +254,10 @@ object IfElseHandler {
    *
    * @param thenPost Postcondition(s) from the `then` branch.
    * @param elsePost Postcondition(s) from the `else` branch.
+   * @param stmt The if-else statement we are reasoning about.
    * @return A single combined postcondition sequence.
    */
-  private def constructCombinedPostcondition(thenPost: Seq[Expr], elsePost: Seq[Expr]): Seq[Expr] = (thenPost, elsePost) match {
+  private def constructCombinedPostcondition(thenPost: Seq[Expr], elsePost: Seq[Expr], stmt: IfElseStmt): Seq[Expr] = (thenPost, elsePost) match {
     case (Seq(thenAss @ Assertion("forall", _, _)), Seq(elseAss @ Assertion("forall", _, _))) => {
       val (thenVars, thenCore) = flattenForall(thenAss)
       val (elseVars, elseCore) = flattenForall(elseAss)
@@ -272,12 +274,20 @@ object IfElseHandler {
 
       val thenDisjuncts = thenSubsets.map { curr =>
         val mapping = thenVars.zip(curr).toMap
-        substituteAssertVars(thenCore)(mapping)
+        val conditions = curr.map(x => substitutePathCondition(stmt.cond, x))
+        ImpliesExpr(
+          generateBinaryChain(conditions, "&&"),
+          substituteAssertVars(thenCore)(mapping)
+        )
       }
 
       val elseDisjuncts = elseSubsets.map { curr =>
         val mapping = elseVars.zip(curr).toMap
-        substituteAssertVars(elseCore)(mapping)
+        val conditions = curr.map(x => substitutePathCondition(UnaryExpr("!", stmt.cond), x))
+        ImpliesExpr(
+          generateBinaryChain(conditions, "&&"),
+          substituteAssertVars(elseCore)(mapping)
+        )
       }
 
       Seq(
@@ -285,14 +295,45 @@ object IfElseHandler {
           Assertion(
             "forall",
             newAssertVars.map(x => AssertVarDecl(x, StateType())),
-            generateOrChain(thenDisjuncts ++ elseDisjuncts)
+            generateBinaryChain(thenDisjuncts ++ elseDisjuncts, "||")
           )
         )
       )
     }
-    case (Seq(Assertion("forall", _, _)), Nil) => thenPost
-    case (Nil, Seq(Assertion("forall", _, _))) => elsePost
+    case (Seq(thenAss @ Assertion("forall", _, _)), Nil) => Seq(guardForallWithPathCondition(thenAss, stmt.cond))
+    case (Nil, Seq(elseAss @ Assertion("forall", _, _))) => Seq(guardForallWithPathCondition(elseAss, UnaryExpr("!", stmt.cond)))
     case _ => sys.error("IfElseHandler: Can only handle \"forall <_s1>, ..., <_si> :: ...\" postconditions in if-else yet.")
+  }
+
+  /**
+   * Helper function to wrap a universal assertion with a branch path condition.
+   */
+  private def guardForallWithPathCondition(assertion: Assertion, pathCond: Expr): Expr = {
+    val (vars, core) = flattenForall(assertion)
+    if (hasNestedAssertion(core)) sys.error("Illegal assertion found.")
+    val conditions = vars.map(x => substitutePathCondition(pathCond, x))
+    val pcChain = generateBinaryChain(conditions, "&&")
+
+    val guardedCore = core match {
+      case ImpliesExpr(stateExists, realBody) =>
+        // we want to put the pc after the StateExistsExpr
+        ImpliesExpr(
+          stateExists,
+          ImpliesExpr(
+            pcChain,
+            realBody
+          )
+        )
+      case other => ImpliesExpr(pcChain, other)
+    }
+
+    WeakestPrecondition.desugarQuantifiers(
+      Assertion(
+        "forall",
+        vars.map(v => AssertVarDecl(v, StateType())),
+        guardedCore
+      )
+    )
   }
 
   /**
@@ -306,6 +347,21 @@ object IfElseHandler {
     }
     case _ => (Nil, expr)
   }
+
+  /**
+   * Helper function that returns true iff there is any nested assertion of the
+   * specified type in this expression.
+   */
+  private def hasNestedAssertion(e: Expr, assertionType: Option[String] = None): Boolean = e match {
+    case Assertion(t, _, _) if assertionType.forall(_ == t) => true
+    case Assertion(_, _, body) => hasNestedAssertion(body, assertionType)
+    case BinaryExpr(e1, _, e2) => hasNestedAssertion(e1, assertionType) || hasNestedAssertion(e2, assertionType)
+    case UnaryExpr(_, inner) => hasNestedAssertion(inner, assertionType)
+    case ImpliesExpr(left, right) => hasNestedAssertion(left, assertionType) || hasNestedAssertion(right, assertionType)
+    case LookupExpr(_, index) => hasNestedAssertion(index, assertionType)
+    case Id(_) | Num(_) | BoolLit(_) | StateExistsExpr(_, _) | AssertVar(_) => false
+  }
+
 
   /**
    * Helper function to generate all combinations (subsets) of size `r` from a list.
@@ -343,10 +399,10 @@ object IfElseHandler {
   }
 
   /**
-   * Helper function to build a left-associated disjunction over a list of expressions.
+   * Helper function to build a left-associated chain of binary expressions for a list of expressions.
    */
-  private def generateOrChain(xs: List[Expr]): Expr = xs match {
+  private def generateBinaryChain(xs: List[Expr], binaryOp: String): Expr = xs match {
     case Nil => BoolLit(false)
-    case _ => xs.reduceLeft((acc, e) => BinaryExpr(acc, "||", e))
+    case _ => xs.reduceLeft((acc, e) => BinaryExpr(acc, binaryOp, e))
   }
 }

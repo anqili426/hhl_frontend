@@ -103,7 +103,7 @@ object Framer {
     var aliases: Map[Id, Seq[(Expr, Expr)]] = Map.empty
 
     // Exclude all variables that are assigned through MultiAssignStmt --> they cannot be trusted
-    val blockList = assignedByMultiAssign(method.body)
+    val blockList = assignedByMultiAssignOrHavoc(method.body)
 
     split.map { triple =>
       // First, incorporate the previous aliases into the triple
@@ -146,14 +146,15 @@ object Framer {
 
   /**
    * Helper function to collect all variables that are ever assigned
-   * through a [[MultiAssignStmt]] in a statement.
+   * through a [[MultiAssignStmt]] or [[HavocStmt]] in a statement.
    */
-  private def assignedByMultiAssign(s: Stmt): Set[Id] = s match {
+  private def assignedByMultiAssignOrHavoc(s: Stmt): Set[Id] = s match {
     case AssignStmt(_, _) => Set.empty
     case MultiAssignStmt(left, _) => left.toSet
-    case IfElseStmt(_, ifStmt, elseStmt) => assignedByMultiAssign(ifStmt) ++ assignedByMultiAssign(elseStmt)
-    case CompositeStmt(stmts) => stmts.flatMap(assignedByMultiAssign).toSet
-    case WhileLoopStmt(_, body, _, _, _) => assignedByMultiAssign(body)
+    case HavocStmt(id, _) => Set(id)
+    case IfElseStmt(_, ifStmt, elseStmt) => assignedByMultiAssignOrHavoc(ifStmt) ++ assignedByMultiAssignOrHavoc(elseStmt)
+    case CompositeStmt(stmts) => stmts.flatMap(assignedByMultiAssignOrHavoc).toSet
+    case WhileLoopStmt(_, body, _, _, _) => assignedByMultiAssignOrHavoc(body)
     case _ => Set.empty
   }
 }
