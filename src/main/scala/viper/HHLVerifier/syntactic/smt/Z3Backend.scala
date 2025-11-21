@@ -39,6 +39,9 @@ class Z3Backend extends SMTBackend {
    * array constants of sort [[StateSort]]. Populated on the fly when encountering state variables in hyper-assertions. */
   private val stateEnv: mutable.Map[String, ArrayExpr[IntSort, IntSort]] = mutable.Map.empty[String, ArrayExpr[IntSort, IntSort]]
 
+  /** Tracks the Z3 sort of each assertion variable (state vs int). */
+  private val assertVarSort: mutable.Map[String, Sort] = mutable.Map.empty[String, Sort]
+
   /**
    * Adds the implication `pre ⇒ wp` to the global SMT constraint pool in
    * [[SyntacticEngine.z3Constraints]].
@@ -119,8 +122,18 @@ class Z3Backend extends SMTBackend {
     case BinaryExpr(e1, op, e2) => op match {
       case "&&" => ctx.mkAnd(encodeBool(e1), encodeBool(e2))
       case "||" => ctx.mkOr(encodeBool(e1), encodeBool(e2))
-      case "==" => ctx.mkEq(encodeInt(e1), encodeInt(e2))
-      case "!=" => ctx.mkDistinct(encodeInt(e1), encodeInt(e2))
+      case "==" => {
+        if (isStateTerm(e1) && isStateTerm(e2))
+          ctx.mkEq(encodeState(e1), encodeState(e2))
+        else
+          ctx.mkEq(encodeInt(e1), encodeInt(e2))
+      }
+      case "!=" => {
+        if (isStateTerm(e1) && isStateTerm(e2))
+          ctx.mkDistinct(encodeState(e1), encodeState(e2))
+        else
+          ctx.mkDistinct(encodeInt(e1), encodeInt(e2))
+      }
       case ">=" => ctx.mkGe(encodeInt(e1), encodeInt(e2))
       case "<=" => ctx.mkLe(encodeInt(e1), encodeInt(e2))
       case ">" => ctx.mkGt(encodeInt(e1), encodeInt(e2))
@@ -129,6 +142,7 @@ class Z3Backend extends SMTBackend {
     case UnaryExpr("!", e) => ctx.mkNot(encodeBool(e))
     case ImpliesExpr(left, right) => ctx.mkImplies(encodeBool(left), encodeBool(right))
     case Assertion(quantifier, List(AssertVarDecl(vName, StateType())), body) => {
+      assertVarSort.update(vName.name, StateSort) // register sort
       val constantsArray: Array[com.microsoft.z3.Expr[_]] = Array(getStateEnv(vName.name))
       val encodedBody: com.microsoft.z3.BoolExpr = encodeBool(body)
       quantifier match {
@@ -137,6 +151,7 @@ class Z3Backend extends SMTBackend {
       }
     }
     case Assertion(quantifier, List(AssertVarDecl(vName, _)), body) => { // quantifier over non-state variable
+      assertVarSort.update(vName.name, IntSort) // register sort
       val constantsArray: Array[com.microsoft.z3.Expr[_]] = Array(getProgEnv(vName.name))
       val encodedBody: com.microsoft.z3.BoolExpr = encodeBool(body)
       quantifier match {
@@ -156,7 +171,13 @@ class Z3Backend extends SMTBackend {
     case LookupExpr(id, index) => encodeInt(ParallelRunner.resolveLookup(index)(id.asInstanceOf[AssertVar]))
     case Id(name) => getProgEnv(name) // a program variable shouldn't occur outside of a LookupExpr. However, there can be free variables from the exists rule
     case Num(value) => ctx.mkInt(value)
-    case AssertVar(name) => getProgEnv(name)
+    case AssertVar(name) => {
+      assertVarSort.get(name) match {
+        case Some(s) if s == StateSort => sys.error(s"LogicEncoder: $name is not an Int variable, cannot be used as Int.")
+        case _ => getProgEnv(name)
+      }
+      getProgEnv(name)
+    }
     case BinaryExpr(e1, op, e2) => op match {
       case "+" => ctx.mkAdd(encodeInt(e1), encodeInt(e2)).asInstanceOf[IntExpr]
       case "-" => ctx.mkSub(encodeInt(e1), encodeInt(e2)).asInstanceOf[IntExpr]
@@ -166,6 +187,16 @@ class Z3Backend extends SMTBackend {
     }
     case UnaryExpr("-", e) => ctx.mkUnaryMinus(encodeInt(e)).asInstanceOf[IntExpr]
     case _ => sys.error("LogicEncoder: Unexpected expression in integer conversion: " + expr.toString)
+  }
+
+  private def encodeState(expr: viper.HHLVerifier.ast.Expr): ArrayExpr[IntSort, IntSort] = expr match {
+    case AssertVar(name) => getStateEnv(name)
+    case _ => sys.error("LogicEncoder: Expected a state term, got: " + expr.toString)
+  }
+
+  private def isStateTerm(e: viper.HHLVerifier.ast.Expr): Boolean = e match {
+    case AssertVar(n) => assertVarSort.get(n).contains(StateSort) || stateEnv.contains(n)
+    case _ => false
   }
 
   private def getProgEnv(s: String): com.microsoft.z3.IntExpr = {
