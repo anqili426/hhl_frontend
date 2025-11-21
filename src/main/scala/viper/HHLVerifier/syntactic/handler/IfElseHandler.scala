@@ -300,8 +300,8 @@ object IfElseHandler {
         )
       )
     }
-    case (Seq(thenAss @ Assertion("forall", _, _)), Nil) => Seq(guardForallWithPathCondition(thenAss, stmt.cond))
-    case (Nil, Seq(elseAss @ Assertion("forall", _, _))) => Seq(guardForallWithPathCondition(elseAss, UnaryExpr("!", stmt.cond)))
+    case (Seq(thenAss @ Assertion("forall", _, _)), Nil) => Seq(guardForallWithPathCondition(thenAss, stmt.cond), addPathCondition(stmt.cond))
+    case (Nil, Seq(elseAss @ Assertion("forall", _, _))) => Seq(guardForallWithPathCondition(elseAss, UnaryExpr("!", stmt.cond)), addPathCondition(UnaryExpr("!", stmt.cond)))
     case _ => sys.error("IfElseHandler: Can only handle \"forall <_s1>, ..., <_si> :: ...\" postconditions in if-else yet.")
   }
 
@@ -332,6 +332,16 @@ object IfElseHandler {
         "forall",
         vars.map(v => AssertVarDecl(v, StateType())),
         guardedCore
+      )
+    )
+  }
+
+  private def addPathCondition(pc: Expr): Expr = {
+    val assertVar = AssertVar("_intState")
+    Assertion("forall", List(AssertVarDecl(assertVar, StateType())),
+      ImpliesExpr(
+        StateExistsExpr(assertVar, false),
+        WeakestPrecondition.substitutePathCondition(pc, assertVar)
       )
     )
   }
