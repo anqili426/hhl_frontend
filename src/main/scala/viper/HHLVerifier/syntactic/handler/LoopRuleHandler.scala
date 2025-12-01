@@ -193,7 +193,10 @@ object ExistsHandler extends LoopRuleHandler {
           BinaryExpr(LookupExpr(existsPartAssertVar, decr), "==", freshVar))
         ))),
         restPart.prepended(Assertion("exists", existsPart.assertVarDecls, ImpliesExpr(StateExistsExpr(existsPartAssertVar, false),
-          BinaryExpr(existsPartBody, "&&", BinaryExpr(LookupExpr(existsPartAssertVar, decr), "<", freshVar))
+          BinaryExpr(existsPartBody, "&&", BinaryExpr(
+            BinaryExpr(LookupExpr(existsPartAssertVar, decr), ">=", Num(0)), "&&",
+            BinaryExpr(LookupExpr(existsPartAssertVar, decr), "<", freshVar))
+          )
         ))),
         name + " > [I ∧ b(σ) ∧ e(σ) = v] if (b) {body} [I ∧ e(σ) < v]")
 
