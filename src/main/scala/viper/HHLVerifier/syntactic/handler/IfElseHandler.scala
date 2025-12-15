@@ -79,14 +79,19 @@ object IfElseHandler {
       }
 
       // We use the WP construction to include the branch condition into the precondition, for which we need a characterizer
-      val characterizerThen = Characterizer(Seq(CharPath(cond, Map.empty)))
-      val characterizerElse = Characterizer(Seq(CharPath(UnaryExpr("!", cond), Map.empty)))
+      //val characterizerThen = Characterizer(Seq(CharPath(cond, Map.empty)))
+      //val characterizerElse = Characterizer(Seq(CharPath(UnaryExpr("!", cond), Map.empty)))
 
-      val blockPre =
-        List(
-          Option.when(thenPre != Nil)(WeakestPrecondition.compute(characterizerThen, thenPre, false)),
-          Option.when(elsePre != Nil)(WeakestPrecondition.compute(characterizerElse, elsePre, false))
-        ).flatten
+      //val blockPre =
+      //  List(
+      //    Option.when(thenPre != Nil)(WeakestPrecondition.compute(characterizerThen, thenPre, false)),
+      //    Option.when(elsePre != Nil)(WeakestPrecondition.compute(characterizerElse, elsePre, false))
+      //  ).flatten
+
+      val thenPreGuarded = thenPre.map(p => guardPre(p, cond))
+      val elsePreGuarded = elsePre.map(p => guardPre(p, UnaryExpr("!", cond)))
+
+      val blockPre = thenPreGuarded ++ elsePreGuarded
 
       val blockPost = constructCombinedPostcondition(thenPost, elsePost, ifs)
 
@@ -275,19 +280,19 @@ object IfElseHandler {
       val thenDisjuncts = thenSubsets.map { curr =>
         val mapping = thenVars.zip(curr).toMap
         val conditions = curr.map(x => substitutePathCondition(stmt.cond, x))
-        ImpliesExpr(
-          generateBinaryChain(conditions, "&&"),
+        //ImpliesExpr(
+        //  generateBinaryChain(conditions, "&&"),
           substituteAssertVars(thenCore)(mapping)
-        )
+        //)
       }
 
       val elseDisjuncts = elseSubsets.map { curr =>
         val mapping = elseVars.zip(curr).toMap
         val conditions = curr.map(x => substitutePathCondition(UnaryExpr("!", stmt.cond), x))
-        ImpliesExpr(
-          generateBinaryChain(conditions, "&&"),
+        //ImpliesExpr(
+        //  generateBinaryChain(conditions, "&&"),
           substituteAssertVars(elseCore)(mapping)
-        )
+        //)
       }
 
       Seq(
@@ -300,8 +305,8 @@ object IfElseHandler {
         )
       )
     }
-    case (Seq(thenAss @ Assertion("forall", _, _)), Nil) => Seq(guardForallWithPathCondition(thenAss, stmt.cond), addPathCondition(stmt.cond))
-    case (Nil, Seq(elseAss @ Assertion("forall", _, _))) => Seq(guardForallWithPathCondition(elseAss, UnaryExpr("!", stmt.cond)), addPathCondition(UnaryExpr("!", stmt.cond)))
+    case (Seq(thenAss @ Assertion("forall", _, _)), Nil) => Seq(guardForallWithPathCondition(thenAss, stmt.cond))
+    case (Nil, Seq(elseAss @ Assertion("forall", _, _))) => Seq(guardForallWithPathCondition(elseAss, UnaryExpr("!", stmt.cond)))
     case _ => sys.error("IfElseHandler: Can only handle \"forall <_s1>, ..., <_si> :: ...\" postconditions in if-else yet.")
   }
 
@@ -310,7 +315,7 @@ object IfElseHandler {
    */
   private def guardForallWithPathCondition(assertion: Assertion, pathCond: Expr): Expr = {
     val (vars, core) = flattenForall(assertion)
-    if (hasNestedAssertion(core)) sys.error("Illegal assertion found.")
+    if (hasNestedAssertion(core)) sys.error(f"IfElseHandler: Illegal assertion found in ${assertion}.")
     val conditions = vars.map(x => substitutePathCondition(pathCond, x))
     val pcChain = generateBinaryChain(conditions, "&&")
 
@@ -411,8 +416,18 @@ object IfElseHandler {
   /**
    * Helper function to build a left-associated chain of binary expressions for a list of expressions.
    */
-  private def generateBinaryChain(xs: List[Expr], binaryOp: String): Expr = xs match {
-    case Nil => BoolLit(false)
+  private def generateBinaryChain(xs: Seq[Expr], binaryOp: String): Expr = xs match {
+    case Nil => binaryOp match {
+      case "||" => BoolLit(false)
+      case "&&" => BoolLit(true)
+      case _ => sys.error("IfElseHandler: Unsupported binary op in chain generation: " + binaryOp)
+    }
     case _ => xs.reduceLeft((acc, e) => BinaryExpr(acc, binaryOp, e))
+  }
+
+  private def guardPre(e: Expr, pc: Expr): Expr = e match {
+    case a @ Assertion("forall", _, _) => guardForallWithPathCondition(a, pc)
+    case other =>
+      sys.error(s"IfElseHandler: Expected a forall-precondition, got: $other")
   }
 }
