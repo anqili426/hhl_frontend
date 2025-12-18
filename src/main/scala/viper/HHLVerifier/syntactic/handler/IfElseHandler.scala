@@ -175,7 +175,7 @@ object IfElseHandler {
       (
         triples.head.post,
         triples.last.pre,
-        triples // TODO: double-check
+        triples.drop(1).dropRight(1)
       )
     }
   }

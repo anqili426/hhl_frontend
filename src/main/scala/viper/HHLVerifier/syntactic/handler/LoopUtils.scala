@@ -17,7 +17,6 @@ object LoopUtils {
   def low(expr: Expr): Expr = {
     val assertVar1 = AssertVar(genSym("_intState"))
     val assertVar2 = AssertVar(genSym("_intState"))
-    //Assertion("forall", List(AssertVarDecl(assertVar1, StateType()), AssertVarDecl(assertVar2, StateType())), BinaryExpr(LookupExpr(assertVar1, expr), "==", LookupExpr(assertVar2, expr))) // TODO: right now, == operator is only defined for integers
     Assertion("forall", List(AssertVarDecl(assertVar1, StateType()), AssertVarDecl(assertVar2, StateType())),
       ImpliesExpr(
         BinaryExpr(StateExistsExpr(assertVar1, false), "&&", StateExistsExpr(assertVar2, false)),

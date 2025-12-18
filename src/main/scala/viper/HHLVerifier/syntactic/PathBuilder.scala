@@ -108,23 +108,6 @@ object PathBuilder {
   }
 
   /**
-   * Derives a [[Characterizer]] for a '''split-free''' [[HHLProgram]].
-   *
-   * @param program a split-free [[HHLProgram]] to analyze
-   * @return        a characterizer capturing all paths of a program. A characterizer is defined as
-   *                a list of [[CharPath]]s, where each element of the list covers one path of the program.
-   *                The characterizer itself then covers exactly all paths of the program.
-   * @throws java.lang.RuntimeException if the program contains more than one
-   *                                    method (feature not yet implemented)
-   */
-  @deprecated("Not needed anymore – use the general method SyntacticEngine.verify")
-  def characterizeSplitFreeProgram(program: HHLProgram): Characterizer = program.methods match {
-    case Nil => Characterizer.empty
-    case x :: Nil => characterizeStmt(x.body)
-    case _ => sys.error("Characterizer: Cannot yet handle multiple methods") // TODO: Add support
-  }
-
-  /**
    * Derives a [[Characterizer]] for a '''split-free''' [[Stmt]]. Recursively
    * '''symbolically characterizes''' a single statement, yielding all feasible execution paths as [[CharPath]] objects.
    *
@@ -173,7 +156,7 @@ object PathBuilder {
       }
         .withHavoc(newVar)
     }
-    case _: WhileLoopStmt | _: MethodCallStmt | _: MultiAssignStmt | _: HyperAssumeStmt | _: HyperAssertStmt => sys.error("Characterizer: Expected a split-free program")
+    case _: WhileLoopStmt | _: MethodCallStmt | _: MultiAssignStmt | _: HyperAssumeStmt | _: HyperAssertStmt => sys.error("PathBuilder: Expected a split-free program")
     case _ => acc
   }
 
@@ -192,6 +175,6 @@ object PathBuilder {
     case BinaryExpr(e1, op, e2) => BinaryExpr(applySubstitution(e1, map), op, applySubstitution(e2, map))
     case UnaryExpr(op, e) => UnaryExpr(op, applySubstitution(e, map))
     case ImpliesExpr(left, right) => ImpliesExpr(applySubstitution(left, map), applySubstitution(right, map))
-    case _ => sys.error("PathBuilder: Yet unsupported expression in substitution: " + expr.toString) // TODO: Check which other expressions could be assigned
+    case _ => sys.error("PathBuilder: Yet unsupported expression in substitution: " + expr.toString)
   }
 }

@@ -38,7 +38,7 @@ object MethodCallHandler {
    */
   def handle(call: Stmt, before: CompositeStmt, after: CompositeStmt, pre: Seq[Expr], post: Seq[Expr], name: String): Seq[Triple] = {
     def worker(params: Seq[Id], res: Seq[Id], method: Method): Seq[Triple] = {
-      // although we assume this has already been checked before during compilation
+      // although we assume this has already been checked before during parsing
       if (params.length != method.params.length) sys.error("MethodCallHandler: Argument arity mismatch in method call")
       if (res.length != method.res.length) sys.error("MethodCallHandler: Result arity mismatch in method call")
 

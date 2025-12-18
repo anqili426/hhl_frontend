@@ -68,7 +68,7 @@ object ForallExistsHandler extends LoopRuleHandler {
     case BinaryExpr(e1, op, e2) => BinaryExpr(computeLoopPost(e1, noForallAfterExists), op, computeLoopPost(e2, noForallAfterExists))
     case UnaryExpr(op, e) => UnaryExpr(op, computeLoopPost(e, noForallAfterExists))
     case ImpliesExpr(left, right) => ImpliesExpr(computeLoopPost(left, noForallAfterExists), computeLoopPost(right, noForallAfterExists))
-    case _ => inv // TODO: Double-check which other Expr are possible
+    case _ => inv
   }
 }
 
