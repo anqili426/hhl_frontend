@@ -1,5 +1,3 @@
-// VALID: true
-
 method simple(x: Int, y: Int) returns (a: Int, z: Int)
     requires forall <_s1> :: (exists <_s2> :: _s2[x] > _s1[x])
     requires forall <_s1>, <_s2> :: _s1[y] == _s2[y]

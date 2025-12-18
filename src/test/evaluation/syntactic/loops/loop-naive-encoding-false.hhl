@@ -1,5 +1,3 @@
-// VALID: false
-
 method naive_encoding(t: Int, n: Int) returns (x: Int)
     requires exists <_s1> :: _s1[t] == 1
     requires forall _v: Int :: _v >= 0 ==> (exists <_s2> :: _s2[t] == 2 && _s2[n] == _v)

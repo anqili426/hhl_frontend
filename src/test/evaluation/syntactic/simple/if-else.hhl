@@ -1,6 +1,5 @@
-// VALID: true
-
 method ifElse(a: Int, b: Int, c: Int) returns (x: Int)
+    //requires forall <_s1> :: true
     requires exists <_s1> :: (forall <_s2> :: ((_s1[a] >= _s2[a]) && (_s1[a] >= _s2[b]) && (_s1[b] >= _s2[a]) && (_s1[b] >= _s2[b])))
     ensures exists <_s1> :: (forall <_s2> :: _s1[x] >= _s2[x])
 {

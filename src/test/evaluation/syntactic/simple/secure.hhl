@@ -1,5 +1,3 @@
-// VALID: true
-
 method secure(h: Int, l: Int) returns (o: Int)
     requires forall <_s1>, <_s2> :: _s1[l] == _s2[l]
     ensures  forall <_s1>, <_s2> :: _s1[o] == _s2[o]
