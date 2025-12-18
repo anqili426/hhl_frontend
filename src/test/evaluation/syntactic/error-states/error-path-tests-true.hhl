@@ -1,0 +1,23 @@
+method ifElse(a: Int, b: Int, c: Int, d: Int) returns (x: Int)
+    requires exists <_s1> :: (forall <_s2> :: ((_s1[a] >= _s2[a]) && (_s1[a] >= _s2[b]) && (_s1[b] >= _s2[a]) && (_s1[b] >= _s2[b])))
+    ensures exists <_s1> :: (forall <_s2> :: _s1[x] >= _s2[x])
+    ensures forall <<_s>> :: false
+{
+    var t: Int
+    if (c > 0) {
+        t := a
+    } else {
+        t := b
+    }
+
+    if (d > 0) {
+        x := a
+    } else {
+        x := b
+    }
+
+    assert (c > 0)  ==> (t == a)
+    assert (c <= 0) ==> (t == b)
+    assert (d > 0)  ==> (x == a)
+    assert (d <= 0) ==> (x == b)
+}

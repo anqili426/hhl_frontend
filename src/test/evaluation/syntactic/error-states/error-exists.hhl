@@ -1,0 +1,7 @@
+method simple(x: Int, y: Int) returns (z: Int)
+    requires exists <_s> :: _s[x] + _s[y] == 0
+    ensures exists <<_s>> :: _s[z] == 0
+{
+    z := x + y
+    assert z != 0
+}

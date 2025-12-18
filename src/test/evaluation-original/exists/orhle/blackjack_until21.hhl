@@ -1,0 +1,21 @@
+// Original benchmark:
+// Source: Robert Dickerson, Qianchuan Ye, Michael K. Zhang, and Benjamin Delaware. 2022. RHLE: Modular Deductive Verification of Relational ∀∃ Properties.
+// Available at: https://github.com/rcdickerson/orhle/blob/6f699e0809cc59e89ca2dd47a735fe1a6dc7a100/experiments/blackjack/draw-until-21.imp
+
+method test(handValue_in: Int) returns (handValue_out: Int)
+requires exists <_s> :: _s[handValue_in] >= 2 && _s[handValue_in] <= 20
+ensures exists <_s> :: _s[handValue_out] == 21
+{
+    handValue_out := handValue_in
+
+    while (handValue_out < 21)
+		invariant exists <_s> :: _s[handValue_out] <= 21
+		decreases 31 - handValue_out
+    {
+        var card: Int
+        havoc card {hint1}
+        assume card >= 1 && card <= 10
+        use hint1(1)
+        handValue_out := handValue_out + card
+    }
+}

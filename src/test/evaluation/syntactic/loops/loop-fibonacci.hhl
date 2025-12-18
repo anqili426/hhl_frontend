@@ -1,5 +1,3 @@
-// VALID: true
-
 method fibonacci(n: Int, t: Int) returns (res: Int)
     requires forall <_s1>, <_s2> :: _s1[t] == 1 && _s2[t] == 2 ==> _s1[n] >= _s2[n]
     ensures forall <_s1>, <_s2> :: _s1[t] == 1 && _s2[t] == 2 ==> _s1[res] >= _s2[res]

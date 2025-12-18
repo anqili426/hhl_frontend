@@ -1,0 +1,16 @@
+method errorLoop()
+    requires exists <_s> :: true
+    ensures (exists <<_s>> :: true)
+{
+        var i: Int
+        i := 0
+
+        while (i < 10)
+            invariant (exists <<_s>> :: true) || (exists <_s> :: _s[i] == 0)
+            invariant forall <_s1>, <_s2> :: _s1[i] == _s2[i]
+            decreases 10-i
+        {
+            assert false
+            i := i + 1
+        }
+}

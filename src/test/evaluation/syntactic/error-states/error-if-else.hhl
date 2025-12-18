@@ -1,0 +1,12 @@
+method ifElse(a: Int, b: Int, c: Int) returns (x: Int)
+    requires forall <_s> :: _s[a] != _s[b]
+    requires exists <_s> :: _s[c] < 0
+    ensures exists <<_s>> :: _s[x] == _s[b]
+{
+    if (c > 0) {
+        x := a
+    } else {
+        x := b
+    }
+    assert x == a
+}

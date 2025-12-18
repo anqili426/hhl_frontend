@@ -1,0 +1,14 @@
+method errorPropagation(i: Int)
+    requires forall <_s> :: true
+    ensures forall <<_s>> :: _s[i] == 0
+{
+    assert i != 1 // assert false
+    foo()
+    assert i != 0
+}
+
+method foo()
+    requires forall <_s> :: true
+    ensures forall <_s> :: true
+{
+}

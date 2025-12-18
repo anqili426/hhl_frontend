@@ -1,0 +1,22 @@
+method fibonacci(n: Int, t: Int) returns (r: Int)
+    requires forall <_s1>, <_s2> :: _s1[t] == 1 && _s2[t] == 2 ==> _s1[n] >= _s2[n]
+    ensures forall <_s1>, <_s2> :: (_s1[t] == 1 && _s2[t] == 2 ==> _s1[r] >= _s2[r])// && (_s1[n] >= 1 ==> _s1[r] >= 1) && (_s1[r] >= 0) && (_s2[n] >= 1 ==> _s2[r] >= 1) && (_s2[r] >= 0)
+{
+    var tmp1: Int
+    var tmp2: Int
+    var res1: Int
+    var res2: Int
+
+    tmp1 := n - 1
+    tmp2 := n - 2
+
+    if (n <= 1) {
+        r := n
+    } else {
+        res1 := fibonacci(tmp1, t)
+        res2 := fibonacci(tmp2, t)
+
+        r := res1 + res2
+    }
+    assume res1 + res2 >= 1
+}

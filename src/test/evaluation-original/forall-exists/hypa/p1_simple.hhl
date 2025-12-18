@@ -1,0 +1,21 @@
+// Original benchmark:
+// Source: Raven Beutner and Bernd Finkbeiner. 2022. Software Verification of Hyperproperties Beyond k-Safety.
+// Available at: https://github.com/hypa-tool/hypa/tree/30fae4f17fbdb03a0acbf837ccbf2d16e9abebbe/benchmarks/beyond/p1_simple
+
+method p1_simple() returns (h: Int, o: Int)
+ensures forall <_s1> :: (exists <_s2> :: _s2[h] == ((-1) * _s1[h]) && _s2[o] == _s1[o])
+{
+    havoc h {hint1}
+
+    havoc o {hint2}
+    use hint2(1)
+    use hint2(-1)
+    assume o == 1 || o == (-1)
+
+    if (h > 0) {
+        o := (-1) * o
+    } else {
+        o := (-1) * o + (h - h)
+    }
+    use forall <_s1> :: hint1(-1 * _s1[h])
+}

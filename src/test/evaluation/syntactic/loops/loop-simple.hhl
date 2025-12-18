@@ -1,0 +1,19 @@
+method test(n: Int) returns (z: Int)
+    requires forall <_s1>, <_s2> :: _s1[n] == _s2[n]
+    ensures forall <_s> :: _s[z] >= _s[n]
+{
+    var i: Int
+    var a: Int
+    i := 0
+    a := n
+
+    while syncRule (i < n)
+        invariant forall <_s1>, <_s2> :: _s1[n - i] == _s2[n - i]
+        invariant forall <_s> :: _s[a] == _s[n] + _s[i] && _s[i] >= 0
+    {
+        a := a + 1
+        i := i + 1
+    }
+
+    z := a
+}

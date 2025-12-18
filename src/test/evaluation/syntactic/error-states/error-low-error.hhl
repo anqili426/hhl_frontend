@@ -1,0 +1,13 @@
+method lowError(h: Int, l: Int, t: Int) returns ()
+    requires exists <_s1>, <_s2> :: _s1[t] == 1 && _s2[t] == 2
+    requires forall <_s1>, <_s2> :: _s1[l] == _s2[l]
+    ensures ((exists <<_s1>> :: _s1[t] == 1) ==> (exists <<_s2>> :: _s2[t] == 2))
+            && ((exists <<_s2>> :: _s2[t] == 2) ==> (exists <<_s1>> :: _s1[t] == 1))
+{
+    if (h > 0) {
+        assert l >= 0
+    }
+    if (l < 0) {
+        assert false
+    }
+}

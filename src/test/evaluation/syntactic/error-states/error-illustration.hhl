@@ -1,0 +1,12 @@
+method errorExample(x: Int) returns (e: Int)
+    requires exists <_s> :: true
+    ensures forall <<_s>> :: (_s[e] == 0) || (_s[e] == 1)
+{
+    e := 0
+    assert x != 0
+
+    e := 1
+    assert x != 1
+
+    e := 2
+}

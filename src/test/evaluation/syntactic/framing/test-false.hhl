@@ -1,0 +1,23 @@
+method simple(x: Int) returns (z: Int)
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    ensures  forall <_s1>, <_s2> :: _s1[z] == _s2[z]
+{
+    var y: Int
+    havoc y
+
+    if (x == 1) {
+        foo(x, y)
+    } //else {
+        //bla(x)
+    //}
+
+    z := x + y
+}
+
+method foo(p: Int, q: Int)
+    ensures  forall <_s1>, <_s2> :: _s1[p] == _s2[p] && _s1[q] == _s2[q]
+{}
+
+method bla(x: Int)
+    ensures forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+{}

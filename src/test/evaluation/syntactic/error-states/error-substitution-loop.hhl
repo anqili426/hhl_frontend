@@ -1,0 +1,19 @@
+method simple(x: Int) returns (y: Int)
+requires exists <_s> :: _s[x] == 7
+requires exists <_s> :: _s[x] == 0
+ensures exists <<_s>> :: _s[y] == 7
+//ensures exists <<_s>> :: _s[y] == 0
+{
+    y := x
+    assert y != 7
+    var i: Int
+    i := 0
+
+    while (i < 10)
+        invariant (exists <<_s>> :: _s[y] == 7) && (exists <_s> :: _s[y] == 0)
+    {
+        y := 0
+        i := i + 1
+    }
+    y := 0
+}

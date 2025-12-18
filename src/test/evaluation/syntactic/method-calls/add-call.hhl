@@ -1,0 +1,15 @@
+method main(x: Int) returns (r: Int)
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    ensures forall <_s1>, <_s2> :: _s1[r] == _s2[r]
+{
+    r := addOne(x)
+}
+
+method addOne(initialValue: Int) returns (finalValue: Int)
+    requires forall <_s> :: true
+    requires forall <_s1>, <_s2> :: _s1[initialValue] == _s2[initialValue] // needed because we don't have framing yet
+    ensures forall <_s> :: _s[finalValue] == _s[initialValue] + 1
+    ensures forall <_s1>, <_s2> :: _s1[finalValue] == _s2[finalValue] // needed because we don't have framing yet
+{
+    finalValue := initialValue + 1
+}

@@ -1,0 +1,16 @@
+method factorial(n: Int, t: Int) returns (r: Int)
+    requires forall <_s1>, <_s2> :: _s1[t] == 1 && _s2[t] == 2 ==> _s1[n] >= _s2[n]
+    ensures forall <_s1>, <_s2> :: (_s1[t] == 1 && _s2[t] == 2 ==> _s1[r] >= _s2[r]) && (_s1[n] >= 1 ==> _s1[r] >= 1) && (_s1[r] >= 0) && (_s2[n] >= 1 ==> _s2[r] >= 1) && (_s2[r] >= 0)
+{
+    var recRes: Int
+    var nMinusOne: Int
+
+    nMinusOne := n - 1
+
+    if (n <= 1) {
+        r := 1
+    } else {
+        recRes := factorial(nMinusOne, t)
+        r := n * recRes
+    }
+}

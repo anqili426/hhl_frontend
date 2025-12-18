@@ -1,0 +1,12 @@
+method framing1(x: Int) returns (y: Int)
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    requires forall <_s> :: _s[x] >= 0
+    ensures  forall <_s1>, <_s2> :: _s1[y] == _s2[y]
+{
+    y := 0
+    while (y < x)
+        invariant forall <_s> :: _s[y] <= _s[x]
+    {
+        y := y + 1
+    }
+}

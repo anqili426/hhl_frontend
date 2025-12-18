@@ -1,0 +1,24 @@
+method foo(x: Int, b: Int) returns (y: Int)
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
+{
+    if (b > 0) {
+        y := m1(x)
+    } else {
+        y := m2(x)
+    }
+}
+
+method m1(x: Int) returns (y: Int)
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
+{
+    y := x + 1
+}
+
+method m2(x: Int) returns (y: Int)
+    requires forall <_s1>, <_s2> :: _s1[x] == _s2[x]
+    ensures forall <_s1>, <_s2> :: _s1[y] == _s2[y]
+{
+    y := x + 2
+}

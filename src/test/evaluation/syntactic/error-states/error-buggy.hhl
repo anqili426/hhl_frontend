@@ -1,0 +1,15 @@
+method buggy() returns (x: Int)
+    requires exists <_s> :: true
+    ensures exists <<_s>> :: _s[x] == 1
+    ensures exists <<_s>> :: _s[x] == 2
+{
+    havoc x {hint}
+    assume x == 1 || x == 2
+    use hint(1)
+    use hint(2)
+
+    var y: Int
+    y := x + x
+
+    assert y % 2 == 1
+}

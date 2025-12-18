@@ -1,0 +1,17 @@
+method simple(x: Int) returns (y: Int)
+    ensures forall <<_s>> :: _s[y] == 7
+    //ensures forall <<_s>> :: _s[y] == 0
+{
+    y := x
+    assert y != 7
+    var i: Int
+    i := 0
+
+    while (i < 10)
+        invariant forall <<_s>> :: _s[y] == 7
+    {
+        y := 0
+        i := i + 1
+    }
+    y := 0
+}
