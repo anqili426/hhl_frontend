@@ -162,18 +162,10 @@ object PathBuilder {
     case AssumeStmt(e) => acc.mapPaths {
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
     }
-    case HyperAssumeStmt(e) => acc.mapPaths {
-      // TODO: Think about correct handling ==> needs to be treated in splitting?
-      case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
-    }
     case AssertStmt(e) => acc.mapPaths {
       case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
     }
       .withAssert(stmt, acc.paths)
-    case HyperAssertStmt(e) => acc.mapPaths {
-      // TODO: Think about correct handling ==> splitting up program (similar to loops and function calls)
-      case CharPath(pc, subst) => CharPath(BinaryExpr(applySubstitution(e, subst), "&&", pc), subst)
-    }
     case HavocStmt(stmt:Id, _) => {
       val newVar = HavocVar(genSym("*havoc"))
       acc.mapPaths {
@@ -181,7 +173,7 @@ object PathBuilder {
       }
         .withHavoc(newVar)
     }
-    case _: WhileLoopStmt | _: MethodCallStmt | _: MultiAssignStmt => sys.error("Characterizer: Expected a split-free program")
+    case _: WhileLoopStmt | _: MethodCallStmt | _: MultiAssignStmt | _: HyperAssumeStmt | _: HyperAssertStmt => sys.error("Characterizer: Expected a split-free program")
     case _ => acc
   }
 
