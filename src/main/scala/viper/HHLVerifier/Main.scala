@@ -30,7 +30,7 @@ object Main {
   var noFrame: Boolean = false
   var smtBackendMode: BackendMode = BackendMode.Both // standard SMT solver mode that is used in syntactic mode (if the argument "--smtmode" is set, this will be overridden)
   val smtRaceModes: (BackendMode, BackendMode) = (BackendMode.Z3, BackendMode.CVC5Proc) // SMT modes that are being run in parallel, if smt mode "Both" is set
-  val smtSolverTimeLimitMs = 20000
+  val smtSolverTimeLimitMs = 10000
   val cvc5Path: String = "cvc5" // executable path of local cvc5 installation (usually just "cvc5") ==> needed for smt mode "CVC5Proc"
   val keepSmtFiles: Boolean = false // only relevant for CVC5Proc smt mode, where temp files are created
 
