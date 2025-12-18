@@ -20,7 +20,15 @@ object TestSyntactic {
   val otherKeyword = List("assume", "assert", "while", "if", "else", "}", "{", "havoc")
   val commentKeyword = List("//", "/*") // The current implementation doesn't support the counting of block comments
   val defaultNumOfRep = 1
-  val smtMode = "z3"
+  val smtMode = "both"
+
+  // Count method declarations in a .hhl file
+  def isMethodDecl(line: String): Boolean = {
+    val t = line.trim
+    // ignore comment-only lines
+    if (commentKeyword.exists(k => t.startsWith(k))) return false
+    t.startsWith("method ")
+  }
 
   def partOfCurrStmt(lineInd: Int, allNonemptyLines: Array[String]): Boolean = {
 
@@ -48,6 +56,8 @@ object TestSyntactic {
     }
     val allLines = program.split("\n")
     val allNonemptyLines = allLines.filter(l => l.trim.nonEmpty)
+
+    val methodCount = allNonemptyLines.count(isMethodDecl)
 
     var commentLOC = 0
     var specLOC = 0
@@ -81,7 +91,7 @@ object TestSyntactic {
     }
 
     val actualLOC = allNonemptyLines.length - commentLOC - specLOC - proofLOC
-    Array(actualLOC, specLOC, proofLOC)
+    Array(actualLOC, specLOC, proofLOC, methodCount)
   }
 
   def runTests(tests: List[File], option: String): List[Array[String]] = {
@@ -201,7 +211,7 @@ object TestSyntactic {
       val outputFilePath = "src/test/evaluation/output" + i + ".csv"
       val outputFile = new BufferedWriter(new FileWriter(outputFilePath))
       val csvWriter = new CSVWriter(outputFile)
-      val schema = Array("Test case name", "Number of triples", "SMT mode", "Runtime total (s)", "Runtime Characterizer avg (s)", "Runtime WP avg (s)", "Runtime SMT encoding avg (s)", "Runtime SMT solving avg (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC")
+      val schema = Array("Test case name", "Number of triples", "SMT mode", "Runtime total (s)", "Runtime Characterizer avg (s)", "Runtime WP avg (s)", "Runtime SMT encoding avg (s)", "Runtime SMT solving avg (s)", "Test result", "Actual LOC", "Spec LOC", "Proof LOC", "Method count")
       val dataToWrite = List(schema) ++ allTestData
       csvWriter.writeAll(dataToWrite.map(_.toArray).asJava)
       outputFile.close()
